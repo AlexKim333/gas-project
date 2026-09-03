@@ -116,8 +116,8 @@
       overflow: hidden;
     }
     .menu {
-      width: 110px;
-      padding: 10px 8px;
+      width: 118px;
+      padding: 10px 6px;
       background-color: #f1f5f9;
       border-right: 1px solid #e2e8f0;
       display: flex;
@@ -127,19 +127,20 @@
     }
     .menu button {
       width: 100%;
-      padding: 10px 6px;
+      padding: 9px 4px;
       background-color: #ffffff;
       color: #475569;
       border: 1px solid #cbd5e1;
       border-radius: 6px;
       cursor: pointer;
-      font-size: 9.5pt;
+      font-size: 8.8pt;
       font-weight: 600;
       white-space: nowrap;
       transition: all 0.15s ease;
       display: flex;
       align-items: center;
       justify-content: center;
+      position: relative;
     }
     .menu button:hover {
       background-color: #f8fafc;
@@ -308,6 +309,27 @@
     .btn-submit { background-color: #0284c7; color: white; }
     .btn-pending { background-color: #ea580c; color: white; }
     .btn-pending-search { background-color: #475569; color: white; }
+    .btn-order-draft {
+      background: linear-gradient(135deg, #0d9488, #0f766e);
+      color: #ffffff;
+      box-shadow: 0 1px 3px rgba(13, 148, 136, 0.35);
+    }
+    .btn-order-draft:hover {
+      background: linear-gradient(135deg, #14b8a6, #0d9488);
+    }
+    .nav-badge {
+      display: inline-block;
+      background-color: #ef4444;
+      color: #ffffff;
+      font-size: 7.2pt;
+      font-weight: 800;
+      padding: 1px 5px;
+      border-radius: 10px;
+      margin-left: 3px;
+      vertical-align: middle;
+      line-height: 1.2;
+      box-shadow: 0 1px 3px rgba(239, 68, 68, 0.4);
+    }
     .btn-ocr {
       background: linear-gradient(135deg, #6366f1, #4f46e5);
       color: #ffffff;
@@ -1184,6 +1206,10 @@
         <button onclick="setPage('입고입력')" class="active">📥 입고입력</button>
         <button onclick="setPage('출고입력')">📤 출고입력</button>
         <button onclick="setPage('상품등록')">🏷️ 상품등록</button>
+        <button type="button" onclick="openOrderDraftModal()" id="btnNavOrderDraft" title="외부창고 주문서 작성 목록">
+          <span>📝 주문서작성</span>
+          <span id="orderDraftBadge" class="nav-badge" style="display: none;">0</span>
+        </button>
       </div>
       <div class="input-area">
         <div class="input-section">
@@ -1231,6 +1257,7 @@
               <input type="file" id="orderImageFileInput" accept="image/*" style="display:none;" onchange="handleImageFileSelect(event)">
               <button type="button" class="action-btn btn-add" onclick="addRecord()" tabindex="7">➕ 추가</button>
               <button type="button" class="action-btn btn-delete" onclick="deleteRecord()" tabindex="8">🗑️ 삭제</button>
+              <button type="button" class="action-btn btn-order-draft" onclick="addSelectedToOrderDraft()" title="선택한 품목을 외부창고 발주 주문서 목록에 추가">📋 주문목록추가</button>
               <button type="button" class="action-btn btn-submit" onclick="submitForm()" tabindex="9">🚀 제출</button>
               <button type="button" class="action-btn btn-pending" onclick="savePending()" tabindex="10">⏸️ 보류</button>
               <button type="button" class="action-btn btn-pending-search" onclick="showPendingModal()" tabindex="11" id="pendingSearchButton">🔍 보류 (<span id="pendingCount">0</span>)</button>
@@ -1431,6 +1458,39 @@
       <div style="display: flex; justify-content: flex-end; gap: 8px;">
         <button type="button" onclick="closeQuickStockModal()" style="padding: 6px 13px; background: #e2e8f0; color: #475569; border: none; border-radius: 5px; font-weight: 600; cursor: pointer; font-size: 8.8pt;">취소</button>
         <button type="button" id="btnSubmitQuickAdj" onclick="submitQuickStockAdjustment()" style="padding: 6px 16px; background: #2563eb; color: #ffffff; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 8.8pt;">💾 재고조정 실행</button>
+      </div>
+    </div>
+
+    <!-- 📝 외부창고 주문서 작성 목록 모달 -->
+    <div id="orderDraftModal" class="modal" style="display: none; width: 620px; max-width: 90%; padding: 18px; box-shadow: 0 10px 30px rgba(0,0,0,0.25);">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 12px;">
+        <h3 style="margin: 0; color: #0f766e; font-size: 11.5pt; font-weight: bold; display: flex; align-items: center; gap: 6px;">
+          <span>📝</span> <span>외부창고 주문서 작성 목록 (<span id="orderDraftModalCount">0</span>개 품목)</span>
+        </h3>
+        <button type="button" onclick="closeOrderDraftModal()" style="border: none; background: none; font-size: 16pt; cursor: pointer; color: #94a3b8; line-height: 1;">&times;</button>
+      </div>
+      <div style="max-height: 320px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 6px; margin-bottom: 12px;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 8.8pt;">
+          <thead>
+            <tr style="background: #f1f5f9; position: sticky; top: 0; z-index: 1;">
+              <th style="padding: 6px 8px; border-bottom: 1px solid #cbd5e1; text-align: left; width: 30%;">품명</th>
+              <th style="padding: 6px 8px; border-bottom: 1px solid #cbd5e1; text-align: center; width: 22%;">색상</th>
+              <th style="padding: 6px 8px; border-bottom: 1px solid #cbd5e1; text-align: right; width: 20%;">발주상자</th>
+              <th style="padding: 6px 8px; border-bottom: 1px solid #cbd5e1; text-align: center; width: 18%;">담은시간</th>
+              <th style="padding: 6px 8px; border-bottom: 1px solid #cbd5e1; text-align: center; width: 10%;">삭제</th>
+            </tr>
+          </thead>
+          <tbody id="orderDraftModalTableBody"></tbody>
+        </table>
+      </div>
+      <div style="background: #f0fdfa; border: 1px solid #ccfbf1; border-radius: 6px; padding: 7px 10px; margin-bottom: 12px; font-size: 7.8pt; color: #0f766e; line-height: 1.4;">
+        ℹ️ <strong>외부창고 발주 연동 준비 완료</strong>: 선택된 품목들이 주문서에 등록되었습니다. 내일 8개 창고 재고 대조 및 시트 자동 전송이 연결됩니다.
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <button type="button" onclick="clearAllOrderDraftItems()" style="padding: 5px 12px; background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; border-radius: 5px; font-weight: 600; cursor: pointer; font-size: 8.2pt;">전체 비우기</button>
+        <div style="display: flex; gap: 8px;">
+          <button type="button" onclick="closeOrderDraftModal()" style="padding: 6px 16px; background: #0d9488; color: #ffffff; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 8.8pt;">확인 (닫기)</button>
+        </div>
       </div>
     </div>
 
@@ -1762,6 +1822,7 @@ function initPage() {
   setInterval(updateClock, 1000);
   loadAdminList();
   loadStockData();
+  updateOrderDraftBadge();
 }
 
 function saveTableData() {
@@ -3999,6 +4060,151 @@ window.addEventListener('paste', function(e) {
   }
 });
 
+// -------------------------------------------------------------------
+// 📝 외부창고 주문서 작성 목록 관리 (Order Draft)
+// -------------------------------------------------------------------
+
+function getOrderDraftItems() {
+  try {
+    const saved = localStorage.getItem('orderDraftItems');
+    return saved ? JSON.parse(saved) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveOrderDraftItems(items) {
+  try {
+    localStorage.setItem('orderDraftItems', JSON.stringify(items));
+  } catch (e) {}
+  updateOrderDraftBadge();
+}
+
+function updateOrderDraftBadge() {
+  const items = getOrderDraftItems();
+  const badge = document.getElementById('orderDraftBadge');
+  if (badge) {
+    badge.textContent = items.length;
+    badge.style.display = items.length > 0 ? 'inline-block' : 'none';
+  }
+}
+
+function addSelectedToOrderDraft() {
+  const checkboxes = document.querySelectorAll('.rowCheckbox:checked');
+  if (!checkboxes.length) {
+    alert('주문서에 추가할 품목을 왼쪽 체크박스(☑️)로 선택해주세요.');
+    return;
+  }
+
+  const currentDraft = getOrderDraftItems();
+  const existingKeys = new Set(currentDraft.map(i => `${i.itemName}___${i.color || 'SURTIDO'}`.toUpperCase()));
+
+  const addedItems = [];
+  const duplicateItems = [];
+
+  checkboxes.forEach(cb => {
+    const idx = parseInt(cb.getAttribute('data-index'), 10);
+    if (isNaN(idx) || idx < 0 || idx >= records.length) return;
+    const rec = records[idx];
+    const key = `${rec.itemName}___${rec.color || 'SURTIDO'}`.toUpperCase();
+
+    if (existingKeys.has(key)) {
+      duplicateItems.push(`${rec.itemName} (${rec.color || 'SURTIDO'})`);
+    } else {
+      const boxQty = Math.abs(rec.boxQty) || 1;
+      const draftItem = {
+        itemName: rec.itemName,
+        color: rec.color || 'SURTIDO',
+        boxQty: boxQty,
+        boxContent: rec.boxContent || 0,
+        addedAt: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+      };
+      currentDraft.push(draftItem);
+      existingKeys.add(key);
+      addedItems.push(`${rec.itemName} (${rec.color || 'SURTIDO'}) - ${boxQty}상자`);
+    }
+  });
+
+  saveOrderDraftItems(currentDraft);
+
+  // 안내 알림창 구성
+  let msg = '';
+  if (addedItems.length > 0) {
+    msg += `✅ [주문목록 추가 완료: ${addedItems.length}개 품목]\n` + addedItems.map(item => ` • ${item}`).join('\n');
+  }
+  if (duplicateItems.length > 0) {
+    if (msg) msg += '\n\n';
+    msg += `⚠️ [이미 주문품목에 추가되어 제외됨: ${duplicateItems.length}개 품목]\n` + duplicateItems.map(item => ` • ${item}`).join('\n');
+  }
+  if (msg) {
+    msg += `\n\n📌 현재 주문서 총 포함 품목: ${currentDraft.length}개`;
+    alert(msg);
+  }
+}
+
+function openOrderDraftModal() {
+  const modal = document.getElementById('orderDraftModal');
+  if (!modal) return;
+  renderOrderDraftTable();
+  modal.style.display = 'block';
+}
+
+function closeOrderDraftModal() {
+  const modal = document.getElementById('orderDraftModal');
+  if (modal) modal.style.display = 'none';
+}
+
+function renderOrderDraftTable() {
+  const items = getOrderDraftItems();
+  const countSpan = document.getElementById('orderDraftModalCount');
+  const tbody = document.getElementById('orderDraftModalTableBody');
+  if (countSpan) countSpan.textContent = items.length;
+  if (!tbody) return;
+
+  if (!items.length) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="5" style="padding: 24px 10px; text-align: center; color: #94a3b8; font-size: 9pt;">
+          현재 주문서에 담긴 품목이 없습니다.<br>
+          <span style="font-size: 8pt; color: #cbd5e1;">장바구니에서 원하는 품목을 체크 후 [📋 주문목록추가]를 눌러주세요.</span>
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  let html = '';
+  items.forEach((item, idx) => {
+    html += `
+      <tr style="border-bottom: 1px solid #f1f5f9;">
+        <td style="padding: 7px 8px; text-align: left; font-weight: 600; color: #0f172a;">${item.itemName}</td>
+        <td style="padding: 7px 8px; text-align: center; color: #475569;">${item.color || 'SURTIDO'}</td>
+        <td style="padding: 7px 8px; text-align: right; font-weight: bold; color: #0f766e;">${item.boxQty} 상자</td>
+        <td style="padding: 7px 8px; text-align: center; color: #94a3b8; font-size: 8pt;">${item.addedAt || '-'}</td>
+        <td style="padding: 7px 8px; text-align: center;">
+          <button type="button" onclick="removeOrderDraftItem(${idx})" style="background: none; border: none; cursor: pointer; color: #ef4444; font-size: 10pt;" title="주문서에서 삭제">✕</button>
+        </td>
+      </tr>
+    `;
+  });
+  tbody.innerHTML = html;
+}
+
+function removeOrderDraftItem(index) {
+  const items = getOrderDraftItems();
+  if (index >= 0 && index < items.length) {
+    items.splice(index, 1);
+    saveOrderDraftItems(items);
+    renderOrderDraftTable();
+  }
+}
+
+function clearAllOrderDraftItems() {
+  if (!confirm('주문서에 담긴 모든 품목을 비우시겠습니까?')) return;
+  saveOrderDraftItems([]);
+  renderOrderDraftTable();
+}
+
 // ---------------- 키보드 단축키 이벤트 ----------------
 
 function setupHotkeyShortcuts() {
@@ -4028,6 +4234,7 @@ function setupHotkeyShortcuts() {
       closeGridSelectionModal();
       closeHotkeyConfigModal();
       closeQuickStockModal();
+      closeOrderDraftModal();
       showOcrLoadingModal(false);
     }
     // Ctrl + Enter : 그리드 모달이 열려 있을 때 일괄 담기 실행
