@@ -1,0 +1,1019 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <base target="_top">
+  <style>
+    :root {
+      --primary-color: #4CAF50;
+      --submit-color: #2196F3;
+      --banner-color: #e0e0ff;
+    }
+    body {
+      font-family: Arial, sans-serif;
+      padding: 0;
+      margin: 0;
+      background-color: #f0f0f0;
+      height: 851px;
+      width: 1075px;
+      overflow: hidden;
+    }
+    .container { display: flex; flex-direction: column; height: 100%; }
+    .banner {
+      width: 100%;
+      height: 90px;
+      border-bottom: 1px solid #000;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      align-items: flex-start;
+      font-size: 12pt;
+      font-weight: bold;
+      background-color: var(--banner-color);
+    }
+    .banner-row { 
+      display: flex; 
+      flex-direction: row; 
+      align-items: center; 
+      gap: 10px; 
+      width: 100%; 
+    }
+    .banner-row.second { 
+      justify-content: space-between; /* 변경: 요소들을 양쪽 끝과 중앙에 균형 배치 */
+      flex-wrap: wrap; /* 추가: 창 크기 초과 시 줄바꿈 허용 */
+      gap: 15px; /* 변경: 요소 간 간격 조정 */
+    }
+    .banner div { display: flex; align-items: center; }
+    .content { flex: 1; display: flex; width: 1075px; }
+    .menu {
+      width: 131px;
+      padding: 10px;
+      background-color: #ddd;
+      border-right: 1px solid #000;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+    }
+    .menu button {
+      width: 100px;
+      padding: 10px;
+      margin-bottom: 20px;
+      background-color: var(--primary-color);
+      color: white;
+      border: none;
+      cursor: pointer;
+      font-size: 10pt;
+      white-space: nowrap;
+    }
+    .menu button:hover, .menu button.active { background-color: #45a049; }
+    .input-area {
+      flex: 1;
+      padding: 10px;
+      display: flex;
+      flex-direction: row;
+      gap: 5px;
+      height: calc(100% - 20px);
+      overflow: hidden;
+    }
+    .input-group {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .input-section { flex: 3; display: flex; flex-direction: column; }
+    .table-section { flex: 7; display: flex; flex-direction: column; overflow: hidden; }
+    .form-group { margin-bottom: 20px; }
+    label {
+      display: inline-block;
+      width: 100px;
+      margin-right: 10px;
+      font-size: 10pt;
+    }
+    select, input[type="text"], input[type="number"], input[type="date"] {
+      width: 200px;
+      padding: 5px;
+      font-size: 10pt;
+    }
+    .input-row { margin-bottom: 10px; display: flex; align-items: center; }
+    .unit-options { margin-bottom: 10px; display: flex; align-items: center; }
+    .arrow-buttons {
+      display: flex;
+      gap: 5px;
+      justify-content: center;
+      align-items: center;
+      margin-left: 10px;
+    }
+    .arrow-buttons button {
+      width: 30px;
+      height: 30px;
+      font-size: 14pt;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      border: 1px solid #000;
+      background-color: var(--primary-color);
+      cursor: pointer;
+    }
+    table { width: 100%; border-collapse: collapse; }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: center;
+      font-size: 10pt;
+    }
+    th { 
+      background-color: #f2f2f2; 
+      height: 40px; 
+      position: sticky; 
+      top: 0; 
+      z-index: 1; 
+    }
+    td { height: 40px; }
+    .scrollable-table {
+      overflow-y: hidden;
+      border: 1px solid #ddd;
+      flex: 1;
+    }
+    .scrollable-table.scroll-enabled { 
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    .buttons { margin-bottom: 10px; display: flex; gap: 10px; align-items: center; }
+    button {
+      padding: 10px 20px;
+      background-color: var(--primary-color);
+      color: white;
+      border: none;
+      cursor: pointer;
+      font-size: 10pt;
+    }
+    button.submit { background-color: var(--submit-color); }
+    button:hover { background-color: #45a049; }
+    .total-label { margin-left: 10px; font-size: 10pt; font-weight: bold; }
+    .radio-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .radio-group label {
+      font-size: 10pt;
+      display: flex;
+      align-items: center;
+    }
+    .dropdown-container {
+      background-color: white;
+      border: 1px solid #ddd;
+      max-height: 200px;
+      overflow-y: auto;
+      z-index: 10;
+      width: 400px;
+      margin-top: 0;
+      position: absolute;
+      left: 110px;
+    }
+    .dropdown-container ul { list-style: none; padding: 0; margin: 0; }
+    .dropdown-container li { padding: 5px 10px; font-size: 10pt; cursor: pointer; }
+    .dropdown-container li:hover { background-color: #f0f0f0; }
+    .editable { background-color: #fff; cursor: text; }
+    .editable:focus { outline: 2px solid var(--submit-color); }
+    #printFrame { display: none; }
+    .processing-button {
+      background-color: #add8e6;
+      color: #666;
+      cursor: default;
+      opacity: 0.7;
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2;
+    }
+    .button-container {
+      position: relative;
+      display: inline-block;
+    }
+    #stockWarningModal {
+      display: none;
+      position: fixed;
+      top: 20%;
+      left: 50%;
+      transform: translate(-50%, 0);
+      background-color: white;
+      padding: 20px;
+      border: 1px solid #ccc;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      z-index: 1000; /* 테이블 헤더(z-index: 1)보다 높게 설정 */
+      width: 80%;
+      max-width: 400px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="banner">
+      <div class="banner-row">
+        <div id="formTitle">검색수정</div>
+        <div class="radio-group">
+          <label><input type="radio" name="recordType" value="in" checked> 입고</label>
+          <label><input type="radio" name="recordType" value="out"> 출고</label>
+        </div>
+        <div class="input-group">
+          <label for="searchDate">날짜:</label>
+          <input type="date" id="searchDate" name="searchDate">
+        </div>
+        <div class="input-group">
+          <label for="invoiceNumber">영수증 번호:</label>
+          <input type="text" id="invoiceNumber" name="invoiceNumber">
+        </div>
+        <div class="arrow-buttons">
+          <button onclick="decrementInvoice()">◀</button>
+          <button onclick="incrementInvoice()">▶</button>
+        </div>
+
+      </div>
+      <div class="banner-row second">
+        <div class="input-group">
+          <label for="adminInput">관리자:</label>
+          <input type="text" id="adminInput" name="adminInput" value="ADMIN">
+        </div>
+          <div class="input-group">
+          <label>로드영수증번호:</label>
+          <span id="loadedInvoiceNumber">000</span>
+        </div>
+        <button onclick="searchRecords()">검색</button>
+      </div>
+    </div>
+    <div class="content">
+      <div class="menu">
+        <button onclick="setPage('입고입력')">입고입력</button>
+        <button onclick="setPage('출고입력')">출고입력</button>
+        <button onclick="setPage('상품등록')">상품등록</button>
+        <button onclick="setPage('검색수정')" class="active">검색수정</button>
+      </div>
+      <div class="input-area">
+        <div class="input-section">
+          <div class="form-group" id="formInputs">
+            <div class="input-row">
+              <label id="locationLabel">위치:</label>
+              <select id="location" name="location" tabindex="1">
+                <option value="">선택</option>
+              </select>
+            </div>
+            <div class="unit-options">
+              <label><input type="radio" name="unitType" value="box" checked onchange="updateUnitType()"> 상자</label>
+              <label><input type="radio" name="unitType" value="individual" onchange="updateUnitType()"> 낱개</label>
+            </div>
+            <div class="input-row">
+              <label for="itemName">품명:</label>
+              <input type="text" id="itemName" name="itemName" autocomplete="off" 
+                     oninput="filterItems(this.value)" onchange="autoFillColor()" tabindex="2">
+              <div id="customDropdown" class="dropdown-container" style="display: none;">
+                <ul id="itemSuggestionsList"></ul>
+              </div>
+            </div>
+            <div class="input-row">
+              <label for="color">색상:</label>
+              <input type="text" id="color" name="color">
+            </div>
+            <div class="input-row">
+              <label id="qtyLabel">수량:</label>
+              <input type="number" id="qty" name="qty" tabindex="4">
+            </div>
+            <div class="input-row">
+              <label for="boxContent">박스당 내용물 개수:</label>
+              <input type="text" id="boxContent" name="boxContent">
+            </div>
+          </div>
+        </div>
+        <div class="table-section">
+          <div class="buttons">
+            <button onclick="addRecord()">Add</button>
+            <button onclick="deleteRecord()">Delete</button>
+            <button class="submit" onclick="updateRecords()">Update</button>
+            <span class="total-label">Total Items: <span id="totalItems">0</span></span>
+            <span class="total-label" id="totalBoxesLabel">Total Boxes: 0</span>
+            <span class="total-label" id="totalIndividualsLabel">Total Individuals: 0</span>
+          </div>
+          <div class="scrollable-table" id="scrollableTable">
+            <table id="recordTable">
+              <thead id="tableHeader">
+                <tr>
+                  <th><input type="checkbox" id="selectAll" onclick="toggleSelectAll()"></th>
+                  <th>Item Name</th>
+                  <th>Color</th>
+                  <th>Box Quantity</th>
+                  <th>Individual Quantity</th>
+                  <th>Quantity per Box</th>
+                  <th>Location</th>
+                </tr>
+              </thead>
+              <tbody id="tableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="stockWarningModal">
+      <h3>재고 부족 경고</h3>
+      <p id="warningMessage"></p>
+      <button onclick="closeStockWarningModal()">닫기</button>
+    </div>
+    <iframe id="printFrame" style="display: none;"></iframe>
+  </div>
+
+<script>
+let dropdownVisible = false;
+let records = [];
+let originalRecords = [];
+let currentType;
+let selectedDate;
+let stockDataCache = [];
+let locationCache = [];
+let debounceTimeout;
+let isLoadingStockData = false;
+
+document.addEventListener('DOMContentLoaded', function() {
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('searchDate').value = today;
+  updateInvoiceNumber();
+  setupDropdownEvents();
+  toggleScroll();
+  loadStockData();
+  loadDropdowns();
+});
+
+function loadStockData() {
+  if (isLoadingStockData) return; // 중복 호출 방지
+  isLoadingStockData = true;
+  const loadingIndicator = document.createElement('div');
+  loadingIndicator.id = 'loadingIndicator';
+  loadingIndicator.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 10px; border: 1px solid #ccc; z-index: 1000;';
+  loadingIndicator.textContent = '재고 데이터 로드 중...';
+  document.body.appendChild(loadingIndicator);
+
+  // 타임아웃 설정
+  const timeoutPromise = new Promise((_, reject) => {
+    setTimeout(() => reject(new Error('재고 데이터 로드 타임아웃')), 30000); // 30초
+  });
+
+  const loadPromise = new Promise((resolve, reject) => {
+    google.script.run
+      .withSuccessHandler(resolve)
+      .withFailureHandler(reject)
+      .getStockData();
+  });
+
+  Promise.race([loadPromise, timeoutPromise])
+    .then(data => {
+      stockDataCache = data;
+      isLoadingStockData = false;
+      console.log('Stock data loaded:', stockDataCache.length, 'items');
+      document.body.removeChild(loadingIndicator);
+    })
+    .catch(err => {
+      isLoadingStockData = false;
+      console.error('Failed to load stock data:', err);
+      alert('재고 데이터를 불러오는 데 실패했습니다: ' + err.message);
+      document.body.removeChild(loadingIndicator);
+      stockDataCache = stockDataCache || [];
+    });
+}
+
+function loadDropdowns() {
+  if (locationCache.length > 0) {
+    const select = document.getElementById('location');
+    select.innerHTML = '<option value="">선택</option>' + locationCache.map(loc => `<option value="${loc}">${loc}</option>`).join('');
+    return;
+  }
+  google.script.run
+    .withSuccessHandler(data => {
+      locationCache = data;
+      const select = document.getElementById('location');
+      select.innerHTML = '<option value="">선택</option>' + data.map(loc => `<option value="${loc}">${loc}</option>`).join('');
+    })
+    .withFailureHandler(err => {
+      console.error('Failed to load locations:', err);
+      alert('입출고처 데이터를 불러오는 데 실패했습니다.');
+    })
+    [currentType === 'in' ? 'getInLocations' : 'getOutLocations']();
+}
+
+function filterItems(searchText) {
+  if (!searchText.trim()) {
+    hideCustomDropdown();
+    return;
+  }
+
+  if (isLoadingStockData) return;
+
+  clearTimeout(debounceTimeout);
+  debounceTimeout = setTimeout(() => {
+    const list = document.getElementById('itemSuggestionsList');
+    if (!list) return;
+
+    const filteredItems = stockDataCache
+      .filter(item => item.name.toLowerCase().includes(searchText.toLowerCase()))
+      .slice(0, 20);
+
+    list.innerHTML = '';
+    const fragment = document.createDocumentFragment();
+    filteredItems.forEach(item => {
+      const li = document.createElement('li');
+      li.textContent = `${item.name} (${item.color}, ${item.stockBox}박스 + ${item.stockIndividual}개, 안전재고 ${item.safeStock}, 포장 ${item.boxContent}개)`;
+      li.onclick = () => selectItem(item.key, item.color, item.boxContent);
+      fragment.appendChild(li);
+    });
+    list.appendChild(fragment);
+
+    if (filteredItems.length > 0) {
+      showCustomDropdown();
+    } else {
+      hideCustomDropdown();
+    }
+  }, 150);
+}
+
+function checkItemAndStock(itemName, color, boxContent, qty, unitType, tempStockCache = stockDataCache) {
+  const key = `${itemName}_${color || 'SURTIDO'}_${boxContent || 0}`;
+  const item = tempStockCache.find(item => item.key === key);
+
+  if (!item) {
+    return { isRegistered: false };
+  }
+
+  if (unitType === 'box') {
+    return { isRegistered: true, isSufficient: item.stockBox >= qty, boxStock: item.stockBox };
+  } else {
+    let totalIndividual = item.stockIndividual;
+    let remainingQty = qty;
+    let boxesNeeded = 0;
+    let boxStock = item.stockBox;
+    while (totalIndividual < remainingQty && boxStock > 0) {
+      if (item.boxContent <= 0) {
+        return { isRegistered: true, isSufficient: false, message: '박스당 내용물 개수가 유효하지 않습니다.' };
+      }
+      boxesNeeded++;
+      totalIndividual += item.boxContent;
+      boxStock--;
+    }
+    return {
+      isRegistered: true,
+      isSufficient: totalIndividual >= remainingQty && boxStock >= 0,
+      boxStock: item.stockBox,
+      individualStock: item.stockIndividual,
+      boxesNeeded
+    };
+  }
+}
+
+document.getElementById('searchDate').addEventListener('change', updateInvoiceNumber);
+document.querySelectorAll('input[name="recordType"]').forEach(radio => {
+  radio.addEventListener('change', function() {
+    currentType = this.value;
+    updateInvoiceNumber();
+    loadDropdowns();
+  });
+});
+
+function updateInvoiceNumber() {
+  const date = document.getElementById('searchDate').value;
+  const typeValue = document.querySelector('input[name="recordType"]:checked').value;
+  const type = typeValue === 'in' ? '입고' : '출고';
+  google.script.run.withSuccessHandler(setInvoiceNumber).getMaxSequentialNumber(date, type);
+}
+
+function setInvoiceNumber(maxSeq) {
+  const invoiceInput = document.getElementById('invoiceNumber');
+  if (maxSeq > 0) {
+    invoiceInput.value = String(maxSeq).padStart(3, '0');
+  } else {
+    invoiceInput.value = '001';
+  }
+}
+
+function searchRecords() {
+  const date = document.getElementById('searchDate').value;
+  selectedDate = date;
+  const seq = document.getElementById('invoiceNumber').value;
+  const typeValue = document.querySelector('input[name="recordType"]:checked').value;
+  const type = typeValue === 'in' ? '입고' : '출고';
+  const formattedDate = date.replace(/-/g, '/');
+  const fullInvoiceNumber = `${formattedDate}-${seq.padStart(3, '0')}`;
+  document.getElementById('loadedInvoiceNumber').textContent = seq || '000';
+  google.script.run.withSuccessHandler(displayRecords).searchRecords(type, fullInvoiceNumber);
+}
+
+function displayRecords(recordsData) {
+  records = recordsData.map(record => ({
+    itemName: record.itemName,
+    color: record.color,
+    boxQty: record.boxQty,
+    individualQty: record.individualQty,
+    boxContent: record.boxContent,
+    location: record.location,
+    unitType: record.boxQty !== 0 ? 'box' : 'individual'
+  }));
+  originalRecords = JSON.parse(JSON.stringify(records));
+  updateTable();
+
+  if (records.length > 0) {
+    const firstLocation = records[0].location;
+    const firstAdmin = recordsData[0].admin || 'ADMIN';
+    const locationSelect = document.getElementById('location');
+    
+    if (!Array.from(locationSelect.options).some(opt => opt.value === firstLocation)) {
+      const newOption = document.createElement('option');
+      newOption.value = firstLocation;
+      newOption.text = firstLocation;
+      locationSelect.add(newOption);
+    }
+    locationSelect.value = firstLocation;
+    document.getElementById('adminInput').value = firstAdmin;
+  } else {
+    document.getElementById('location').value = '';
+    document.getElementById('adminInput').value = 'ADMIN';
+  }
+  updateTotals();
+  toggleScroll();
+}
+
+function addRecord() {
+  currentType = document.querySelector('input[name="recordType"]:checked').value;
+  const unitType = document.querySelector('input[name="unitType"]:checked').value;
+  const qty = parseInt(document.getElementById('qty').value) || 0;
+  const itemName = document.getElementById('itemName').value.split('_')[0] || '';
+  const color = document.getElementById('color').value;
+  const boxContent = parseInt(document.getElementById('boxContent').value) || 0;
+  const location = document.getElementById('location').value;
+
+  if (!itemName || !location || (!qty && unitType === 'box') || (!qty && unitType === 'individual')) {
+    alert('필수 항목(품명, 입출고처, 수량)을 입력하세요.');
+    return;
+  }
+
+  const stockInfo = checkItemAndStock(itemName, color, boxContent, qty, unitType);
+  if (!stockInfo.isRegistered) {
+    const confirmRegister = confirm('등록되지 않은 상품입니다. 상품을 등록하시겠습니까?');
+    if (confirmRegister) {
+      const currentData = { itemName, color, boxContent, qty, unitType, location, type: currentType };
+      sessionStorage.setItem('pendingData', JSON.stringify(currentData));
+      setPage('상품등록', currentData);
+    }
+    return;
+  }
+
+  if (currentType === 'out' && !stockInfo.isSufficient) {
+    showStockWarningModal(qty, unitType === 'box' ? stockInfo.boxStock : stockInfo.individualStock, unitType === 'box' ? '박스' : '낱개');
+    return;
+  }
+
+  const formData = {
+    itemName,
+    color,
+    boxQty: unitType === 'box' ? (currentType === 'in' ? qty : -qty) : 0,
+    individualQty: unitType === 'individual' ? (currentType === 'in' ? qty : -qty) : 0,
+    boxContent,
+    location,
+    unitType
+  };
+    if (currentType === 'out' && unitType === 'individual') {
+    const proceed = confirm('낱개출고입니다. 진행할까요?');
+    if (!proceed) {
+      return;
+    }
+  }
+  records.push(formData);
+  updateTable();
+  clearForm();
+  toggleScroll();
+  updateTotals();
+}
+
+function showStockWarningModal(orderQty, currentStock, unit) {
+  const message = `재고가 부족합니다 주문: ${orderQty}${unit}, 현재고: ${currentStock}${unit}`;
+  document.getElementById('warningMessage').textContent = message;
+  document.getElementById('stockWarningModal').style.display = 'block';
+}
+
+function closeStockWarningModal() {
+  document.getElementById('stockWarningModal').style.display = 'none';
+}
+
+function deleteRecord() {
+  const checkboxes = document.querySelectorAll('.rowCheckbox:checked');
+  const indices = Array.from(checkboxes).map(cb => parseInt(cb.dataset.index));
+  records = records.filter((_, idx) => !indices.includes(idx));
+  updateTable();
+  updateTotals();
+  toggleScroll();
+}
+
+function updateTable() {
+  const tbody = document.getElementById('tableBody');
+  let html = '';
+  records.forEach((rec, idx) => {
+    html += `
+      <tr>
+        <td><input type="checkbox" class="rowCheckbox" data-index="${idx}"></td>
+        <td>${rec.itemName}</td>
+        <td>${rec.color}</td>
+        <td contenteditable="true" class="editable" onblur="updateRecord(${idx}, 'boxQty', this.textContent)">${Math.abs(rec.boxQty)}</td>
+        <td contenteditable="true" class="editable" onblur="updateRecord(${idx}, 'individualQty', this.textContent)">${Math.abs(rec.individualQty)}</td>
+        <td>${rec.boxContent}</td>
+        <td>${rec.location}</td>
+      </tr>
+    `;
+  });
+  tbody.innerHTML = html;
+}
+
+function updateRecord(index, field, value) {
+  const type = document.querySelector('input[name="recordType"]:checked').value;
+  value = parseInt(value) || 0;
+  records[index][field] = type === 'in' ? value : -value;
+  updateTable();
+  updateTotals();
+  toggleScroll();
+}
+
+function clearForm() {
+  document.getElementById('itemName').value = '';
+  document.getElementById('color').value = '';
+  document.getElementById('boxContent').value = '';
+  document.getElementById('qty').value = '';
+}
+
+function toggleScroll() {
+  const table = document.getElementById('scrollableTable');
+  table.classList.toggle('scroll-enabled', records.length >= 5);
+}
+
+function updateTotals() {
+  const totalItems = records.length;
+  const totalBoxes = records.reduce((sum, rec) => sum + Math.abs(rec.boxQty), 0);
+  const totalIndividuals = records.reduce((sum, rec) => sum + Math.abs(rec.individualQty), 0);
+  document.getElementById('totalItems').textContent = totalItems;
+  document.getElementById('totalBoxesLabel').textContent = `Total Boxes: ${totalBoxes}`;
+  document.getElementById('totalIndividualsLabel').textContent = `Total Individuals: ${totalIndividuals}`;
+}
+
+function updateRecords() {
+  const typeValue = document.querySelector('input[name="recordType"]:checked').value;
+  const type = typeValue === 'in' ? '입고' : '출고';
+  const invoiceNumber = document.getElementById('invoiceNumber').value;
+  const date = document.getElementById('searchDate').value;
+  const fullInvoiceNumber = `${date.replace(/-/g, '/')}-${invoiceNumber.padStart(3, '0')}`;
+  const adminValue = document.getElementById('adminInput').value;
+  const loadedInvoiceNumber = document.getElementById('loadedInvoiceNumber').textContent;
+if (invoiceNumber.padStart(3, '0') !== loadedInvoiceNumber) {
+    alert('로드값과 변경값이 틀립니다.');
+    return;
+  }
+  // 업데이트 처리 중 UI 피드백
+  const buttonContainer = document.querySelector('.submit').parentNode;
+  const originalButton = document.querySelector('.submit');
+  originalButton.style.visibility = 'hidden';
+  const processingButton = document.createElement('div');
+  processingButton.className = 'processing-button';
+  processingButton.textContent = '처리 중...';
+  buttonContainer.appendChild(processingButton);
+
+  // 레코드가 없을 경우 삭제 처리
+  if (records.length === 0) {
+    const confirmDelete = confirm(`${date} ${invoiceNumber}번 ${type}를 삭제하시겠습니까?`);
+    if (confirmDelete) {
+      google.script.run
+        .withSuccessHandler(() => {
+          alert('레코드가 성공적으로 삭제되었습니다.');
+          records = [];
+          updateTable();
+          updateTotals();
+          toggleScroll();
+          originalButton.style.visibility = 'visible';
+          buttonContainer.removeChild(processingButton);
+          loadStockData(); // 재고 데이터 갱신
+        })
+        .withFailureHandler(err => {
+          alert('삭제 실패: ' + err.message);
+          originalButton.style.visibility = 'visible';
+          buttonContainer.removeChild(processingButton);
+        })
+        .updatePendingRecords(fullInvoiceNumber, type, [], adminValue);
+    } else {
+      originalButton.style.visibility = 'visible';
+      buttonContainer.removeChild(processingButton);
+    }
+    return;
+  }
+
+  // 재고 검증을 위한 임시 재고 캐시 생성
+  let tempStockCache = JSON.parse(JSON.stringify(stockDataCache)); // 깊은 복사
+  if (typeValue === 'out' && originalRecords.length > 0) {
+    // 기존 레코드의 재고 반환 시뮬레이션
+    originalRecords.forEach(record => {
+      const key = `${record.itemName}_${record.color || 'SURTIDO'}_${record.boxContent || 0}`;
+      const item = tempStockCache.find(item => item.key === key);
+      if (item) {
+        // 출고 레코드 삭제 시 재고 증가
+        item.stockBox += Math.abs(record.boxQty);
+        item.stockIndividual += Math.abs(record.individualQty);
+      }
+    });
+  }
+
+  // 새 레코드에 대해 재고 검증
+  if (typeValue === 'out') {
+    for (const record of records) {
+      const stockInfo = checkItemAndStock(
+        record.itemName,
+        record.color,
+        record.boxContent,
+        Math.abs(record.boxQty),
+        record.unitType,
+        tempStockCache
+      );
+      if (!stockInfo.isSufficient) {
+        alert(`재고 부족: ${record.itemName} (${record.color})`);
+        originalButton.style.visibility = 'visible';
+        buttonContainer.removeChild(processingButton);
+        return;
+      }
+    }
+  }
+
+  // 새 레코드로 업데이트
+  const recordsToPrint = [...records];
+  google.script.run
+    .withSuccessHandler(() => {
+      alert('레코드가 성공적으로 업데이트되었습니다.');
+      printReceipt(recordsToPrint, typeValue, date, adminValue, fullInvoiceNumber, () => {
+        records = [];
+        updateTable();
+        updateTotals();
+        toggleScroll();
+        originalButton.style.visibility = 'visible';
+        buttonContainer.removeChild(processingButton);
+        loadStockData(); // 재고 데이터 갱신
+      });
+    })
+    .withFailureHandler(err => {
+      alert('업데이트 실패: ' + err.message);
+      originalButton.style.visibility = 'visible';
+      buttonContainer.removeChild(processingButton);
+    })
+    .updatePendingRecords(fullInvoiceNumber, type, records, adminValue);
+}
+
+function printReceipt(records, type, selectedDate, admin, invoiceNumber, callback) {
+  const iframe = document.getElementById('printFrame');
+  const doc = iframe.contentWindow.document;
+  const formattedDate = selectedDate.replace(/-/g, '/');
+  
+  const purifiedNumber = invoiceNumber.includes('-') ? 
+    invoiceNumber.split('-')[1] : invoiceNumber;
+  
+  const totalItems = new Set(records.map(r => `${r.itemName}_${r.color}`)).size;
+  const totalBoxes = records.reduce((sum, r) => sum + Math.abs(r.boxQty), 0);
+  const totalIndividuals = records.reduce((sum, r) => sum + Math.abs(r.individualQty), 0);
+  const rowsPerPage = 15;
+  const pages = Math.ceil(records.length / rowsPerPage);
+  const title = type === 'in' ? 'COMPROBANTE DE ENTRADA' : 'COMPROBANTE DE SALIDA';
+  const titleColor = type === 'in' ? 'red' : 'black';
+  
+  const adminColor = admin === 'ADMIN' ? 'black' : 'green';
+  const adminStyle = `font-size: 11pt; color: ${adminColor};`;
+  
+  let htmlContent = '';
+  
+  for (let page = 0; page < pages; page++) {
+    const startIdx = page * rowsPerPage;
+    const endIdx = Math.min(startIdx + rowsPerPage, records.length);
+    const pageRecords = records.slice(startIdx, endIdx);
+    let tableRows = '<tr><th>PRODUCTO</th><th>COLOR</th><th>BULTO</th><th>PZS</th><th>PZS/B</th><th>TOTAL</th></tr>';
+    for (let i = 0; i < 15; i++) {
+      if (i < pageRecords.length) {
+        const rec = pageRecords[i];
+        const boxQty = Math.abs(rec.boxQty);
+        const individualQty = Math.abs(rec.individualQty);
+        const boxContent = rec.boxContent || 0;
+        const totalIndividual = (boxQty * boxContent) + individualQty;
+        tableRows += `<tr><td>${rec.itemName}</td><td>${rec.color}</td><td>${boxQty}</td><td>${individualQty}</td><td>${boxContent}</td><td>${totalIndividual}</td></tr>`;
+      } else {
+        tableRows += `<tr><td></td><td></td><td></td><td></td><td></td><td></td></tr>`;
+      }
+    }
+
+    const summaryTable = page === 0 ? `
+      <table class="summary-table">
+        <tr><th>cant item</th><th>cant bulto</th><th>cant pzs</th></tr>
+        <tr><td>${totalItems}</td><td>${totalBoxes}</td><td>${totalIndividuals}</td></tr>
+      </table>
+    ` : '';
+
+    htmlContent += `
+      <div class="page">
+        <div class="receipt-container">
+          <div class="receipt">
+            <div class="header" style="color: ${titleColor};">${title}</div>
+            <div class="details">
+              <p>No: ${purifiedNumber}</p>
+              <p>fetcha: ${formattedDate}</p>
+              <p class="location">UBICACION: <span class="location-value">${records.length > 0 ? records[0].location : '미지정'}</span></p>
+              <p class="admin">VENDEDOR: <span style="${adminStyle}">${admin}</span></p>
+              ${summaryTable}
+            </div>
+            <table class="main-table">${tableRows}</table>
+            <div class="footer">
+              <span>ANIMO!!!</span>
+              <span class="page-number">${page + 1}-${pages}</span>
+            </div>
+          </div>
+          <div class="receipt">
+            <div class="header" style="color: ${titleColor};">${title}</div>
+            <div class="details">
+              <p>No: ${purifiedNumber}</p>
+              <p>fetcha: ${formattedDate}</p>
+              <p class="location">UBICACION: <span class="location-value">${records.length > 0 ? records[0].location : '미지정'}</span></p>
+              <p class="admin">VENDEDOR: <span style="${adminStyle}">${admin}</span></p>
+              ${summaryTable}
+            </div>
+            <table class="main-table">${tableRows}</table>
+            <div class="footer">
+              <span>ANIMO!!!</span>
+              <span class="page-number">${page + 1}-${pages}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+  
+  doc.open();
+  doc.write(`
+    <html>
+      <head>
+        <style>
+          @page { 
+            size: letter landscape; 
+            margin: 0.5in;
+            margin-bottom: 1in;
+          }
+          body { 
+            font-family: Arial, sans-serif; 
+            margin: 0; 
+            padding: 0; 
+          }
+          .page { 
+            width: 100%; 
+            height: 7.5in;
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            page-break-after: always;
+            margin-bottom: 0.5in;
+          }
+          .receipt-container { 
+            display: flex; 
+            justify-content: space-between; 
+            width: 10in; 
+            margin-top: 0.2in;
+          }
+          .receipt { 
+            width: 4.75in; 
+            border: 1px solid #000; 
+            padding: 0.1in; 
+            box-sizing: border-box;
+            margin-bottom: 0.2in;
+          }
+          .header { text-align: center; font-weight: bold; font-size: 14pt; margin-bottom: 0.2in; }
+          .details { font-size: 10pt; margin-bottom: 0.2in; }
+          .details p { margin: 0.05in 0; }
+          .location { font-size: 10pt; font-weight: bold; text-decoration: underline; }
+          .location-value { color: blue; font-size: 13pt; }
+          .admin { font-size: 9pt; font-weight: bold; }
+          .summary-table { width: 60%; margin: 0.1in auto; border-collapse: collapse; font-size: 10pt; }
+          .summary-table th, .summary-table td { border: 1px solid #000; padding: 0.05in; text-align: center; }
+          .summary-table th { background-color: #f2f2f2; font-weight: bold; }
+          .main-table { width: 100%; border-collapse: collapse; font-size: 10pt; }
+          .main-table th, .main-table td { border: 1px solid #000; padding: 0.05in; text-align: center; height: 0.3in; }
+          .main-table th { background-color: #f2f2f2; font-weight: bold; }
+          .footer { 
+            text-align: center; 
+            font-size: 10pt; 
+            margin-top: 0.2in;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+          }
+          .page-number {
+            font-weight: bold;
+          }
+        </style>
+      </head>
+      <body>${htmlContent}</body>
+    </html>
+  `);
+  doc.close();
+  iframe.contentWindow.focus();
+  
+  setTimeout(() => {
+    console.log('Attempting to print...');
+    iframe.contentWindow.print();
+    setTimeout(() => {
+      console.log('Print completed, executing callback...');
+      if (typeof callback === 'function') {
+        callback();
+      }
+    }, 2000); // 인쇄 후 2초 대기
+  }, 500); // 렌더링 후 0.5초 대기
+}
+
+function showCustomDropdown() {
+  const dropdown = document.getElementById('customDropdown');
+  const input = document.getElementById('itemName');
+  if (!dropdown || !input) return;
+  const rect = input.getBoundingClientRect();
+  dropdown.style.display = 'block';
+  dropdown.style.top = `${rect.bottom + window.scrollY}px`;
+  dropdown.style.left = `${rect.left + window.scrollX}px`;
+  dropdownVisible = true;
+}
+
+function hideCustomDropdown() {
+  const dropdown = document.getElementById('customDropdown');
+  if (dropdown) {
+    dropdown.style.display = 'none';
+    dropdownVisible = false;
+  }
+}
+
+function selectItem(key, color, boxContent) {
+  document.getElementById('itemName').value = key.split('_')[0];
+  document.getElementById('color').value = color || 'SURTIDO';
+  document.getElementById('boxContent').value = boxContent || '';
+  hideCustomDropdown();
+}
+
+function autoFillColor() {
+  const key = document.getElementById('itemName').value;
+  if (key.includes('_')) {
+    const [name, color, boxContent] = key.split('_');
+    document.getElementById('color').value = color || 'SURTIDO';
+    document.getElementById('boxContent').value = boxContent || '';
+  }
+}
+
+function setupDropdownEvents() {
+  const itemNameInput = document.getElementById('itemName');
+  if (itemNameInput) {
+    itemNameInput.addEventListener('blur', () => setTimeout(hideCustomDropdown, 100));
+  }
+  document.addEventListener('click', (e) => {
+    const dropdown = document.getElementById('customDropdown');
+    const itemName = document.getElementById('itemName');
+    if (dropdown && itemName && !itemName.contains(e.target) && !dropdown.contains(e.target)) {
+      hideCustomDropdown();
+    }
+  });
+}
+
+function incrementInvoice() {
+  const currentSeq = parseInt(document.getElementById('invoiceNumber').value);
+  if (isNaN(currentSeq)) return;
+  const date = document.getElementById('searchDate').value;
+  const typeValue = document.querySelector('input[name="recordType"]:checked').value;
+  const type = typeValue === 'in' ? '입고' : '출고';
+  google.script.run.withSuccessHandler(maxSeq => {
+    if (currentSeq < maxSeq) {
+      document.getElementById('invoiceNumber').value = String(currentSeq + 1).padStart(3, '0');
+    } else {
+      alert('선택한 입/출고 증은 없습니다');
+    }
+  }).getMaxSequentialNumber(date, type);
+}
+
+function decrementInvoice() {
+  const currentSeq = parseInt(document.getElementById('invoiceNumber').value);
+  if (isNaN(currentSeq) || currentSeq <= 1) {
+    alert('선택한 입/출고 증은 없습니다');
+    return;
+  }
+  document.getElementById('invoiceNumber').value = String(currentSeq - 1).padStart(3, '0');
+}
+
+function toggleSelectAll() {
+  const selectAll = document.getElementById('selectAll').checked;
+  document.querySelectorAll('.rowCheckbox').forEach(cb => cb.checked = selectAll);
+}
+
+function updateUnitType() {
+  // unitType 변경 시 필요한 로직 추가 가능
+}
+</script>
+</body>
+</html>

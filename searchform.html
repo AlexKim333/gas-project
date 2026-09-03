@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    :root { --primary-color: #4CAF50; --submit-color: #2196F3; }
+    body { font-family: Arial, sans-serif; padding: 0; margin: 0; background-color: #f0f0f0; height: 851px; width: 1075px; overflow: hidden; }
+    .container { display: flex; flex-direction: column; height: 100%; }
+    .banner { width: 100%; height: 90px; border-bottom: 1px solid #000; padding: 10px; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start; font-size: 12pt; font-weight: bold; }
+    .content { flex: 1; display: flex; width: 1075px; }
+    .menu { width: 131px; padding: 10px; background-color: #ddd; border-right: 1px solid #000; display: flex; flex-direction: column; justify-content: flex-start; }
+    .menu button { width: 100px; padding: 10px; margin-bottom: 20px; background-color: var(--primary-color); color: white; border: none; cursor: pointer; font-size: 10pt; }
+    .menu button:hover, .menu button.active { background-color: #45a049; }
+    .input-area { flex: 1; padding: 10px; display: flex; flex-direction: row; gap: 10px; height: calc(100% - 20px); overflow: hidden; }
+    .input-section { flex: 3; display: flex; flex-direction: column; }
+    .table-section { flex: 7; display: flex; flex-direction: column; overflow: hidden; }
+    .form-group { margin-bottom: 20px; }
+    label { display: inline-block; width: 100px; margin-right: 10px; font-size: 10pt; }
+    input[type="text"], input[type="number"] { width: 200px; padding: 5px; font-size: 10pt; }
+    .input-row { margin-bottom: 10px; display: flex; align-items: center; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: center; font-size: 10pt; }
+    th { background-color: #f2f2f2; height: 40px; position: sticky; top: 0; z-index: 1; }
+    .scrollable-table { overflow-y: hidden; border: 1px solid #ddd; flex: 1; }
+    .scrollable-table.scroll-enabled { max-height: 200px; overflow-y: auto; }
+    .buttons { margin-bottom: 10px; display: flex; gap: 10px; align-items: center; }
+    button { padding: 10px 20px; background-color: var(--primary-color); color: white; border: none; cursor: pointer; font-size: 10pt; }
+    button.submit { background-color: var(--submit-color); }
+    button:hover { background-color: #45a049; }
+    .total-label { margin-left: 10px; font-size: 10pt; font-weight: bold; }
+    .dropdown-container { background-color: white; border: 1px solid #ddd; max-height: 200px; overflow-y: auto; z-index: 10; width: 400px; margin-top: 0; position: absolute; left: 110px; }
+    .dropdown-container ul { list-style: none; padding: 0; margin: 0; }
+    .dropdown-container li { padding: 5px 10px; font-size: 10pt; cursor: pointer; }
+    .dropdown-container li:hover { background-color: #f0f0f0; }
+    .input-row { position: relative; }
+    .editable { background-color: #fff; cursor: text; }
+    .editable:focus { outline: 2px solid var(--submit-color); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="banner">
+      <div id="formTitle">상품등록</div>
+      <div><label>날짜/시간:</label><input type="text" id="datetime" readonly style="width: 200px;"></div>
+    </div>
+    <div class="content">
+      <div class="menu">
+        <button onclick="setPage('입고입력')">입고입력</button>
+        <button onclick="setPage('출고입력')">출고입력</button>
+        <button onclick="setPage('상품등록')" class="active">상품등록</button>
+      </div>
+      <div class="input-area">
+        <div class="input-section">
+          <div class="form-group">
+            <div class="input-row">
+              <label for="itemName">품명:</label>
+              <input type="text" id="itemName" name="itemName" autocomplete="off" tabindex="1">
+              <div id="customDropdown" class="dropdown-container" style="display: none;">
+                <ul id="itemSuggestionsList"></ul>
+              </div>
+            </div>
+            <div class="input-row">
+              <label for="color">색상:</label>
+              <input type="text" id="color" name="color" value="SURTIDO" tabindex="2">
+            </div>
+            <div class="input-row">
+              <label for="boxContent">박스당수량:</label>
+              <input type="number" id="boxContent" name="boxContent" tabindex="3">
+            </div>
+            <div class="input-row">
+              <label for="safeStock">안전재고:</label>
+              <input type="number" id="safeStock" name="safeStock" tabindex="4">
+            </div>
+            <div class="input-row">
+              <label for="initialStock">기초재고:</label>
+              <input type="number" id="initialStock" name="initialStock" tabindex="5">
+            </div>
+          </div>
+        </div>
+        <div class="table-section">
+          <div class="buttons">
+            <button onclick="addRecord()" tabindex="6">추가</button>
+            <button onclick="deleteRecord()" tabindex="7">삭제</button>
+            <button class="submit" onclick="submitForm()" tabindex="8">제출</button>
+            <span class="total-label">품목합산: <span id="totalItems">0</span></span>
+          </div>
+          <div class="scrollable-table" id="scrollableTable">
+            <table id="recordTable">
+              <thead id="tableHeader">
+                <tr>
+                  <th><input type="checkbox" id="selectAll" onclick="toggleSelectAll()"></th>
+                  <th>품명</th>
+                  <th>색상</th>
+                  <th>박스당수량</th>
+                  <th>안전재고</th>
+                  <th>기초재고</th>
+                </tr>
+              </thead>
+              <tbody id="tableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="confirmModal" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: white; padding: 20px; border: 1px solid #ddd; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); z-index: 1000;">
+    <h3>상품등록 확인</h3>
+    <table id="confirmTable">
+      <thead>
+        <tr><th>품명</th><th>색상</th><th>박스당수량</th><th>안전재고</th><th>기초재고</th></tr>
+      </thead>
+      <tbody id="confirmBody"></tbody>
+    </table>
+    <div id="modalButtons" style="margin-top: 15px; text-align: center;">
+      <button onclick="confirmSubmit()">확인</button>
+      <button onclick="cancelSubmit()">취소</button>
+    </div>
+  </div>
+
+  <script>
+    let records = [];
+    let dropdownVisible = false;
+
+    window.onload = () => {
+      initPage();
+      updateClock();
+      setInterval(updateClock, 1000);
+    };
+
+    function initPage() {
+      setPage('상품등록');
+      updateTotals();
+      toggleScroll();
+      setupEventListeners();
+    }
+
+    function setPage(page) {
+      if (page === '입고입력') {
+        google.script.run.switchToPage('입고입력');
+      } else if (page === '출고입력') {
+        google.script.run.switchToPage('출고입력');
+      } else if (page === '상품등록') {
+        document.querySelectorAll('.menu button').forEach(btn => btn.classList.remove('active'));
+        document.querySelector('.menu button[onclick="setPage(\'상품등록\')"]').classList.add('active');
+      }
+    }
+
+    function updateClock() {
+      document.getElementById('datetime').value = new Date().toLocaleString();
+    }
+
+    function setupEventListeners() {
+      const itemNameInput = document.getElementById('itemName');
+      itemNameInput.oninput = () => filterItems(itemNameInput.value);
+      itemNameInput.onchange = () => autoFillColor();
+
+      document.addEventListener('click', (e) => {
+        const dropdown = document.getElementById('customDropdown');
+        const input = document.getElementById('itemName');
+        if (!dropdown.contains(e.target) && e.target !== input && dropdownVisible) {
+          hideCustomDropdown();
+        }
+      });
+
+      itemNameInput.addEventListener('blur', () => {
+        setTimeout(() => {
+          if (dropdownVisible) hideCustomDropdown();
+        }, 100);
+      });
+
+      itemNameInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Tab' || e.key === 'Enter') hideCustomDropdown();
+      });
+    }
+
+    function filterItems(searchText) {
+      console.log('filterItems called with:', searchText);
+      if (!searchText.trim()) {
+        hideCustomDropdown();
+        return;
+      }
+      google.script.run.withSuccessHandler(items => {
+        console.log('Items received:', items);
+        const list = document.getElementById('itemSuggestionsList');
+        list.innerHTML = '';
+        items.forEach(item => {
+          const li = document.createElement('li');
+          li.textContent = `${item.name} (${item.color}, ${item.stockBox}박스 + ${item.stockIndividual}개, 안전재고 ${item.safeStock}, 포장 ${item.boxContent}개)`;
+          li.addEventListener('click', (e) => {
+            e.preventDefault();
+            console.log('Item clicked:', item.key);
+            selectItem(item.key, item.color, item.boxContent);
+          });
+          list.appendChild(li);
+        });
+        showCustomDropdown();
+      }).withFailureHandler(handleError).getFilteredItemNames(searchText);
+    }
+
+    function showCustomDropdown() {
+      console.log('showCustomDropdown called');
+      const dropdown = document.getElementById('customDropdown');
+      const input = document.getElementById('itemName');
+      const rect = input.getBoundingClientRect();
+
+      dropdown.style.display = 'block';
+      dropdown.style.top = `${rect.height}px`;
+      dropdownVisible = true;
+    }
+
+    function hideCustomDropdown() {
+      console.log('hideCustomDropdown called');
+      document.getElementById('customDropdown').style.display = 'none';
+      dropdownVisible = false;
+    }
+
+    function selectItem(key, color, boxContent) {
+      console.log('selectItem called with:', key, color, boxContent);
+      const itemNameInput = document.getElementById('itemName');
+      const colorInput = document.getElementById('color');
+      const boxContentInput = document.getElementById('boxContent');
+
+      const [name] = key.split('_');
+      itemNameInput.value = name;
+      colorInput.value = color || 'SURTIDO';
+      boxContentInput.value = boxContent || '';
+
+      console.log('After selectItem - itemName:', itemNameInput.value, 'color:', colorInput.value, 'boxContent:', boxContentInput.value);
+      hideCustomDropdown();
+    }
+
+    function autoFillColor() {
+      const key = document.getElementById('itemName').value;
+      if (key.includes('_')) {
+        const [name, color, boxContent] = key.split('_');
+        document.getElementById('color').value = color || 'SURTIDO';
+        document.getElementById('boxContent').value = boxContent || '';
+      }
+    }
+
+    function addRecord() {
+      const formData = {
+        itemName: document.getElementById('itemName').value || '',
+        color: document.getElementById('color').value,
+        boxContent: parseInt(document.getElementById('boxContent').value) || 0,
+        safeStock: parseInt(document.getElementById('safeStock').value) || 0,
+        initialStock: parseInt(document.getElementById('initialStock').value) || 0
+      };
+      if (!formData.itemName || !formData.boxContent) {
+        alert('필수 항목(품명, 박스당수량)을 입력하세요.');
+        return;
+      }
+      records.push(formData);
+      updateTable();
+      clearForm();
+      toggleScroll();
+      updateTotals();
+    }
+
+    function updateTable() {
+      const tbody = document.getElementById('tableBody');
+      tbody.innerHTML = records.map((rec, idx) => `
+        <tr>
+          <td><input type="checkbox" class="rowCheckbox" data-index="${idx}"></td>
+          <td>${rec.itemName}</td>
+          <td contenteditable="true" class="editable" onblur="updateRecord(${idx}, 'color', this.textContent)">${rec.color}</td>
+          <td contenteditable="true" class="editable" onblur="updateRecord(${idx}, 'boxContent', this.textContent)">${rec.boxContent}</td>
+          <td>${rec.safeStock}</td>
+          <td>${rec.initialStock}</td>
+        </tr>
+      `).join('');
+    }
+
+    function updateRecord(index, field, value) {
+      if (field === 'boxContent') {
+        value = parseInt(value) || 0; // 박스당수량은 숫자 처리
+      } else {
+        value = value.trim(); // 색상은 문자열로 유지
+      }
+      records[index][field] = value;
+      updateTable(); // 테이블 갱신
+      updateTotals();
+    }
+
+    function clearForm() {
+      document.getElementById('itemName').value = '';
+      document.getElementById('color').value = 'SURTIDO';
+      document.getElementById('boxContent').value = '';
+      document.getElementById('safeStock').value = '';
+      document.getElementById('initialStock').value = '';
+    }
+
+    function toggleSelectAll() {
+      const checked = document.getElementById('selectAll').checked;
+      document.querySelectorAll('.rowCheckbox').forEach(cb => cb.checked = checked);
+    }
+
+    function deleteRecord() {
+      const toDelete = Array.from(document.querySelectorAll('.rowCheckbox:checked')).map(cb => parseInt(cb.dataset.index));
+      records = records.filter((_, idx) => !toDelete.includes(idx));
+      updateTable();
+      toggleScroll();
+      updateTotals();
+    }
+
+    function submitForm() {
+      if (!records.length) return alert('레코드가 없습니다.');
+      showConfirmModal();
+    }
+
+    function showConfirmModal() {
+      const tbody = document.getElementById('confirmBody');
+      tbody.innerHTML = records.map(rec => `
+        <tr>
+          <td>${rec.itemName}</td>
+          <td>${rec.color}</td>
+          <td>${rec.boxContent}</td>
+          <td>${rec.safeStock}</td>
+          <td>${rec.initialStock}</td>
+        </tr>
+      `).join('');
+      document.getElementById('confirmModal').style.display = 'block';
+    }
+
+    function confirmSubmit() {
+      google.script.run.withSuccessHandler(results => {
+        const duplicates = results.filter(r => !r.success);
+        if (duplicates.length > 0) {
+          alert(duplicates.map(d => `${d.message}: ${d.record.itemName}`).join('\n'));
+        } else {
+          records = [];
+          updateTable();
+          toggleScroll();
+          updateTotals();
+        }
+        document.getElementById('confirmModal').style.display = 'none';
+      }).withFailureHandler(handleError).registerProduct(records);
+    }
+
+    function cancelSubmit() {
+      document.getElementById('confirmModal').style.display = 'none';
+    }
+
+    function toggleScroll() {
+      const table = document.getElementById('scrollableTable');
+      table.classList.toggle('scroll-enabled', document.querySelectorAll('#tableBody tr').length >= 5);
+    }
+
+    function updateTotals() {
+      document.getElementById('totalItems').textContent = records.length;
+    }
+
+    function handleError(error) {
+      console.error('Error:', error);
+      alert('오류 발생: ' + error.message);
+    }
+  </script>
+</body>
+</html>

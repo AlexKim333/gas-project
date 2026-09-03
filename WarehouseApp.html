@@ -1,0 +1,1699 @@
+<html>
+<head>
+  <base target="_top">
+  <style>
+    :root {
+      --primary-color: #4CAF50;
+      --submit-color: #2196F3;
+      --banner-in: #ffe0e0;
+      --banner-out: #e0ffe0;
+      --highlight-color: #e0ffe0;
+    }
+    body {
+      font-family: Arial, sans-serif;
+      padding: 0;
+      margin: 0;
+      background-color: #f0f0f0;
+      height: 851px;
+      width: 1075px;
+      overflow: hidden;
+    }
+    .container { display: flex; flex-direction: column; height: 100%; }
+    .banner {
+      width: 100%;
+      height: 90px;
+      border-bottom: 1px solid #000;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      align-items: flex-start;
+      font-size: 12pt;
+      font-weight: bold;
+    }
+    .banner div { display: flex; align-items: center; }
+    .content { flex: 1; display: flex; width: 1075px; }
+    .admin-input {margin-left:100px;}
+    .admin-select {
+      margin-left: 10px;
+      width: 200px;
+      padding: 5px;
+      font-size: 10pt;
+    }
+    .menu {
+      width: 131px;
+      padding: 10px;
+      background-color: #ddd;
+      border-right: 1px solid #000;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+    }
+    .menu button {
+      width: 100px;
+      padding: 10px;
+      margin-bottom: 20px;
+      background-color: var(--primary-color);
+      color: white;
+      border: none;
+      cursor: pointer;
+      font-size: 10pt;
+      white-space: nowrap;
+    }
+    .menu button:hover, .menu button.active { background-color: #45a049; }
+    .input-area {
+      flex: 1;
+      padding: 10px;
+      display: flex;
+      flex-direction: row;
+      gap: 10px;
+      height: calc(100% - 20px);
+      overflow: hidden;
+    }
+    .input-section { flex: 3; display: flex; flex-direction: column; }
+    .table-section { flex: 7; display: flex; flex-direction: column; overflow: hidden; }
+    .form-group { margin-bottom: 20px; }
+    label {
+      display: inline-block;
+      width: 100px;
+      margin-right: 10px;
+      font-size: 10pt;
+    }
+    select, input[type="text"], input[type="number"] {
+      width: 200px;
+      padding: 5px;
+      font-size: 10pt;
+    }
+    .input-row { margin-bottom: 10px; display: flex; align-items: center; position: relative; }
+    .unit-options { margin-bottom: 10px; display: flex; align-items: center; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: center;
+      font-size: 10pt;
+    }
+    th {
+      background-color: #f2f2f2;
+      height: 40px;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+    td { height: 40px; }
+    .scrollable-table {
+      overflow-y: hidden;
+      border: 1px solid #ddd;
+      flex: 1;
+    }
+    .scrollable-table.scroll-enabled { max-height: 300px; overflow-y: auto; }
+    .buttons { margin-bottom: 10px; display: flex; gap: 10px; align-items: center; }
+    button {
+      padding: 10px 20px;
+      background-color: var(--primary-color);
+      color: white;
+      border: none;
+      cursor: pointer;
+      font-size: 10pt;
+    }
+    button.submit { background-color: var(--submit-color); }
+    button:hover { background-color: #45a049; }
+    .total-label { margin-left: 10px; font-size: 10pt; font-weight: bold; }
+    .dropdown-container {
+      background-color: white;
+      border: 1px solid #ddd;
+      max-height: 200px;
+      overflow-y: auto;
+      z-index: 10;
+      width: 400px;
+      margin-top: 0;
+      position: absolute;
+      left: 110px;
+    }
+    .dropdown-container ul { list-style: none; padding: 0; margin: 0; }
+    .dropdown-container li { padding: 5px 10px; font-size: 10pt; cursor: pointer; }
+    .dropdown-container li:hover { background-color: #f0f0f0; }
+    .editable { background-color: #fff; cursor: text; }
+    .editable:focus { outline: 2px solid var(--submit-color); }
+    #recordTable th:nth-child(1), #recordTable td:nth-child(1) { width: 30px; }
+    #recordTable th:nth-child(2), #recordTable td:nth-child(2) { width: 200px; }
+    #recordTable th:nth-child(3), #recordTable td:nth-child(3) { width: 150px; }
+    #recordTable th:nth-child(4), #recordTable td:nth-child(4) { width: 120px; }
+    #recordTable th:nth-child(5), #recordTable td:nth-child(5) { width: 120px; }
+    #recordTable th:nth-child(6), #recordTable td:nth-child(6) { width: 100px; }
+    #recordTable th:nth-child(7), #recordTable td:nth-child(7) { width: 120px; }
+    .modal {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background-color: white;
+      padding: 20px;
+      border: 1px solid #ddd;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      z-index: 1000;
+      width: 80%;
+      max-width: 900px;
+      max-height: 80%;
+      overflow-y: auto;
+    }
+    .modal table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    .modal th, .modal td { border: 1px solid #ddd; padding: 8px; text-align: center; font-size: 10pt; }
+    .modal th { background-color: #f2f2f2; }
+    #modalButtons { margin-top: 15px; text-align: center; }
+    #modalButtons .button-container { margin: 0 5px; display: inline-block; position: relative; }
+    #modalButtons button { padding: 10px 20px; font-size: 10pt; }
+    .processing-button {
+      background-color: #add8e6;
+      color: #666;
+      cursor: default;
+      opacity: 0.7;
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2;
+    }
+    #pendingModal {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background-color: white;
+      padding: 20px;
+      border: 1px solid #ddd;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      z-index: 1000;
+      width: 80%;
+      max-width: 900px;
+      max-height: 80%;
+      overflow: hidden;
+    }
+    #pendingModal .modal-content {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+    #pendingModal .banner {
+      background-color: #f2f2f2;
+      padding: 10px;
+      font-size: 12pt;
+      font-weight: bold;
+      text-align: center;
+      border-bottom: 1px solid #ddd;
+    }
+    #pendingModal .grid-container {
+      flex: 1;
+      display: flex;
+      padding: 10px;
+      gap: 10px;
+      overflow: hidden;
+    }
+    #pendingModal .summary-grid {
+      flex: 1;
+      overflow-y: auto;
+      border: 1px solid #ddd;
+      max-height: 300px
+      
+    }
+    #pendingModal .detail-grid {
+      flex: 2;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    #pendingModal .detail-grid .buttons {
+      margin-bottom: 10px;
+      display: flex;
+      gap: 10px;
+    }
+    #pendingModal .detail-table {
+      flex: 1;
+      overflow-y: auto;
+      border: 1px solid #ddd;
+      max-height: 300px
+      /* Added to limit height and trigger scrollbar */
+      
+    }
+    /* Ensure tables fill their containers properly */
+#pendingModal .summary-grid table,
+#pendingModal .detail-table table {
+  width: 100%;
+  min-height: 100%; /* Ensure table takes full container height */
+}
+
+/* Optional: Style the scrollbar for better visibility */
+#pendingModal .summary-grid::-webkit-scrollbar,
+#pendingModal .detail-table::-webkit-scrollbar {
+  width: 10px;
+}
+
+#pendingModal .summary-grid::-webkit-scrollbar-thumb,
+#pendingModal .detail-table::-webkit-scrollbar-thumb {
+  background-color: #888;
+  border-radius: 5px;
+}
+
+#pendingModal .summary-grid::-webkit-scrollbar-track,
+#pendingModal .detail-table::-webkit-scrollbar-track {
+  background-color: #f1f1f1;
+}
+    #pendingModal .selected-row {
+      background-color: var(--highlight-color);
+    }
+    #stockWarningModal {
+      display: none;
+      position: fixed;
+      top: 20%;
+      left: 50%;
+      transform: translateX(-50%);
+      background: white;
+      padding: 20px;
+      border: 1px solid #ccc;
+      z-index: 1000;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="banner">
+      <div id="formTitle"></div>
+      <div>
+        <div><label>날짜/시간:</label><input type="text" id="datetime" readonly style="width: 200px;"></div>
+        <div style="margin-top: 5px;" id="invoiceRow"><span id="invoiceLabel"></span><span id="invoiceNumber">001</span></div>
+        <div style="margin-top: 5px;"><label>관리자:</label><select id="adminSelect" class="admin-select">
+        <option value="ADMIN">ADMIN</option>
+      </select></div>
+      </div>
+    </div>
+    <div class="content">
+      <div class="menu">
+        <button onclick="setPage('입고입력')" class="active">입고입력</button>
+        <button onclick="setPage('출고입력')">출고입력</button>
+        <button onclick="setPage('상품등록')">상품등록</button>
+      </div>
+      <div class="input-area">
+        <div class="input-section">
+          <div class="form-group" id="formInputs"></div>
+        </div>
+        <div class="table-section">
+          <div class="buttons">
+            <button onclick="addRecord()" tabindex="7">추가</button>
+            <button onclick="deleteRecord()" tabindex="8">삭제</button>
+            <button class="submit" onclick="submitForm()" tabindex="9">제출</button>
+            <button onclick="savePending()" tabindex="10">보류</button>
+            <button onclick="showPendingModal()" tabindex="11" id="pendingSearchButton">보류 검색 (<span id="pendingCount">0</span>)</button>
+            <span class="total-label">품목합산: <span id="totalItems">0</span></span>
+            <span class="total-label" id="totalBoxesLabel"></span>
+            <span class="total-label" id="totalIndividualsLabel"></span>
+          </div>
+          <div class="scrollable-table" id="scrollableTable">
+            <table id="recordTable">
+              <thead id="tableHeader"></thead>
+              <tbody id="tableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="confirmModal" class="modal">
+      <h3 id="confirmTitle"></h3>
+      <table id="confirmTable">
+        <thead id="confirmHeader"></thead>
+        <tbody id="confirmBody"></tbody>
+      </table>
+      <div id="modalButtons">
+        <div class="button-container">
+          <button onclick="confirmSubmit()">확인</button>
+        </div>
+        <div class="button-container">
+          <button onclick="cancelSubmit()">취소</button>
+        </div>
+      </div>
+    </div>
+    <div id="pendingModal" class="modal">
+      <div class="modal-content">
+        <div class="banner">
+          보류 목록 (총 <span id="totalPendingCount">0</span>건)
+        </div>
+        <div class="grid-container">
+          <div class="summary-grid">
+            <table id="pendingSummaryTable">
+              <thead>
+                <tr>
+                  <th>보류 번호</th>
+                  <th>등록 날짜</th>
+                  <th>위치</th>
+                  <th>관리자</th>
+                  <th>품목 수</th>
+                </tr>
+              </thead>
+              <tbody id="pendingSummaryBody"></tbody>
+            </table>
+          </div>
+          <div class="detail-grid">
+            <div class="buttons">
+              <button onclick="navigatePending('prev')">←</button>
+              <button onclick="navigatePending('next')">→</button>
+              <button onclick="loadPending()">선택</button>
+              <button onclick="deletePending()">삭제</button>
+              <button onclick="cancelPendingModal()">취소</button>
+            </div>
+            <div class="detail-table">
+              <table id="pendingDetailTable">
+                <thead id="pendingDetailHeader"></thead>
+                <tbody id="pendingDetailBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="stockWarningModal" class="modal">
+      <p id="warningMessage"></p>
+      <button onclick="closeStockWarningModal()">닫기</button>
+    </div>
+    <iframe id="printFrame" style="display: none;"></iframe>
+  </div>
+
+<script>
+let dropdownVisible = false;
+let records = [];
+let currentType = '<?!= currentType ?>';
+let currentInvoiceNumber = '';
+let unitType = 'box';
+let pendingRecord = <?!= pendingRecord ?>;
+let selectedPendingIndex = -1;
+let stockDataCache = [];
+let locationCache = [];
+let debounceTimeout;
+let isLoadingStockData = false;
+
+const typeConfig = {
+  'in': {
+    title: '입고입력', bannerColor: 'var(--banner-in)', processFunction: 'processInForm',
+    locationsFunction: 'getInLocations', invoiceFunction: 'getInitialInvoiceNumber',
+    locationLabel: '입고처:', qtyLabel: '입고수량:', invoiceLabel: '입고증번호:',
+    totalBoxesLabel: '박스수합산: ', totalIndividualsLabel: '갯수입고합산: ',
+    tableHeaders: ['품명', '컬러', '박스입고수량', '낱개입고수량', '박스당내용물개수', '입고처'],
+    confirmTitle: '입고사항 확인',
+    pendingStorageKey: 'pendingInRecordsList',
+    sessionStorageKey: 'pendingInRecords',
+    metadataStorageKey: 'pendingInMetadata',
+    inputs: `
+      <div class="input-row"><label id="locationLabel"></label><select id="location" name="location" tabindex="1" onchange="saveMetadata()"><option value="">선택</option></select></div>
+      <div class="unit-options">
+        <label><input type="radio" name="unitType" value="box" checked onchange="updateUnitType()"> 상자</label>
+        <label><input type="radio" name="unitType" value="individual" onchange="updateUnitType()"> 낱개</label>
+      </div>
+      <div class="input-row"><label for="itemName">품명:</label><input type="text" id="itemName" name="itemName" autocomplete="off" oninput="filterItems(this.value)" onchange="autoFillColor()" tabindex="2"><div id="customDropdown" class="dropdown-container" style="display: none;"><ul id="itemSuggestionsList"></ul></div></div>
+      <div class="input-row"><label for="color">색상:</label><input type="text" id="color" name="color" value="SURTIDO" tabindex="3"></div>
+      <div class="input-row"><label id="qtyLabel"></label><input type="number" id="qty" name="qty" tabindex="4"></div>
+      <div class="input-row"><label for="boxContent"> 박스당내용개수:</label><input type="number" id="boxContent" name="boxContent" tabindex="5"></div>
+    `
+  },
+  'out': {
+    title: '출고입력', bannerColor: 'var(--banner-out)', processFunction: 'processOutForm',
+    locationsFunction: 'getOutLocations', invoiceFunction: 'getInitialOutInvoiceNumber',
+    locationLabel: '출고처:', qtyLabel: '출고수량:', invoiceLabel: '출고증번호:',
+    totalBoxesLabel: '박스수합산: ', totalIndividualsLabel: '갯수출고합산: ',
+    tableHeaders: ['품명', '컬러', '박스출고수량', '낱개출고수량', '박스당물개수', '출고처'],
+    confirmTitle: '출고사항 확인',
+    pendingStorageKey: 'pendingOutRecordsList',
+    sessionStorageKey: 'pendingOutRecords',
+    metadataStorageKey: 'pendingOutMetadata',
+    inputs: `
+      <div class="input-row"><label id="locationLabel"></label><select id="location" name="location" tabindex="1" onchange="saveMetadata()"><option value="">선택</option></select></div>
+      <div class="unit-options">
+        <label><input type="radio" name="unitType" value="box" checked onchange="updateUnitType()"> 상자</label>
+        <label><input type="radio" name="unitType" value="individual" onchange="updateUnitType()"> 낱개</label>
+      </div>
+      <div class="input-row"><label for="itemName">품명:</label><input type="text" id="itemName" name="itemName" autocomplete="off" oninput="filterItems(this.value)" onchange="autoFillColor()" tabindex="2"><div id="customDropdown" class="dropdown-container" style="display: none;"><ul id="itemSuggestionsList"></ul></div></div>
+      <div class="input-row"><label for="color">색상:</label><input type="text" id="color" name="color" value="SURTIDO" tabindex="3"></div>
+      <div class="input-row"><label id="qtyLabel"></label><input type="number" id="qty" name="qty" tabindex="4"></div>
+      <div class="input-row"><label for="boxContent"> 박스당내용개수:</label><input type="number" id="boxContent" name="boxContent" tabindex="5"></div>
+    `
+  },
+  'product': {
+    title: '상품등록', bannerColor: '#f0f0f0', processFunction: 'registerProduct',
+    confirmTitle: '상품 등록 확인',
+    tableHeaders: ['품명', '색상', '박스당수량', '안전재고', '기초재고', '제조사'],
+    inputs: `
+      <div class="input-row"><label for="itemName">품명:</label><input type="text" id="itemName" name="itemName" autocomplete="off" oninput="filterItems(this.value)" onchange="autoFillColor()" tabindex="1"><div id="customDropdown" class="dropdown-container" style="display: none;"><ul id="itemSuggestionsList"></ul></div></div>
+      <div class="input-row"><label for="color">색상:</label><input type="text" id="color" name="color" value="SURTIDO" tabindex="2"></div>
+      <div class="input-row"><label for="boxContent">박스당수량:</label><input type="number" id="boxContent" name="boxContent" tabindex="3"></div>
+      <div class="input-row"><label for="safeStock">안전재고:</label><input type="number" id="safeStock" name="safeStock" tabindex="4"></div>
+      <div class="input-row"><label for="initialStock">기초재고:</label><input type="number" id="initialStock" name="initialStock" tabindex="5"></div>
+      <div class="input-row"><label for="manufacturer">제조사:</label><select id="manufacturer" name="manufacturer" tabindex="6"><option value="">선택</option></select></div>
+    `
+  }
+};
+
+function loadStockData() {
+  if (isLoadingStockData) return;
+  isLoadingStockData = true;
+  const loadingIndicator = document.createElement('div');
+  loadingIndicator.id = 'loadingIndicator';
+  loadingIndicator.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 10px; border: 1px solid #ccc; z-index: 1000;';
+  loadingIndicator.textContent = '재고 데이터 로드 중...';
+  document.body.appendChild(loadingIndicator);
+
+  const timeoutPromise = new Promise((_, reject) => {
+    setTimeout(() => reject(new Error('재고 데이터 로드 타임아웃')), 30000);
+  });
+
+  const loadPromise = new Promise((resolve, reject) => {
+    google.script.run
+      .withSuccessHandler(resolve)
+      .withFailureHandler(reject)
+      .getStockData();
+  });
+
+  Promise.race([loadPromise, timeoutPromise])
+    .then(data => {
+      stockDataCache = data;
+      isLoadingStockData = false;
+      document.body.removeChild(loadingIndicator);
+    })
+    .catch(err => {
+      isLoadingStockData = false;
+      alert('재고 데이터를 불러오는 데 실패했습니다: ' + err.message);
+      document.body.removeChild(loadingIndicator);
+      stockDataCache = stockDataCache || [];
+    });
+}
+
+function loadManufacturers() {
+  google.script.run
+    .withSuccessHandler(manufacturers => {
+      const select = document.getElementById('manufacturer');
+      if (select) {
+        select.innerHTML = '<option value="">선택</option>' + 
+          manufacturers.map(m => `<option value="${m}">${m}</option>`).join('');
+      }
+    })
+    .withFailureHandler(error => {
+      alert('제조사 데이터를 불러오는 데 실패했습니다.');
+    })
+    .getManufacturers();
+}
+
+function loadAdminList() {
+  google.script.run
+    .withSuccessHandler(admins => {
+      const select = document.getElementById('adminSelect');
+      if (!select) return;
+      select.innerHTML = '<option value="ADMIN" selected>ADMIN</option>' +
+        admins.map(admin => `<option value="${admin}">${admin}</option>`).join('');
+      restoreMetadata();
+      updatePendingCount();
+    })
+    .withFailureHandler(error => {
+      alert('관리자 목록을 불러오는 데 실패했습니다: ' + error.message);
+    })
+    .getAdminList();
+}
+
+function saveMetadata() {
+  if (currentType === 'product') return;
+  try {
+    const storageKey = typeConfig[currentType].metadataStorageKey;
+    const locationSelect = document.getElementById('location');
+    const adminSelect = document.getElementById('adminSelect');
+    const metadata = {
+      location: locationSelect ? locationSelect.value : '',
+      admin: adminSelect ? adminSelect.value : 'ADMIN'
+    };
+    localStorage.setItem(storageKey, JSON.stringify(metadata));
+  } catch (e) {
+  }
+}
+
+function restoreMetadata() {
+  if (currentType === 'product') return;
+  try {
+    const storageKey = typeConfig[currentType].metadataStorageKey;
+    const savedMetadata = localStorage.getItem(storageKey);
+    if (savedMetadata) {
+      const metadata = JSON.parse(savedMetadata);
+      const locationSelect = document.getElementById('location');
+      const adminSelect = document.getElementById('adminSelect');
+      if (locationSelect && metadata.location && Array.from(locationSelect.options).some(opt => opt.value === metadata.location)) {
+        locationSelect.value = metadata.location;
+      }
+      if (adminSelect && metadata.admin && Array.from(adminSelect.options).some(opt => opt.value === metadata.admin)) {
+        adminSelect.value = metadata.admin;
+      }
+    }
+  } catch (e) {
+    localStorage.removeItem(storageKey);
+  }
+}
+
+function setPage(page, initialData = null) {
+  currentType = page === '입고입력' ? 'in' : page === '출고입력' ? 'out' : 'product';
+  const config = typeConfig[currentType];
+  if (!config) {
+    alert(`오류: 페이지 유형 '${page}'를 설정할 수 없습니다.`);
+    return;
+  }
+
+  try {
+    const formTitle = document.getElementById('formTitle');
+    const banner = document.querySelector('.banner');
+    const formInputs = document.getElementById('formInputs');
+    const invoiceRow = document.getElementById('invoiceRow');
+    const confirmTitle = document.getElementById('confirmTitle');
+    const tableHeader = document.getElementById('tableHeader');
+    const confirmHeader = document.getElementById('confirmHeader');
+    const totalBoxesLabel = document.getElementById('totalBoxesLabel');
+    const totalIndividualsLabel = document.getElementById('totalIndividualsLabel');
+
+    if (formTitle) formTitle.innerText = config.title;
+    if (banner) banner.style.backgroundColor = config.bannerColor || '#f0f0f0';
+    if (formInputs) formInputs.innerHTML = config.inputs;
+    if (invoiceRow) invoiceRow.style.display = currentType === 'product' ? 'none' : 'block';
+
+    document.querySelectorAll('.menu button').forEach(btn => btn.classList.remove('active'));
+    const activeButton = document.querySelector(`.menu button[onclick="setPage('${page}')"]`);
+    if (activeButton) activeButton.classList.add('active');
+
+    // locationCache 초기화
+    locationCache = [];
+
+    setTimeout(() => {
+      try {
+        if (currentType !== 'product') {
+          const locationLabel = document.getElementById('locationLabel');
+          const qtyLabel = document.getElementById('qtyLabel');
+          const invoiceLabel = document.getElementById('invoiceLabel');
+          if (locationLabel) locationLabel.innerText = config.locationLabel;
+          if (qtyLabel) qtyLabel.innerText = config.qtyLabel;
+          if (invoiceLabel) invoiceLabel.innerText = config.invoiceLabel;
+          if (totalBoxesLabel) totalBoxesLabel.innerText = config.totalBoxesLabel + ' ';
+          if (totalIndividualsLabel) totalIndividualsLabel.innerText = config.totalIndividualsLabel + ' ';
+        } else {
+          if (totalBoxesLabel) totalBoxesLabel.innerText = '';
+          if (totalIndividualsLabel) totalIndividualsLabel.innerText = '';
+          loadManufacturers();
+        }
+        if (confirmTitle) confirmTitle.innerText = config.confirmTitle;
+        if (tableHeader) tableHeader.innerHTML = `<tr><th><input type="checkbox" id="selectAll" onclick="toggleSelectAll()"></th>${config.tableHeaders.map(h => `<th>${h}</th>`).join('')}</tr>`;
+        if (confirmHeader) confirmHeader.innerHTML = `<tr>${config.tableHeaders.map(h => `<th>${h}</th>`).join('')}</tr>`;
+        if (currentType !== 'product') {
+          loadDropdowns();
+          getInitialInvoice();
+        }
+        if (currentType === 'product') {
+          const itemNameInput = document.getElementById('itemName');
+          const colorInput = document.getElementById('color');
+          const boxContentInput = document.getElementById('boxContent');
+          const manufacturerInput = document.getElementById('manufacturer');
+          if (initialData) {
+            if (itemNameInput) itemNameInput.value = initialData.itemName || '';
+            if (colorInput) colorInput.value = initialData.color || 'SURTIDO';
+            if (boxContentInput) boxContentInput.value = initialData.boxContent || '';
+            sessionStorage.removeItem('pendingData');
+          } else if (pendingRecord) {
+            if (itemNameInput) itemNameInput.value = pendingRecord.itemName || '';
+            if (colorInput) colorInput.value = pendingRecord.color || 'SURTIDO';
+            if (boxContentInput) boxContentInput.value = pendingRecord.boxContent || '';
+            if (manufacturerInput) manufacturerInput.value = pendingRecord.manufacturer || '';
+            pendingRecord = null;
+          }
+          records = [];
+          updateTable();
+        } else {
+          loadTableData();
+          const savedData = sessionStorage.getItem('pendingData');
+          let restoredFromSession = false;
+          if (savedData) {
+            try {
+              const data = JSON.parse(savedData);
+              if (data.type === currentType) {
+                const itemNameInput = document.getElementById('itemName');
+                const colorInput = document.getElementById('color');
+                const boxContentInput = document.getElementById('boxContent');
+                const qtyInput = document.getElementById('qty');
+                const locationSelect = document.getElementById('location');
+                if (itemNameInput) itemNameInput.value = data.itemName || '';
+                if (colorInput) colorInput.value = data.color || 'SURTIDO';
+                if (boxContentInput) boxContentInput.value = data.boxContent || '';
+                if (qtyInput) qtyInput.value = data.qty || (currentType === 'out' ? '1' : '0');
+                if (locationSelect) locationSelect.value = data.location || '';
+                const unitRadio = document.querySelector(`input[name="unitType"][value="${data.unitType}"]`);
+                if (unitRadio) unitRadio.checked = true;
+                sessionStorage.removeItem('pendingData');
+                restoredFromSession = true;
+              } else {
+                sessionStorage.removeItem('pendingData');
+              }
+            } catch (e) {
+              sessionStorage.removeItem('pendingData');
+            }
+          }
+          const qtyInput = document.getElementById('qty');
+          if (!restoredFromSession && qtyInput) {
+            qtyInput.value = currentType === 'out' ? '1' : '0';
+          }
+        }
+        setupDropdownEvents();
+        setupMetadataEvents();
+        updateTotals();
+        toggleScroll();
+        updatePendingCount();
+      } catch (error) {
+        alert('페이지 설정 중 오류가 발생했습니다.');
+      }
+    }, 0);
+  } catch (error) {
+    alert('페이지 기본 구조 설정 중 오류가 발생했습니다.');
+  }
+}
+
+function initPage() {
+  let initialPage = '상품등록';
+  if (currentType === 'in') initialPage = '입고입력';
+  else if (currentType === 'out') initialPage = '출고입력';
+  setPage(initialPage);
+  updateClock();
+  setInterval(updateClock, 1000);
+  loadAdminList();
+  loadStockData();
+}
+
+function saveTableData() {
+  if (currentType === 'product') return;
+  try {
+    const storageKey = typeConfig[currentType].sessionStorageKey;
+    localStorage.setItem(storageKey, JSON.stringify(records));
+    saveMetadata();
+  } catch (e) {
+  }
+}
+
+function loadTableData() {
+  if (currentType === 'product') {
+    records = [];
+    return;
+  }
+  const storageKey = typeConfig[currentType].sessionStorageKey;
+  const savedRecords = localStorage.getItem(storageKey);
+  if (savedRecords) {
+    try {
+      records = JSON.parse(savedRecords);
+    } catch (e) {
+      records = [];
+      localStorage.removeItem(storageKey);
+    }
+  } else {
+    records = [];
+  }
+  updateTable();
+  updateTotals();
+  toggleScroll();
+  restoreMetadata();
+}
+
+function updateClock() {
+  const datetimeInput = document.getElementById('datetime');
+  if (datetimeInput) datetimeInput.value = new Date().toLocaleString();
+}
+
+function loadDropdowns() {
+  if (locationCache.length > 0) {
+    const select = document.getElementById('location');
+    select.innerHTML = '<option value="">선택</option>' + locationCache.map(loc => `<option value="${loc}">${loc}</option>`).join('');
+    restoreMetadata();
+    return;
+  }
+  google.script.run.withSuccessHandler(data => {
+    locationCache = data;
+    const select = document.getElementById('location');
+    select.innerHTML = '<option value="">선택</option>' + data.map(loc => `<option value="${loc}">${loc}</option>`).join('');
+    restoreMetadata();
+  }).withFailureHandler(handleError)[typeConfig[currentType].locationsFunction]();
+}
+
+function getInitialInvoice() {
+  google.script.run.withSuccessHandler(num => {
+    currentInvoiceNumber = num;
+    const invoiceSpan = document.getElementById('invoiceNumber');
+    if (invoiceSpan) invoiceSpan.textContent = num; // +1 하지 않음
+  }).withFailureHandler(handleError)[typeConfig[currentType].invoiceFunction]();
+}
+
+function filterItems(searchText) {
+  if (!searchText.trim()) {
+    hideCustomDropdown();
+    return;
+  }
+
+  if (isLoadingStockData) return;
+
+  clearTimeout(debounceTimeout);
+  debounceTimeout = setTimeout(() => {
+    const list = document.getElementById('itemSuggestionsList');
+    if (!list) return;
+
+    const filteredItems = stockDataCache
+      .filter(item => item.name.toLowerCase().includes(searchText.toLowerCase()))
+      .slice(0, 20);
+
+    list.innerHTML = '';
+    const fragment = document.createDocumentFragment();
+    filteredItems.forEach(item => {
+      const li = document.createElement('li');
+      li.textContent = `${item.name} (${item.color}, ${item.stockBox}박스 + ${item.stockIndividual}개, 안전재고 ${item.safeStock}, 포장 ${item.boxContent}개)`;
+      li.onclick = () => selectItem(item.key, item.color, item.boxContent);
+      fragment.appendChild(li);
+    });
+    list.appendChild(fragment);
+
+    if (filteredItems.length > 0) {
+      showCustomDropdown();
+    } else {
+      hideCustomDropdown();
+    }
+  }, 300); // 디바운스 시간 300ms로 변경
+}
+
+function showCustomDropdown() {
+  const dropdown = document.getElementById('customDropdown');
+  const input = document.getElementById('itemName');
+  if (!dropdown || !input) return;
+  dropdown.style.display = 'block';
+  dropdown.style.top = `${input.offsetTop + input.offsetHeight}px`;
+  dropdown.style.left = `${input.offsetLeft}px`;
+  dropdownVisible = true;
+}
+
+function hideCustomDropdown() {
+  const dropdown = document.getElementById('customDropdown');
+  if (dropdown) {
+    dropdown.style.display = 'none';
+    dropdownVisible = false;
+  }
+}
+
+function selectItem(key, color, boxContent) {
+  const itemNameInput = document.getElementById('itemName');
+  const colorInput = document.getElementById('color');
+  const boxContentInput = document.getElementById('boxContent');
+  if (!itemNameInput || !colorInput || !boxContentInput) return;
+  itemNameInput.value = currentType === 'product' ? key.split('_')[0] : key;
+  colorInput.value = color || 'SURTIDO';
+  boxContentInput.value = boxContent || '';
+  dropdownVisible = false;
+  hideCustomDropdown();
+}
+
+function autoFillColor() {
+  const itemNameInput = document.getElementById('itemName');
+  if (!itemNameInput) return;
+  const key = itemNameInput.value;
+  if (key.includes('_')) {
+    const [name, color, boxContent] = key.split('_');
+    const colorInput = document.getElementById('color');
+    const boxContentInput = document.getElementById('boxContent');
+    if (colorInput) colorInput.value = color || 'SURTIDO';
+    if (boxContentInput) boxContentInput.value = boxContent || '';
+  }
+}
+
+function updateUnitType() {
+  const checkedRadio = document.querySelector('input[name="unitType"]:checked');
+  if (checkedRadio) unitType = checkedRadio.value;
+}
+
+function checkItemAndStock(itemName, color, boxContent, qty, unitType) {
+  const key = `${itemName}_${color || 'SURTIDO'}_${boxContent || 0}`;
+  const item = stockDataCache.find(item => item.key === key);
+
+  if (!item) {
+    return { isRegistered: false };
+  }
+
+  if (unitType === 'box') {
+    return { isRegistered: true, isSufficient: item.stockBox >= qty, boxStock: item.stockBox };
+  } else {
+    let totalIndividual = item.stockIndividual;
+    let remainingQty = qty;
+    let boxesNeeded = 0;
+    let boxStock = item.stockBox;
+    while (totalIndividual < remainingQty && boxStock > 0) {
+      if (item.boxContent <= 0) {
+        return { isRegistered: true, isSufficient: false, message: '박스당 내용물 개수가 유효하지 않습니다.' };
+      }
+      boxesNeeded++;
+      totalIndividual += item.boxContent;
+      boxStock--;
+    }
+    return {
+      isRegistered: true,
+      isSufficient: totalIndividual >= remainingQty && boxStock >= 0,
+      boxStock: item.stockBox,
+      individualStock: item.stockIndividual,
+      boxesNeeded
+    };
+  }
+}
+
+function addRecord() {
+  if (currentType === 'product') {
+    const itemNameInput = document.getElementById('itemName');
+    const colorInput = document.getElementById('color');
+    const boxContentInput = document.getElementById('boxContent');
+    const safeStockInput = document.getElementById('safeStock');
+    const initialStockInput = document.getElementById('initialStock');
+    const manufacturerInput = document.getElementById('manufacturer');
+    if (!itemNameInput || !colorInput || !boxContentInput || !safeStockInput || !initialStockInput || !manufacturerInput) {
+      alert('상품 등록 폼의 일부 요소를 찾을 수 없습니다.');
+      return;
+    }
+    const itemName = itemNameInput.value.split('_')[0] || '';
+    const color = colorInput.value;
+    const boxContent = parseInt(boxContentInput.value) || 0;
+    const safeStock = parseInt(safeStockInput.value) || 0;
+    const initialStock = parseInt(initialStockInput.value) || 0;
+    const manufacturer = manufacturerInput.value;
+    if (!itemName) {
+      alert('품명을 입력하세요.');
+      return;
+    }
+    const formData = {
+      itemName, color, boxContent, safeStock, initialStock, manufacturer
+    };
+    records.push(formData);
+    updateTable();
+    clearForm();
+    toggleScroll();
+    updateTotals();
+    return;
+  }
+
+  const unitTypeRadio = document.querySelector('input[name="unitType"]:checked');
+  const qtyInput = document.getElementById('qty');
+  const itemNameInput = document.getElementById('itemName');
+  const colorInput = document.getElementById('color');
+  const boxContentInput = document.getElementById('boxContent');
+  const locationSelect = document.getElementById('location');
+  if (!unitTypeRadio || !qtyInput || !itemNameInput || !colorInput || !boxContentInput || !locationSelect) {
+    alert('입출고 폼의 일부 요소를 찾을 수 없습니다.');
+    return;
+  }
+  const unitType = unitTypeRadio.value;
+  const qty = parseInt(qtyInput.value) || 0;
+  const itemName = itemNameInput.value.split('_')[0] || '';
+  const color = colorInput.value;
+  const boxContent = parseInt(boxContentInput.value) || 0;
+  const location = locationSelect.value;
+  if (!itemName || !location || (!qty && unitType === 'box') || (!qty && unitType === 'individual')) {
+    alert('필수 항목(품명, 입출고처, 수량)을 입력하세요.');
+    return;
+  }
+
+  const stockInfo = checkItemAndStock(itemName, color, boxContent, qty, unitType);
+  if (!stockInfo.isRegistered) {
+    const confirmRegister = confirm('등록되지 않은 상품입니다. 상품을 등록하시겠습니까?');
+    if (confirmRegister) {
+      const productData = { itemName, color, boxContent };
+      const originalData = { itemName, color, boxContent, qty, unitType, location, type: currentType };
+      saveTableData();
+      try {
+        sessionStorage.setItem('pendingData', JSON.stringify(originalData));
+      } catch (e) {
+      }
+      setPage('상품등록', productData);
+    }
+    return;
+  }
+
+  if (currentType === 'out' && !stockInfo.isSufficient) {
+    showStockWarningModal(qty, unitType === 'box' ? stockInfo.boxStock : stockInfo.individualStock, unitType === 'box' ? '박스' : '낱개');
+    return;
+  }
+
+  const formData = {
+    itemName,
+    color,
+    boxQty: unitType === 'box' ? (currentType === 'in' ? qty : -qty) : 0,
+    individualQty: unitType === 'individual' ? (currentType === 'in' ? qty : -qty) : 0,
+    boxContent,
+    location,
+    unitType
+  };
+
+  if (currentType === 'out' && unitType === 'individual') {
+    const proceed = confirm('낱개출고입니다. 진행할까요?');
+    if (!proceed) {
+      return;
+    }
+  }
+  records.push(formData);
+  saveTableData();
+  updateTable();
+  clearForm();
+  toggleScroll();
+  updateTotals();
+}
+
+function showStockWarningModal(orderQty, currentStock, unit) {
+  const message = `재고가 부족합니다 주문: ${orderQty}${unit}, 현재고: ${currentStock}${unit}`;
+  const warningMessageP = document.getElementById('warningMessage');
+  const stockWarningModalDiv = document.getElementById('stockWarningModal');
+  if (warningMessageP) warningMessageP.textContent = message;
+  if (stockWarningModalDiv) stockWarningModalDiv.style.display = 'block';
+}
+
+function closeStockWarningModal() {
+  const stockWarningModalDiv = document.getElementById('stockWarningModal');
+  if (stockWarningModalDiv) stockWarningModalDiv.style.display = 'none';
+}
+
+function updateTable() {
+  const tbody = document.getElementById('tableBody');
+  if (!tbody) return;
+  let html = '';
+  records.forEach((rec, idx) => {
+    html += currentType === 'product' ? `
+      <tr>
+        <td><input type="checkbox" class="rowCheckbox" data-index="${idx}"></td>
+        <td>${rec.itemName}</td>
+        <td contenteditable="true" class="editable" onblur="updateRecord(${idx}, 'color', this.textContent)">${rec.color}</td>
+        <td contenteditable="true" class="editable" onblur="updateRecord(${idx}, 'boxContent', this.textContent)">${rec.boxContent}</td>
+        <td>${rec.safeStock}</td>
+        <td>${rec.initialStock}</td>
+        <td>${rec.manufacturer || ''}</td>
+      </tr>
+    ` : `
+      <tr>
+        <td><input type="checkbox" class="rowCheckbox" data-index="${idx}"></td>
+        <td>${rec.itemName}</td>
+        <td>${rec.color}</td>
+        <td contenteditable="true" class="editable" onblur="updateRecord(${idx}, 'boxQty', this.textContent)">${currentType === 'in' ? rec.boxQty : Math.abs(rec.boxQty)}</td>
+        <td contenteditable="true" class="editable" onblur="updateRecord(${idx}, 'individualQty', this.textContent)">${currentType === 'in' ? rec.individualQty : Math.abs(rec.individualQty)}</td>
+        <td contenteditable="true" class="editable" onblur="updateRecord(${idx}, 'boxContent', this.textContent)">${rec.boxContent}</td>
+        <td>${rec.location}</td>
+      </tr>
+    `;
+  });
+  tbody.innerHTML = html;
+}
+
+function updateRecord(index, field, value) {
+  if (index < 0 || index >= records.length) return;
+  if (field === 'boxContent' || field === 'boxQty' || field === 'individualQty' || field === 'safeStock' || field === 'initialStock') {
+    value = parseInt(value) || 0;
+    if (field === 'boxQty' || field === 'individualQty') {
+      records[index][field] = currentType === 'in' ? value : -Math.abs(value);
+      if (field === 'boxQty' && value !== 0) records[index].individualQty = 0;
+      if (field === 'individualQty' && value !== 0) records[index].boxQty = 0;
+    } else {
+      records[index][field] = value;
+    }
+  } else {
+    records[index][field] = value.trim();
+  }
+  saveTableData();
+  updateTable();
+  updateTotals();
+}
+
+function clearForm() {
+  const itemNameInput = document.getElementById('itemName');
+  const colorInput = document.getElementById('color');
+  const boxContentInput = document.getElementById('boxContent');
+  const qtyInput = document.getElementById('qty');
+  const safeStockInput = document.getElementById('safeStock');
+  const initialStockInput = document.getElementById('initialStock');
+  const manufacturerInput = document.getElementById('manufacturer');
+  if (itemNameInput) itemNameInput.value = '';
+  if (colorInput) colorInput.value = 'SURTIDO';
+  if (boxContentInput) boxContentInput.value = '';
+  if (currentType === 'product') {
+    if (safeStockInput) safeStockInput.value = '';
+    if (initialStockInput) initialStockInput.value = '';
+    if (manufacturerInput) manufacturerInput.value = '';
+  } else {
+    if (qtyInput) qtyInput.value = currentType === 'out' ? '1' : '0';
+  }
+  hideCustomDropdown();
+}
+
+function toggleSelectAll() {
+  const selectAllCheckbox = document.getElementById('selectAll');
+  if (!selectAllCheckbox) return;
+  const checked = selectAllCheckbox.checked;
+  document.querySelectorAll('.rowCheckbox').forEach(cb => cb.checked = checked);
+}
+
+function deleteRecord() {
+  const toDelete = Array.from(document.querySelectorAll('.rowCheckbox:checked')).map(cb => parseInt(cb.dataset.index));
+  records = records.filter((_, idx) => !toDelete.includes(idx));
+  saveTableData();
+  updateTable();
+  toggleScroll();
+  updateTotals();
+}
+
+function submitForm() {
+  if (!records.length) {
+    alert('레코드가 없습니다.');
+    return;
+  }
+  showConfirmModal();
+}
+
+function showConfirmModal() {
+  const tbody = document.getElementById('confirmBody');
+  const confirmModalDiv = document.getElementById('confirmModal');
+  if (!tbody || !confirmModalDiv) return;
+  let html = '';
+  records.forEach(rec => {
+    html += currentType === 'product' ? `
+      <tr>
+        <td>${rec.itemName}</td>
+        <td>${rec.color}</td>
+        <td>${rec.boxContent}</td>
+        <td>${rec.safeStock}</td>
+        <td>${rec.initialStock}</td>
+        <td>${rec.manufacturer || ''}</td>
+      </tr>
+    ` : `
+      <tr>
+        <td>${rec.itemName}</td>
+        <td>${rec.color}</td>
+        <td>${currentType === 'in' ? rec.boxQty : Math.abs(rec.boxQty)}</td>
+        <td>${currentType === 'in' ? rec.individualQty : Math.abs(rec.individualQty)}</td>
+        <td>${rec.boxContent}</td>
+        <td>${rec.location}</td>
+      </tr>
+    `;
+  });
+  tbody.innerHTML = html;
+  confirmModalDiv.style.display = 'block';
+}
+
+function confirmSubmit() {
+  if (!records.length) {
+    alert('제출할 데이터가 없습니다.');
+    const confirmModalDiv = document.getElementById('confirmModal');
+    if (confirmModalDiv) confirmModalDiv.style.display = 'none';
+    return;
+  }
+  const buttonContainer = document.querySelector('#modalButtons .button-container:first-child');
+  if (!buttonContainer) return;
+  const originalButton = buttonContainer.querySelector('button');
+  if (!originalButton) return;
+  originalButton.style.visibility = 'hidden';
+  const processingButton = document.createElement('div');
+  processingButton.className = 'processing-button';
+  processingButton.textContent = '처리 중...';
+  buttonContainer.appendChild(processingButton);
+  const adminSelect = document.getElementById('adminSelect');
+  const adminValue = adminSelect ? adminSelect.value : 'ADMIN';
+  const recordsToPrint = [...records];
+  const type = currentType;
+  google.script.run
+    .withSuccessHandler(result => {
+      if (currentType === 'product') {
+        const duplicates = result.filter(r => !r.success);
+        if (duplicates.length > 0) {
+          alert('다음 상품은 이미 등록되어 있거나 오류가 발생했습니다:\n' + duplicates.map(d => `${d.record.itemName} (${d.record.color}) - ${d.message}`).join('\n'));
+        } else {
+          alert('상품이 성공적으로 등록되었습니다.');
+          records = [];
+          pendingRecord = null;
+          clearForm();
+        }
+        updateTable();
+        toggleScroll();
+        updateTotals();
+        const confirmModalDiv = document.getElementById('confirmModal');
+        if (confirmModalDiv) confirmModalDiv.style.display = 'none';
+        if (adminSelect) adminSelect.value = 'ADMIN';
+        originalButton.style.visibility = 'visible';
+        if (buttonContainer.contains(processingButton)) {
+          buttonContainer.removeChild(processingButton);
+        }
+        loadStockData();
+      } else {
+        alert('입출고가 성공적으로 처리되었습니다.');
+        printReceipt(recordsToPrint, type, new Date().toLocaleDateString(), adminValue, result, () => {
+          records = [];
+          updateTable();
+          toggleScroll();
+          currentInvoiceNumber = result;
+          const invoiceSpan = document.getElementById('invoiceNumber');
+          if (invoiceSpan) invoiceSpan.textContent = result; // 반드시 서버 번호로 갱신
+          updateTotals();
+          const storageKey = typeConfig[currentType].sessionStorageKey;
+          const metadataKey = typeConfig[currentType].metadataStorageKey;
+          localStorage.removeItem(storageKey);
+          localStorage.removeItem(metadataKey);
+          const locationSelect = document.getElementById('location');
+          if (locationSelect) locationSelect.value = '';
+          clearForm();
+          const confirmModalDiv = document.getElementById('confirmModal');
+          if (confirmModalDiv) confirmModalDiv.style.display = 'none';
+          if (adminSelect) adminSelect.value = 'ADMIN';
+          originalButton.style.visibility = 'visible';
+          if (buttonContainer.contains(processingButton)) {
+            buttonContainer.removeChild(processingButton);
+          }
+          loadStockData();
+        });
+      }
+    })
+    .withFailureHandler(err => {
+      handleError(err);
+      originalButton.style.visibility = 'visible';
+      if (buttonContainer.contains(processingButton)) {
+        buttonContainer.removeChild(processingButton);
+      }
+    })[typeConfig[currentType].processFunction](records, adminValue);
+}
+
+function cancelSubmit() {
+  const confirmModalDiv = document.getElementById('confirmModal');
+  if (confirmModalDiv) confirmModalDiv.style.display = 'none';
+}
+
+function savePending() {
+  if (!records.length) {
+    alert('보류할 레코드가 없습니다.');
+    return;
+  }
+  const locationSelect = document.getElementById('location');
+  const adminSelect = document.getElementById('adminSelect');
+  const datetimeInput = document.getElementById('datetime');
+  if (!locationSelect || !adminSelect || !datetimeInput) {
+    alert('필수 요소를 찾을 수 없습니다.');
+    return;
+  }
+  const pendingData = {
+    records: records,
+    location: locationSelect.value,
+    admin: adminSelect.value,
+    date: datetimeInput.value,
+    createdAt: new Date().toLocaleString()
+  };
+  const storageKey = typeConfig[currentType].pendingStorageKey;
+  let pendingList = [];
+  try {
+    const saved = localStorage.getItem(storageKey);
+    if (saved) pendingList = JSON.parse(saved);
+  } catch (e) {
+  }
+  pendingList.push(pendingData);
+  try {
+    localStorage.setItem(storageKey, JSON.stringify(pendingList));
+  } catch (e) {
+    alert('보류 데이터를 저장하는 데 실패했습니다.');
+    return;
+  }
+  if (currentType === 'out') {
+    google.script.run
+      .withSuccessHandler(() => {
+        records = [];
+        localStorage.removeItem(typeConfig[currentType].sessionStorageKey);
+        localStorage.removeItem(typeConfig[currentType].metadataStorageKey);
+        locationSelect.value = '';
+        adminSelect.value = 'ADMIN';
+        updateTable();
+        toggleScroll();
+        updateTotals();
+        updatePendingCount();
+        alert('보류가 저장되었습니다.');
+      })
+      .withFailureHandler(err => {
+        alert('재고 차감 중 오류가 발생했습니다: ' + err.message);
+        pendingList.pop();
+        localStorage.setItem(storageKey, JSON.stringify(pendingList));
+      })
+      .updateStockSheet(records, 'out');
+  } else {
+    records = [];
+    localStorage.removeItem(typeConfig[currentType].sessionStorageKey);
+    localStorage.removeItem(typeConfig[currentType].metadataStorageKey);
+    locationSelect.value = '';
+    adminSelect.value = 'ADMIN';
+    updateTable();
+    toggleScroll();
+    updateTotals();
+    updatePendingCount();
+    alert('보류가 저장되었습니다.');
+  }
+}
+
+function updatePendingCount() {
+  const storageKey = typeConfig[currentType].pendingStorageKey;
+  let pendingList = [];
+  try {
+    const saved = localStorage.getItem(storageKey);
+    if (saved) pendingList = JSON.parse(saved);
+  } catch (e) {
+  }
+  const countSpan = document.getElementById('pendingCount');
+  if (countSpan) countSpan.textContent = pendingList.length;
+}
+
+function showPendingModal() {
+  const storageKey = typeConfig[currentType].pendingStorageKey;
+  let pendingList = [];
+  try {
+    const saved = localStorage.getItem(storageKey);
+    if (saved) pendingList = JSON.parse(saved);
+  } catch (e) {
+  }
+  const totalCountSpan = document.getElementById('totalPendingCount');
+  const summaryBody = document.getElementById('pendingSummaryBody');
+  const detailHeader = document.getElementById('pendingDetailHeader');
+  const detailBody = document.getElementById('pendingDetailBody');
+  const modal = document.getElementById('pendingModal');
+  if (!totalCountSpan || !summaryBody || !detailHeader || !detailBody || !modal) return;
+  totalCountSpan.textContent = pendingList.length;
+  let summaryHtml = '';
+  pendingList.forEach((pending, idx) => {
+    const itemCount = new Set(pending.records.map(r => `${r.itemName}_${r.color}`)).size;
+    summaryHtml += `
+      <tr onclick="selectPending(${idx})" id="pendingRow${idx}">
+        <td>${idx + 1}</td>
+        <td>${pending.createdAt}</td>
+        <td>${pending.location}</td>
+        <td>${pending.admin}</td>
+        <td>${itemCount}</td>
+      </tr>
+    `;
+  });
+  summaryBody.innerHTML = summaryHtml;
+  detailHeader.innerHTML = `<tr>${typeConfig[currentType].tableHeaders.map(h => `<th>${h}</th>`).join('')}</tr>`;
+  detailBody.innerHTML = '';
+  selectedPendingIndex = -1;
+  if (pendingList.length > 0) {
+    selectPending(0);
+  }
+  modal.style.display = 'block';
+}
+
+function selectPending(index) {
+  if (index < 0) return;
+  const storageKey = typeConfig[currentType].pendingStorageKey;
+  let pendingList = [];
+  try {
+    const saved = localStorage.getItem(storageKey);
+    if (saved) pendingList = JSON.parse(saved);
+  } catch (e) {
+    return;
+  }
+  if (index >= pendingList.length) return;
+  selectedPendingIndex = index;
+  document.querySelectorAll('#pendingSummaryBody tr').forEach(row => row.classList.remove('selected-row'));
+  const row = document.getElementById(`pendingRow${index}`);
+  if (row) row.classList.add('selected-row');
+  const detailBody = document.getElementById('pendingDetailBody');
+  if (!detailBody) return;
+  let html = '';
+  pendingList[index].records.forEach(rec => {
+    html += `
+      <tr>
+        <td>${rec.itemName}</td>
+        <td>${rec.color}</td>
+        <td>${currentType === 'in' ? rec.boxQty : Math.abs(rec.boxQty)}</td>
+        <td>${currentType === 'in' ? rec.individualQty : Math.abs(rec.individualQty)}</td>
+        <td>${rec.boxContent}</td>
+        <td>${rec.location}</td>
+      </tr>
+    `;
+  });
+  detailBody.innerHTML = html;
+}
+
+function navigatePending(direction) {
+  const storageKey = typeConfig[currentType].pendingStorageKey;
+  let pendingList = [];
+  try {
+    const saved = localStorage.getItem(storageKey);
+    if (saved) pendingList = JSON.parse(saved);
+  } catch (e) {
+    return;
+  }
+  if (pendingList.length === 0) return;
+  let newIndex = selectedPendingIndex;
+  if (direction === 'prev') {
+    newIndex = selectedPendingIndex > 0 ? selectedPendingIndex - 1 : pendingList.length - 1;
+  } else if (direction === 'next') {
+    newIndex = selectedPendingIndex < pendingList.length - 1 ? selectedPendingIndex + 1 : 0;
+  }
+  selectPending(newIndex);
+}
+
+function loadPending() {
+  if (selectedPendingIndex < 0) {
+    alert('선택된 보류 데이터가 없습니다.');
+    return;
+  }
+  const storageKey = typeConfig[currentType].pendingStorageKey;
+  let pendingList = [];
+  try {
+    const saved = localStorage.getItem(storageKey);
+    if (saved) pendingList = JSON.parse(saved);
+  } catch (e) {
+    return;
+  }
+  if (selectedPendingIndex >= pendingList.length) return;
+  const pendingData = pendingList[selectedPendingIndex];
+  records = pendingData.records;
+  const locationSelect = document.getElementById('location');
+  const adminSelect = document.getElementById('adminSelect');
+  if (locationSelect) locationSelect.value = pendingData.location;
+  if (adminSelect) adminSelect.value = pendingData.admin;
+  pendingList.splice(selectedPendingIndex, 1);
+  try {
+    localStorage.setItem(storageKey, JSON.stringify(pendingList));
+  } catch (e) {
+    alert('보류 데이터 업데이트에 실패했습니다.');
+    return;
+  }
+  if (currentType === 'out') {
+    const restoreRecords = pendingData.records.map(rec => ({
+      ...rec,
+      boxQty: -Math.abs(rec.boxQty),
+      individualQty: -Math.abs(rec.individualQty)
+    }));
+    google.script.run
+      .withSuccessHandler(() => {
+        updateTable();
+        toggleScroll();
+        updateTotals();
+        updatePendingCount();
+        cancelPendingModal();
+        saveMetadata();
+        saveTableData();
+        alert('보류 데이터가 로드되었습니다.');
+      })
+      .withFailureHandler(err => {
+        alert('재고 복원 중 오류가 발생했습니다: ' + err.message);
+        pendingList.splice(selectedPendingIndex, 0, pendingData);
+        localStorage.setItem(storageKey, JSON.stringify(pendingList));
+      })
+      .updateStockSheet(restoreRecords, 'in');
+  } else {
+    updateTable();
+    toggleScroll();
+    updateTotals();
+    updatePendingCount();
+    cancelPendingModal();
+    saveMetadata();
+    saveTableData();
+    alert('보류 데이터가 로드되었습니다.');
+  }
+}
+
+function deletePending() {
+  if (selectedPendingIndex < 0) {
+    alert('선택된 보류 데이터가 없습니다.');
+    return;
+  }
+  const storageKey = typeConfig[currentType].pendingStorageKey;
+  let pendingList = [];
+  try {
+    const saved = localStorage.getItem(storageKey);
+    if (saved) pendingList = JSON.parse(saved);
+  } catch (e) {
+    return;
+  }
+  if (selectedPendingIndex >= pendingList.length) return;
+  const pendingData = pendingList[selectedPendingIndex];
+  pendingList.splice(selectedPendingIndex, 1);
+  try {
+    localStorage.setItem(storageKey, JSON.stringify(pendingList));
+  } catch (e) {
+    alert('보류 데이터 삭제에 실패했습니다.');
+    return;
+  }
+  if (currentType === 'out') {
+    const restoreRecords = pendingData.records.map(rec => ({
+      ...rec,
+      boxQty: -Math.abs(rec.boxQty),
+      individualQty: -Math.abs(rec.individualQty)
+    }));
+    google.script.run
+      .withSuccessHandler(() => {
+        const totalCountSpan = document.getElementById('totalPendingCount');
+        const summaryBody = document.getElementById('pendingSummaryBody');
+        const detailBody = document.getElementById('pendingDetailBody');
+        if (totalCountSpan) totalCountSpan.textContent = pendingList.length;
+        let summaryHtml = '';
+        pendingList.forEach((pending, idx) => {
+          const itemCount = new Set(pending.records.map(r => `${r.itemName}_${r.color}`)).size;
+          summaryHtml += `
+            <tr onclick="selectPending(${idx})" id="pendingRow${idx}">
+              <td>${idx + 1}</td>
+              <td>${pending.createdAt}</td>
+              <td>${pending.location}</td>
+              <td>${pending.admin}</td>
+              <td>${itemCount}</td>
+            </tr>
+          `;
+        });
+        if (summaryBody) summaryBody.innerHTML = summaryHtml;
+        if (detailBody) detailBody.innerHTML = '';
+        selectedPendingIndex = -1;
+        if (pendingList.length > 0) {
+          selectPending(0);
+        } else {
+          cancelPendingModal();
+        }
+        updatePendingCount();
+        alert('보류 데이터가 삭제되었습니다.');
+      })
+      .withFailureHandler(err => {
+        alert('재고 복원 중 오류가 발생했습니다: ' + err.message);
+        pendingList.splice(selectedPendingIndex, 0, pendingData);
+        localStorage.setItem(storageKey, JSON.stringify(pendingList));
+      })
+      .updateStockSheet(restoreRecords, 'in');
+  } else {
+    const totalCountSpan = document.getElementById('totalPendingCount');
+    const summaryBody = document.getElementById('pendingSummaryBody');
+    const detailBody = document.getElementById('pendingDetailBody');
+    if (totalCountSpan) totalCountSpan.textContent = pendingList.length;
+    let summaryHtml = '';
+    pendingList.forEach((pending, idx) => {
+      const itemCount = new Set(pending.records.map(r => `${r.itemName}_${r.color}`)).size;
+      summaryHtml += `
+        <tr onclick="selectPending(${idx})" id="pendingRow${idx}">
+          <td>${idx + 1}</td>
+          <td>${pending.createdAt}</td>
+          <td>${pending.location}</td>
+          <td>${pending.admin}</td>
+          <td>${itemCount}</td>
+        </tr>
+      `;
+    });
+    if (summaryBody) summaryBody.innerHTML = summaryHtml;
+    if (detailBody) detailBody.innerHTML = '';
+    selectedPendingIndex = -1;
+    if (pendingList.length > 0) {
+      selectPending(0);
+    } else {
+      cancelPendingModal();
+    }
+    updatePendingCount();
+    alert('보류 데이터가 삭제되었습니다.');
+  }
+}
+
+function cancelPendingModal() {
+  const modal = document.getElementById('pendingModal');
+  if (modal) modal.style.display = 'none';
+  selectedPendingIndex = -1;
+}
+
+function toggleScroll() {
+  const table = document.getElementById('scrollableTable');
+  if (table) {
+    table.classList.toggle('scroll-enabled', records.length >= 5);
+  }
+}
+
+function updateTotals() {
+  const totalItemsSpan = document.getElementById('totalItems');
+  const totalBoxesLabelSpan = document.getElementById('totalBoxesLabel');
+  const totalIndividualsLabelSpan = document.getElementById('totalIndividualsLabel');
+  if (!totalItemsSpan || !totalBoxesLabelSpan || !totalIndividualsLabelSpan) return;
+  if (currentType === 'product') {
+    totalItemsSpan.textContent = records.length;
+    totalBoxesLabelSpan.innerText = '';
+    totalIndividualsLabelSpan.innerText = '';
+  } else {
+    const totalItems = new Set(records.map(r => `${r.itemName}_${r.color}`)).size;
+    const totalBoxes = records.reduce((sum, r) => sum + (currentType === 'in' ? r.boxQty : Math.abs(r.boxQty)), 0);
+    const totalIndividuals = records.reduce((sum, r) => sum + (currentType === 'in' ? r.individualQty : Math.abs(r.individualQty)), 0);
+    totalItemsSpan.textContent = totalItems;
+    totalBoxesLabelSpan.innerText = `${typeConfig[currentType].totalBoxesLabel}${totalBoxes}`;
+    totalIndividualsLabelSpan.innerText = `${typeConfig[currentType].totalIndividualsLabel}${totalIndividuals}`;
+  }
+}
+
+function handleError(error) {
+  alert('오류 발생: ' + error.message);
+  const buttonContainer = document.querySelector('#modalButtons .button-container:first-child');
+  if (buttonContainer) {
+    const originalButton = document.querySelector('.processing-button');
+    if (originalButton) originalButton.style.visibility = 'visible';
+    if (processingButton && buttonContainer.contains(processingButton)) {
+      buttonContainer.removeChild(processingButton);
+    }
+  }
+}
+
+function printReceipt(records, type, selectedDate, admin, invoiceNumber, callback) {
+  const iframe = document.getElementById('printFrame');
+  if (!iframe) return;
+  const doc = iframe.contentWindow.document;
+  const formattedDate = selectedDate.replace(/-/g, '/');
+  const totalItems = new Set(records.map(r => `${r.itemName}_${r.color}`)).size;
+  const totalBoxes = records.reduce((sum, r) => sum + Math.abs(r.boxQty), 0);
+  const totalIndividuals = records.reduce((sum, r) => sum + Math.abs(r.individualQty), 0);
+  const rowsPerPage = 15;
+  const pages = Math.ceil(records.length / rowsPerPage);
+  const title = type === 'in' ? 'COMPROBANTE DE ENTRADA' : 'COMPROBANTE DE SALIDA';
+  const titleColor = type === 'in' ? 'red' : 'black';
+  const adminColor = admin === 'ADMIN' ? 'black' : 'green';
+  const adminStyle = `font-size: 11pt; color: ${adminColor};`;
+  let htmlContent = '';
+  const locationValue = records.length > 0 ? records[0].location : '미지정';
+  for (let page = 0; page < pages; page++) {
+    const startIdx = page * rowsPerPage;
+    const endIdx = Math.min(startIdx + rowsPerPage, records.length);
+    const pageRecords = records.slice(startIdx, endIdx);
+    let tableRows = '<tr><th>PRODUCTO</th><th>COLOR</th><th>BULTO</th><th>PZS</th><th>PZS/B</th><th>TOTAL</th></tr>';
+    for (let i = 0; i < 15; i++) {
+      if (i < pageRecords.length) {
+        const rec = pageRecords[i];
+        const boxQty = Math.abs(rec.boxQty);
+        const individualQty = Math.abs(rec.individualQty);
+        const boxContent = rec.boxContent || 0;
+        const totalIndividual = (boxQty * boxContent) + individualQty;
+        tableRows += `<tr><td>${rec.itemName}</td><td>${rec.color}</td><td>${boxQty}</td><td>${individualQty}</td><td>${boxContent}</td><td>${totalIndividual}</td></tr>`;
+      } else {
+        tableRows += `<tr><td></td><td></td><td></td><td></td><td></td><td></td></tr>`;
+      }
+    }
+    const summaryTable = page === 0 ? `
+      <table class="summary-table">
+        <tr><th>cant item</th><th>cant bulto</th><th>cant pzs</th></tr>
+        <tr><td>${totalItems}</td><td>${totalBoxes}</td><td>${totalIndividuals}</td></tr>
+      </table>
+    ` : '';
+    htmlContent += `
+      <div class="page">
+        <div class="receipt-container">
+          <div class="receipt">
+            <div class="header" style="color: ${titleColor};">${title}</div>
+            <div class="details">
+              <p>No: ${invoiceNumber}</p>
+              <p>fetcha: ${formattedDate}</p>
+              <p class="location">UBICACION: <span class="location-value">${locationValue}</span></p>
+              <p class="admin">VENDEDOR: <span style="${adminStyle}">${admin}</span></p>
+              ${summaryTable}
+            </div>
+            <table class="main-table">${tableRows}</table>
+            <div class="footer">
+              <span>ANIMO!!!</span>
+              <span class="page-number">${page + 1}-${pages}</span>
+            </div>
+          </div>
+          <div class="receipt">
+            <div class="header" style="color: ${titleColor};">${title}</div>
+            <div class="details">
+              <p>No: ${invoiceNumber}</p>
+              <p>fetcha: ${formattedDate}</p>
+              <p class="location">UBICACION: <span class="location-value">${locationValue}</span></p>
+              <p class="admin">VENDEDOR: <span style="${adminStyle}">${admin}</span></p>
+              ${summaryTable}
+            </div>
+            <table class="main-table">${tableRows}</table>
+            <div class="footer">
+              <span>ANIMO!!!</span>
+              <span class="page-number">${page + 1}-${pages}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+  doc.open();
+  doc.write(`
+    <html>
+      <head>
+        <style>
+          @page { size: letter landscape; margin: 0.5in; margin-bottom: 1in; }
+          body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
+          .page { width: 100%; height: 7.5in; display: flex; justify-content: center; align-items: center; page-break-after: always; margin-bottom: 0.5in; }
+          .receipt-container { display: flex; justify-content: space-between; width: 10in; margin-top: 0.2in; }
+          .receipt { width: 4.75in; border: 1px solid #000; padding: 0.1in; box-sizing: border-box; margin-bottom: 0.2in; }
+          .header { text-align: center; font-weight: bold; font-size: 14pt; margin-bottom: 0.2in; }
+          .details { font-size: 10pt; margin-bottom: 0.2in; }
+          .details p { margin: 0.05in 0; }
+          .location { font-size: 10pt; font-weight: bold; text-decoration: underline; }
+          .location-value { color: blue; font-size: 13pt; }
+          .admin { font-size: 9pt; font-weight: bold; }
+          .summary-table { width: 60%; margin: 0.1in auto; border-collapse: collapse; font-size: 10pt; }
+          .summary-table th, .summary-table td { border: 1px solid #000; padding: 0.05in; text-align: center; }
+          .summary-table th { background-color: #f2f2f2; font-weight: bold; }
+          .main-table { width: 100%; border-collapse: collapse; font-size: 10pt; }
+          .main-table th, .main-table td { border: 1px solid #000; padding: 0.05in; text-align: center; height: 0.3in; }
+          .main-table th { background-color: #f2f2f2; font-weight: bold; }
+          .footer { text-align: center; font-size: 10pt; margin-top: 0.2in; display: flex; justify-content: space-between; align-items: center; }
+          .page-number { font-weight: bold; }
+        </style>
+      </head>
+      <body>${htmlContent}</body>
+    </html>
+  `);
+  doc.close();
+  iframe.contentWindow.focus();
+  setTimeout(() => {
+    iframe.contentWindow.print();
+    setTimeout(() => {
+      if (typeof callback === 'function') {
+        callback();
+      }
+    }, 3000);
+  }, 500);
+}
+
+function setupDropdownEvents() {
+  const itemNameInput = document.getElementById('itemName');
+  if (itemNameInput) {
+    itemNameInput.addEventListener('blur', () => setTimeout(hideCustomDropdown, 100));
+  }
+  document.addEventListener('click', e => {
+    const dropdown = document.getElementById('customDropdown');
+    const itemName = document.getElementById('itemName');
+    if (dropdown && itemName && !itemName.contains(e.target) && !dropdown.contains(e.target)) {
+      hideCustomDropdown();
+    }
+  });
+}
+
+function setupMetadataEvents() {
+  const adminSelect = document.getElementById('adminSelect');
+  if (adminSelect) adminSelect.addEventListener('change', saveMetadata);
+}
+
+document.addEventListener('DOMContentLoaded', initPage);
+window.onload = initPage;
+</script>
+</body>
+</html>

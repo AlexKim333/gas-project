@@ -1,0 +1,12 @@
+﻿# Clasp credentials (DO NOT COMMIT)
+.clasprc.json
+
+# OS / Editor files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+.vscode/
+.idea/
+node_modules/
