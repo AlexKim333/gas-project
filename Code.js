@@ -848,7 +848,7 @@ function showApp(type, pendingData = null) {
   const template = HtmlService.createTemplateFromFile('WarehouseApp');
   template.currentType = type;
   template.pendingRecord = pendingData ? JSON.stringify(pendingData) : 'null';
-  const html = template.evaluate().setWidth(1075).setHeight(851);
+  const html = template.evaluate().setWidth(1180).setHeight(851);
   SpreadsheetApp.getUi().showModalDialog(html, '창고 관리');
 }
 

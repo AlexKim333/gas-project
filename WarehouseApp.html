@@ -282,12 +282,13 @@
     }
     .action-buttons {
       display: flex;
-      gap: 5px;
+      gap: 4px;
       align-items: center;
+      flex-wrap: nowrap;
     }
     .action-btn {
-      padding: 6px 12px;
-      font-size: 8.8pt;
+      padding: 5px 9px;
+      font-size: 8.5pt;
       font-weight: 700;
       border: none;
       border-radius: 5px;
@@ -296,7 +297,7 @@
       transition: all 0.15s ease;
       display: flex;
       align-items: center;
-      gap: 4px;
+      gap: 3px;
     }
     .action-btn:hover {
       opacity: 0.9;
@@ -342,16 +343,17 @@
     .totals-pill-bar {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
       background: #ffffff;
       border: 1px solid #cbd5e1;
-      padding: 5px 12px;
+      padding: 4px 10px;
       border-radius: 20px;
       box-shadow: 0 1px 2px rgba(0,0,0,0.04);
       white-space: nowrap;
+      flex-shrink: 0;
     }
     .total-pill {
-      font-size: 8.5pt;
+      font-size: 8.2pt;
       color: #475569;
       font-weight: 500;
     }
@@ -397,12 +399,12 @@
       background-color: #f8fafc;
     }
     #recordTable th:nth-child(1), #recordTable td:nth-child(1) { width: 34px; }
-    #recordTable th:nth-child(2), #recordTable td:nth-child(2) { width: 190px; }
-    #recordTable th:nth-child(3), #recordTable td:nth-child(3) { width: 120px; }
-    #recordTable th:nth-child(4), #recordTable td:nth-child(4) { width: 90px; }
-    #recordTable th:nth-child(5), #recordTable td:nth-child(5) { width: 90px; }
-    #recordTable th:nth-child(6), #recordTable td:nth-child(6) { width: 90px; }
-    #recordTable th:nth-child(7), #recordTable td:nth-child(7) { width: 120px; }
+    #recordTable th:nth-child(2), #recordTable td:nth-child(2) { width: 130px; }
+    #recordTable th:nth-child(3), #recordTable td:nth-child(3) { width: 95px; }
+    #recordTable th:nth-child(4), #recordTable td:nth-child(4) { width: 75px; }
+    #recordTable th:nth-child(5), #recordTable td:nth-child(5) { width: 75px; }
+    #recordTable th:nth-child(6), #recordTable td:nth-child(6) { width: 85px; }
+    #recordTable th:nth-child(7), #recordTable td:nth-child(7) { width: 175px; }
     .modal {
       display: none;
       position: fixed;
@@ -1214,13 +1216,13 @@
         <div class="table-section">
           <div class="table-top-bar">
             <div class="action-buttons">
-              <button type="button" class="action-btn btn-ocr" onclick="triggerHandwrittenImageUpload()" title="손글씨 주문서 사진 붙여넣기 (Ctrl+V) 또는 파일 선택">📷 주문서인식 (Ctrl+V)</button>
+              <button type="button" class="action-btn btn-ocr" onclick="triggerHandwrittenImageUpload()" title="손글씨 주문서 사진 붙여넣기 (Ctrl+V) 또는 파일 선택">📷 주문서 (Ctrl+V)</button>
               <input type="file" id="orderImageFileInput" accept="image/*" style="display:none;" onchange="handleImageFileSelect(event)">
               <button type="button" class="action-btn btn-add" onclick="addRecord()" tabindex="7">➕ 추가</button>
               <button type="button" class="action-btn btn-delete" onclick="deleteRecord()" tabindex="8">🗑️ 삭제</button>
               <button type="button" class="action-btn btn-submit" onclick="submitForm()" tabindex="9">🚀 제출</button>
               <button type="button" class="action-btn btn-pending" onclick="savePending()" tabindex="10">⏸️ 보류</button>
-              <button type="button" class="action-btn btn-pending-search" onclick="showPendingModal()" tabindex="11" id="pendingSearchButton">🔍 보류검색 (<span id="pendingCount">0</span>)</button>
+              <button type="button" class="action-btn btn-pending-search" onclick="showPendingModal()" tabindex="11" id="pendingSearchButton">🔍 보류 (<span id="pendingCount">0</span>)</button>
             </div>
             <div class="totals-pill-bar">
               <span class="total-pill">품목: <strong id="totalItems">0</strong></span>
