@@ -771,7 +771,7 @@ function filterItems(searchText) {
     filteredItems.forEach(item => {
       const li = document.createElement('li');
       li.textContent = `${item.name} (${item.color}, ${item.stockBox}박스 + ${item.stockIndividual}개, 안전재고 ${item.safeStock}, 포장 ${item.boxContent}개)`;
-      li.onclick = () => selectItem(item.key, item.color, item.boxContent);
+      li.onclick = () => selectItem(item.name, item.color, item.boxContent);
       fragment.appendChild(li);
     });
     list.appendChild(fragment);
@@ -802,12 +802,12 @@ function hideCustomDropdown() {
   }
 }
 
-function selectItem(key, color, boxContent) {
+function selectItem(name, color, boxContent) {
   const itemNameInput = document.getElementById('itemName');
   const colorInput = document.getElementById('color');
   const boxContentInput = document.getElementById('boxContent');
   if (!itemNameInput || !colorInput || !boxContentInput) return;
-  itemNameInput.value = currentType === 'product' ? key.split('_')[0] : key;
+  itemNameInput.value = name;
   colorInput.value = color || 'SURTIDO';
   boxContentInput.value = boxContent || '';
   dropdownVisible = false;
@@ -817,13 +817,14 @@ function selectItem(key, color, boxContent) {
 function autoFillColor() {
   const itemNameInput = document.getElementById('itemName');
   if (!itemNameInput) return;
-  const key = itemNameInput.value;
-  if (key.includes('_')) {
-    const [name, color, boxContent] = key.split('_');
+  const val = itemNameInput.value.trim();
+  const matched = stockDataCache.find(item => item.name === val || item.key === val);
+  if (matched) {
+    itemNameInput.value = matched.name;
     const colorInput = document.getElementById('color');
     const boxContentInput = document.getElementById('boxContent');
-    if (colorInput) colorInput.value = color || 'SURTIDO';
-    if (boxContentInput) boxContentInput.value = boxContent || '';
+    if (colorInput) colorInput.value = matched.color || 'SURTIDO';
+    if (boxContentInput) boxContentInput.value = matched.boxContent || '';
   }
 }
 
@@ -877,7 +878,7 @@ function addRecord() {
       alert('상품 등록 폼의 일부 요소를 찾을 수 없습니다.');
       return;
     }
-    const itemName = itemNameInput.value.split('_')[0] || '';
+    const itemName = itemNameInput.value.trim();
     const color = colorInput.value;
     const boxContent = parseInt(boxContentInput.value) || 0;
     const safeStock = parseInt(safeStockInput.value) || 0;
@@ -910,7 +911,7 @@ function addRecord() {
   }
   const unitType = unitTypeRadio.value;
   const qty = parseInt(qtyInput.value) || 0;
-  const itemName = itemNameInput.value.split('_')[0] || '';
+  const itemName = itemNameInput.value.trim();
   const color = colorInput.value;
   const boxContent = parseInt(boxContentInput.value) || 0;
   const location = locationSelect.value;

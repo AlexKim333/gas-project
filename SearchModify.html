@@ -425,7 +425,7 @@ function filterItems(searchText) {
     filteredItems.forEach(item => {
       const li = document.createElement('li');
       li.textContent = `${item.name} (${item.color}, ${item.stockBox}박스 + ${item.stockIndividual}개, 안전재고 ${item.safeStock}, 포장 ${item.boxContent}개)`;
-      li.onclick = () => selectItem(item.key, item.color, item.boxContent);
+      li.onclick = () => selectItem(item.name, item.color, item.boxContent);
       fragment.appendChild(li);
     });
     list.appendChild(fragment);
@@ -546,7 +546,7 @@ function addRecord() {
   currentType = document.querySelector('input[name="recordType"]:checked').value;
   const unitType = document.querySelector('input[name="unitType"]:checked').value;
   const qty = parseInt(document.getElementById('qty').value) || 0;
-  const itemName = document.getElementById('itemName').value.split('_')[0] || '';
+  const itemName = document.getElementById('itemName').value.trim();
   const color = document.getElementById('color').value;
   const boxContent = parseInt(document.getElementById('boxContent').value) || 0;
   const location = document.getElementById('location').value;
@@ -952,19 +952,24 @@ function hideCustomDropdown() {
   }
 }
 
-function selectItem(key, color, boxContent) {
-  document.getElementById('itemName').value = key.split('_')[0];
+function selectItem(name, color, boxContent) {
+  document.getElementById('itemName').value = name;
   document.getElementById('color').value = color || 'SURTIDO';
   document.getElementById('boxContent').value = boxContent || '';
   hideCustomDropdown();
 }
 
 function autoFillColor() {
-  const key = document.getElementById('itemName').value;
-  if (key.includes('_')) {
-    const [name, color, boxContent] = key.split('_');
-    document.getElementById('color').value = color || 'SURTIDO';
-    document.getElementById('boxContent').value = boxContent || '';
+  const itemNameInput = document.getElementById('itemName');
+  if (!itemNameInput) return;
+  const val = itemNameInput.value.trim();
+  const matched = stockDataCache.find(item => item.name === val || item.key === val);
+  if (matched) {
+    itemNameInput.value = matched.name;
+    const colorInput = document.getElementById('color');
+    const boxContentInput = document.getElementById('boxContent');
+    if (colorInput) colorInput.value = matched.color || 'SURTIDO';
+    if (boxContentInput) boxContentInput.value = matched.boxContent || '';
   }
 }
 
