@@ -158,7 +158,8 @@
       flex-direction: row;
       gap: 14px;
       height: 100%;
-      overflow: hidden;
+      overflow: visible;
+      position: relative;
     }
     .input-section {
       width: 300px;
@@ -166,7 +167,9 @@
       display: flex;
       flex-direction: column;
       gap: 8px;
-      overflow: hidden;
+      overflow: visible;
+      position: relative;
+      z-index: 60;
     }
     .table-section {
       flex: 1;
@@ -174,6 +177,8 @@
       flex-direction: column;
       overflow: hidden;
       min-width: 0;
+      position: relative;
+      z-index: 10;
     }
     .form-group {
       background: #ffffff;
@@ -182,6 +187,8 @@
       padding: 10px 12px;
       box-shadow: 0 1px 3px rgba(0,0,0,0.04);
       flex: none;
+      overflow: visible;
+      position: relative;
     }
     .input-row {
       margin-bottom: 7px;
@@ -235,21 +242,32 @@
     }
     .dropdown-container {
       background-color: white;
-      border: 1px solid #cbd5e1;
+      border: 1.5px solid #cbd5e1;
       border-radius: 6px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-      max-height: 200px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+      max-height: 250px;
       overflow-y: auto;
-      z-index: 100;
-      width: 380px;
+      z-index: 9999;
+      width: 480px;
       margin-top: 2px;
       position: absolute;
-      left: 92px;
+      left: 90px;
       top: 100%;
     }
     .dropdown-container ul { list-style: none; padding: 0; margin: 0; }
-    .dropdown-container li { padding: 6px 10px; font-size: 9pt; cursor: pointer; border-bottom: 1px solid #f1f5f9; }
+    .dropdown-container li {
+      padding: 6px 10px;
+      font-size: 8.8pt;
+      cursor: pointer;
+      border-bottom: 1px solid #f1f5f9;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      white-space: nowrap;
+    }
     .dropdown-container li:hover { background-color: #f0fdf4; color: #15803d; }
+    .dropdown-container li:last-child { border-bottom: none; }
     .editable { background-color: #fff; cursor: text; }
     .editable:focus { outline: 2px solid var(--submit-color); }
 
@@ -1721,7 +1739,15 @@ function filterItems(searchText) {
     const fragment = document.createDocumentFragment();
     filteredItems.forEach(item => {
       const li = document.createElement('li');
-      li.textContent = `${item.name} (${item.color}, ${item.stockBox}박스 + ${item.stockIndividual}개, 안전재고 ${item.safeStock}, 포장 ${item.boxContent}개)`;
+      li.innerHTML = `
+        <div style="display:flex; align-items:center; gap:6px; overflow:hidden; text-overflow:ellipsis;">
+          <strong style="color:#0f172a; font-size:9pt;">${item.name}</strong>
+          <span style="font-size:7.5pt; background:#f1f5f9; color:#475569; padding:1px 5px; border-radius:3px; font-weight:600;">${item.color}</span>
+        </div>
+        <div style="font-size:7.8pt; color:#64748b; flex:none; text-align:right;">
+          재고: <strong style="color:#2e7d32;">${item.stockBox}상자</strong> + ${item.stockIndividual}개 <span style="color:#94a3b8;">(${item.boxContent}入)</span>
+        </div>
+      `;
       li.onclick = () => selectItem(item.name, item.color, item.boxContent);
       fragment.appendChild(li);
     });
