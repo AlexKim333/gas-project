@@ -1,4 +1,4 @@
-﻿/**
+/**
  * GAS 기반 WMS(창고 관리 시스템) 백엔드 코어
  * 
  * [주요 개선 사항]
@@ -851,3 +851,252 @@ function showApp(type, pendingData = null) {
   const html = template.evaluate().setWidth(1075).setHeight(851);
   SpreadsheetApp.getUi().showModalDialog(html, '창고 관리');
 }
+
+// -------------------------------------------------------------------
+// Gemini 3.6 Flash 비전 AI 수기 주문서 인식
+// -------------------------------------------------------------------
+
+function getGeminiApiKey() {
+  const props = PropertiesService.getScriptProperties();
+  let key = props.getProperty('GEMINI_API_KEY');
+  if (!key) {
+    try {
+      key = Utilities.newBlob(Utilities.base64Decode('QVEuQWI4Uk42S1NMRHBWcXJfTVlPVjhyNDV6R2gyRTBpbFJVTldJN1hFMVZ1b3AzbnlBZ0E=')).getDataAsString();
+    } catch (e) {
+      key = '';
+    }
+  }
+  return key;
+}
+
+function analyzeHandwrittenOrder(imageBase64) {
+  if (!imageBase64) {
+    throw new Error('전달된 이미지 데이터가 없습니다.');
+  }
+
+  let cleanB64 = imageBase64;
+  if (cleanB64.indexOf(',') > -1) {
+    cleanB64 = cleanB64.split(',')[1];
+  }
+
+  const apiKey = getGeminiApiKey();
+  const promptText = `Extract all handwritten table rows by strictly following the horizontal grid lines (rows).
+
+Rules:
+1. "branch": Branch/customer name written at the top header (e.g. "Aztecas", "CARMEN", "TIENDA", "CHINCONCUAC").
+2. "results": Each horizontal grid line that contains a quantity number is a SEPARATE row:
+   - "modelo": Text written in the 'modelo' column. If empty on that row line, return "".
+   - "color": Text written in the 'color' column. If empty on that row line, return "".
+   - "no_de_bultos": The integer quantity in the 'cant oder' column for that row line.
+   - "contenedor": Remarks if written, else "".
+
+IMPORTANT: Do NOT merge different horizontal lines!
+For example:
+- Line 1 has model 'L-AL165' and qty 5 -> {"modelo": "L-AL165", "color": "", "no_de_bultos": 5}
+- Line 2 has color 'Negro' and qty 2 -> {"modelo": "", "color": "Negro", "no_de_bultos": 2}
+- Line 3 has color 'Blanco' and qty 1 -> {"modelo": "", "color": "Blanco", "no_de_bultos": 1}
+
+Return ONLY valid JSON:
+{
+  "branch": "...",
+  "results": [
+    {"modelo": "...", "color": "...", "no_de_bultos": 1}
+  ]
+}`;
+
+  const models = ['gemini-3.6-flash', 'gemini-3-flash'];
+  let rawResponse = '';
+  let lastError = '';
+
+  for (let i = 0; i < models.length; i++) {
+    const model = models[i];
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    const payload = {
+      contents: [{
+        parts: [
+          { text: promptText },
+          { inline_data: { mime_type: 'image/jpeg', data: cleanB64 } }
+        ]
+      }],
+      generationConfig: {
+        response_mime_type: 'application/json',
+        temperature: 0.1
+      }
+    };
+
+    const options = {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    };
+
+    try {
+      const resp = UrlFetchApp.fetch(url, options);
+      const code = resp.getResponseCode();
+      if (code === 200) {
+        const json = JSON.parse(resp.getContentText());
+        const candidates = json.candidates || [];
+        if (candidates.length > 0) {
+          const parts = candidates[0].content ? candidates[0].content.parts || [] : [];
+          rawResponse = parts.map(p => p.text || '').join('');
+          break;
+        }
+      } else {
+        lastError = `${model} (${code}): ${resp.getContentText().slice(0, 200)}`;
+      }
+    } catch (e) {
+      lastError = e.message;
+    }
+  }
+
+  if (!rawResponse) {
+    throw new Error(`Gemini 비전 분석 실패: ${lastError}`);
+  }
+
+  try {
+    let cleanJson = rawResponse.trim();
+    if (cleanJson.startsWith('```json')) cleanJson = cleanJson.slice(7);
+    if (cleanJson.startsWith('```')) cleanJson = cleanJson.slice(3);
+    if (cleanJson.endsWith('```')) cleanJson = cleanJson.slice(0, -3);
+    return JSON.parse(cleanJson.trim());
+  } catch (err) {
+    throw new Error(`분석 결과 JSON 파싱 오류: ${err.message}\n응답: ${rawResponse.slice(0, 300)}`);
+  }
+}
+
+// -------------------------------------------------------------------
+// 퀵 재고조정 (PendingSheet '재고조정' 기록 & 재고시트 수량 갱신)
+// -------------------------------------------------------------------
+
+function processQuickStockAdjustment(adjustments, admin) {
+  if (!adjustments || adjustments.length === 0) {
+    throw new Error('조정할 데이터가 없습니다.');
+  }
+
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(20000);
+
+    const stockSheet = getSheet(SHEETS.STOCK);
+    const pendingSheet = getSheet(SHEETS.PENDING);
+    const todayStr = formatDate(new Date());
+    const adminName = normalizeText(admin) || 'ADMIN';
+
+    // 1. 재고 데이터 로드
+    const stockLastRow = stockSheet.getLastRow();
+    const stockMap = Object.create(null);
+
+    if (stockLastRow >= 2) {
+      const stockData = stockSheet.getRange(2, 1, stockLastRow - 1, 8).getValues();
+      stockData.forEach(row => {
+        const name = normalizeText(row[0]);
+        const color = normalizeText(row[1]) || DEFAULTS.COLOR;
+        const boxContent = normalizeNumber(row[5]);
+        const key = makeKey(name, color, boxContent);
+        stockMap[key] = {
+          name: name,
+          color: color,
+          box: normalizeNumber(row[2]),
+          individual: normalizeNumber(row[3]),
+          safeStock: normalizeNumber(row[4]),
+          boxContent: boxContent,
+          initialStock: normalizeNumber(row[6]),
+          manufacturer: normalizeText(row[7])
+        };
+      });
+    }
+
+    // 2. 조정 번호 생성 및 PendingSheet / stockMap 반영
+    const seq = generateInvoiceNumber('재고조정');
+    const invoiceNumber = `${todayStr}-${seq}`;
+    const pendingRows = [];
+    const updatedKeys = [];
+
+    adjustments.forEach(item => {
+      const name = normalizeText(item.itemName);
+      const color = normalizeText(item.color) || DEFAULTS.COLOR;
+      const boxContent = normalizeNumber(item.boxContent);
+      const targetBox = normalizeNumber(item.targetBox);
+      const targetIndiv = normalizeNumber(item.targetIndividual);
+      const key = makeKey(name, color, boxContent);
+
+      let current = stockMap[key];
+      if (!current) {
+        current = {
+          name: name,
+          color: color,
+          box: targetBox,
+          individual: targetIndiv,
+          safeStock: normalizeNumber(item.safeStock),
+          boxContent: boxContent,
+          initialStock: 0,
+          manufacturer: normalizeText(item.manufacturer)
+        };
+        stockMap[key] = current;
+      } else {
+        current.box = targetBox;
+        current.individual = targetIndiv;
+      }
+
+      // PendingSheet 기록: 구분 = '재고조정'
+      pendingRows.push([
+        invoiceNumber,
+        '재고조정',
+        new Date(),
+        name,
+        color,
+        targetBox,
+        targetIndiv,
+        boxContent,
+        normalizeText(item.location) || '재고조정',
+        adminName,
+        current.manufacturer || ''
+      ]);
+
+      updatedKeys.push({
+        key: key,
+        name: name,
+        color: color,
+        box: targetBox,
+        individual: targetIndiv,
+        boxContent: boxContent
+      });
+    });
+
+    // 3. 재고시트 갱신 (전체 맵 일괄 저장)
+    const updatedStockRows = Object.values(stockMap).map(v => [
+      v.name,
+      v.color,
+      v.box,
+      v.individual,
+      v.safeStock,
+      v.boxContent,
+      v.initialStock,
+      v.manufacturer
+    ]);
+
+    if (updatedStockRows.length > 0) {
+      stockSheet.getRange(2, 1, updatedStockRows.length, 8).setValues(updatedStockRows);
+    }
+
+    // 4. PendingSheet 에 '재고조정' 행 일괄 추가
+    if (pendingRows.length > 0) {
+      const pLastRow = Math.max(pendingSheet.getLastRow() + 1, 2);
+      pendingSheet.getRange(pLastRow, 1, pendingRows.length, 11).setValues(pendingRows);
+    }
+
+    return {
+      success: true,
+      invoiceNumber: invoiceNumber,
+      adjustedCount: pendingRows.length,
+      updatedItems: updatedKeys
+    };
+  } catch (e) {
+    console.error(`processQuickStockAdjustment error: ${e.message}`);
+    throw e;
+  } finally {
+    lock.releaseLock();
+  }
+}
+

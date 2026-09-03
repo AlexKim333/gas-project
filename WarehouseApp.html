@@ -307,6 +307,37 @@
     .btn-submit { background-color: #0284c7; color: white; }
     .btn-pending { background-color: #ea580c; color: white; }
     .btn-pending-search { background-color: #475569; color: white; }
+    .btn-ocr {
+      background: linear-gradient(135deg, #6366f1, #4f46e5);
+      color: #ffffff;
+      box-shadow: 0 2px 5px rgba(99, 102, 241, 0.35);
+    }
+    .btn-ocr:hover {
+      background: linear-gradient(135deg, #4f46e5, #4338ca);
+    }
+    .btn-quick-adj {
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 2px 7px;
+      font-size: 7.5pt;
+      font-weight: 700;
+      cursor: pointer;
+      margin-left: 6px;
+      transition: all 0.15s;
+      box-shadow: 0 1px 3px rgba(217, 119, 6, 0.3);
+      vertical-align: middle;
+      display: inline-block;
+    }
+    .btn-quick-adj:hover {
+      background: linear-gradient(135deg, #d97706, #b45309);
+      transform: scale(1.05);
+    }
+    @keyframes ocrPulse {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(250%); }
+    }
 
     .totals-pill-bar {
       display: flex;
@@ -1183,6 +1214,8 @@
         <div class="table-section">
           <div class="table-top-bar">
             <div class="action-buttons">
+              <button type="button" class="action-btn btn-ocr" onclick="triggerHandwrittenImageUpload()" title="손글씨 주문서 사진 붙여넣기 (Ctrl+V) 또는 파일 선택">📷 주문서인식 (Ctrl+V)</button>
+              <input type="file" id="orderImageFileInput" accept="image/*" style="display:none;" onchange="handleImageFileSelect(event)">
               <button type="button" class="action-btn btn-add" onclick="addRecord()" tabindex="7">➕ 추가</button>
               <button type="button" class="action-btn btn-delete" onclick="deleteRecord()" tabindex="8">🗑️ 삭제</button>
               <button type="button" class="action-btn btn-submit" onclick="submitForm()" tabindex="9">🚀 제출</button>
@@ -1334,6 +1367,60 @@
         <button type="button" class="btn-cancel-slots" onclick="closeHotkeyConfigModal()">취소 (닫기)</button>
       </div>
     </div>
+    
+    <!-- 📷 비전 AI 수기 주문서 인식 로딩 모달 -->
+    <div id="ocrLoadingModal" class="modal" style="display: none; width: 380px; text-align: center; padding: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.25);">
+      <div style="font-size: 26pt; margin-bottom: 6px;">📷 🤖</div>
+      <h3 style="margin: 0 0 6px 0; color: #1e293b; font-size: 12pt; font-weight: bold;">손글씨 주문서 비전 AI 분석 중...</h3>
+      <p style="margin: 0 0 12px 0; color: #64748b; font-size: 8.5pt;">Gemini 3.6 Flash가 지점명 및 품목/수량 표를 분석하고 있습니다.</p>
+      <div style="width: 100%; height: 140px; max-height: 140px; overflow: hidden; border: 1px solid #e2e8f0; border-radius: 6px; margin-bottom: 12px; background: #f8fafc; display: flex; align-items: center; justify-content: center;">
+        <img id="ocrPreviewImage" src="" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+      </div>
+      <div style="height: 4px; width: 100%; background: #e2e8f0; border-radius: 2px; overflow: hidden; position: relative;">
+        <div style="height: 100%; width: 40%; background: #4f46e5; border-radius: 2px; animation: ocrPulse 1.2s infinite ease-in-out;"></div>
+      </div>
+    </div>
+
+    <!-- ⚡ 퀵 재고조정 모달 (실재고 즉시 반영) -->
+    <div id="quickStockModal" class="modal" style="display: none; width: 420px; padding: 18px; box-shadow: 0 10px 30px rgba(0,0,0,0.25);">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 12px;">
+        <h3 style="margin: 0; color: #1e293b; font-size: 11.5pt; font-weight: bold; display: flex; align-items: center; gap: 6px;">
+          <span>⚡</span> <span>퀵 재고조정 (실재고 즉시 반영)</span>
+        </h3>
+        <button type="button" onclick="closeQuickStockModal()" style="border: none; background: none; font-size: 16pt; cursor: pointer; color: #94a3b8; line-height: 1;">&times;</button>
+      </div>
+      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 9px 12px; margin-bottom: 12px;">
+        <div style="font-size: 10.5pt; font-weight: bold; color: #0f172a; margin-bottom: 4px;" id="qadjItemTitle">품목 정보</div>
+        <div style="display: flex; gap: 12px; font-size: 8.5pt; color: #475569;">
+          <span>현재 전산재고: <strong id="qadjCurrentStock" style="color: #dc2626;">0상자 + 0개</strong></span>
+          <span>|</span>
+          <span>주문 요청: <strong id="qadjRequestedQty" style="color: #2563eb;">0상자</strong></span>
+        </div>
+      </div>
+      <div style="margin-bottom: 12px;">
+        <label style="display: block; font-size: 8.8pt; font-weight: bold; color: #334155; margin-bottom: 6px;">
+          실제 창고 보유 재고 (이 수량으로 재고시트가 변경됩니다):
+        </label>
+        <div style="display: flex; gap: 10px; align-items: center;">
+          <div style="flex: 1; display: flex; align-items: center; gap: 6px;">
+            <input type="number" id="qadjTargetBox" min="0" style="width: 100%; padding: 6px 8px; font-size: 11pt; font-weight: bold; text-align: right; border: 1.5px solid #cbd5e1; border-radius: 5px;" placeholder="0">
+            <span style="font-size: 9pt; font-weight: bold; color: #475569;">상자</span>
+          </div>
+          <div style="flex: 1; display: flex; align-items: center; gap: 6px;">
+            <input type="number" id="qadjTargetIndiv" min="0" style="width: 100%; padding: 6px 8px; font-size: 11pt; font-weight: bold; text-align: right; border: 1.5px solid #cbd5e1; border-radius: 5px;" placeholder="0">
+            <span style="font-size: 9pt; font-weight: bold; color: #475569;">낱개</span>
+          </div>
+        </div>
+      </div>
+      <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 7px 10px; margin-bottom: 14px; font-size: 7.8pt; color: #1e40af; line-height: 1.4;">
+        ℹ️ <strong>PendingSheet 기록 안내</strong>: 저장 시 PendingSheet에 <strong>'재고조정'</strong> 구분으로 공식 로그가 기록되며, 재고시트의 수량이 즉시 갱신됩니다.
+      </div>
+      <div style="display: flex; justify-content: flex-end; gap: 8px;">
+        <button type="button" onclick="closeQuickStockModal()" style="padding: 6px 13px; background: #e2e8f0; color: #475569; border: none; border-radius: 5px; font-weight: 600; cursor: pointer; font-size: 8.8pt;">취소</button>
+        <button type="button" id="btnSubmitQuickAdj" onclick="submitQuickStockAdjustment()" style="padding: 6px 16px; background: #2563eb; color: #ffffff; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 8.8pt;">💾 재고조정 실행</button>
+      </div>
+    </div>
+
     <iframe id="printFrame" style="display: none;"></iframe>
   </div>
 
@@ -1965,27 +2052,58 @@ function updateTable() {
   if (!tbody) return;
   let html = '';
   records.forEach((rec, idx) => {
-    html += currentType === 'product' ? `
-      <tr>
-        <td><input type="checkbox" class="rowCheckbox" data-index="${idx}"></td>
-        <td>${rec.itemName}</td>
-        <td contenteditable="true" class="editable" onblur="updateRecord(${idx}, 'color', this.textContent)">${rec.color}</td>
-        <td contenteditable="true" class="editable" onblur="updateRecord(${idx}, 'boxContent', this.textContent)">${rec.boxContent}</td>
-        <td>${rec.safeStock}</td>
-        <td>${rec.initialStock}</td>
-        <td>${rec.manufacturer || ''}</td>
-      </tr>
-    ` : `
-      <tr>
-        <td><input type="checkbox" class="rowCheckbox" data-index="${idx}"></td>
-        <td>${rec.itemName}</td>
-        <td>${rec.color}</td>
-        <td contenteditable="true" class="editable" onblur="updateRecord(${idx}, 'boxQty', this.textContent)">${currentType === 'in' ? rec.boxQty : Math.abs(rec.boxQty)}</td>
-        <td contenteditable="true" class="editable" onblur="updateRecord(${idx}, 'individualQty', this.textContent)">${currentType === 'in' ? rec.individualQty : Math.abs(rec.individualQty)}</td>
-        <td contenteditable="true" class="editable" onblur="updateRecord(${idx}, 'boxContent', this.textContent)">${rec.boxContent}</td>
-        <td>${rec.location}</td>
-      </tr>
-    `;
+    if (currentType === 'product') {
+      html += `
+        <tr>
+          <td><input type="checkbox" class="rowCheckbox" data-index="${idx}"></td>
+          <td>${rec.itemName}</td>
+          <td contenteditable="true" class="editable" onblur="updateRecord(${idx}, 'color', this.textContent)">${rec.color}</td>
+          <td contenteditable="true" class="editable" onblur="updateRecord(${idx}, 'boxContent', this.textContent)">${rec.boxContent}</td>
+          <td>${rec.safeStock}</td>
+          <td>${rec.initialStock}</td>
+          <td>${rec.manufacturer || ''}</td>
+        </tr>
+      `;
+    } else {
+      let shortageBadge = '';
+      let shortageRowStyle = '';
+      if (currentType === 'out' && stockDataCache && stockDataCache.length > 0) {
+        const sInfo = stockDataCache.find(s => 
+          s.name.toLowerCase() === rec.itemName.toLowerCase() && 
+          (s.color || 'SURTIDO').toLowerCase() === (rec.color || 'SURTIDO').toLowerCase()
+        );
+        const curBox = sInfo ? (sInfo.stockBox || 0) : 0;
+        const curIndiv = sInfo ? (sInfo.stockIndividual || 0) : 0;
+        const reqBox = Math.abs(rec.boxQty || 0);
+        const reqIndiv = Math.abs(rec.individualQty || 0);
+        const isShort = (rec.unitType === 'box' && reqBox > curBox) ||
+                        (rec.unitType === 'individual' && reqIndiv > (curBox * (rec.boxContent || 0) + curIndiv));
+        if (isShort) {
+          shortageRowStyle = 'background-color: #fff1f2;';
+          shortageBadge = `
+            <div style="margin-top: 2px; display: flex; align-items: center; gap: 4px;">
+              <span style="font-size: 7.2pt; background: #fee2e2; color: #b91c1c; padding: 1px 5px; border-radius: 3px; font-weight: 700;">재고부족(${curBox}상자)</span>
+              <button type="button" class="btn-quick-adj" onclick="openQuickAdjustModal('${rec.itemName}', '${rec.color}', ${rec.boxContent || 0}, ${curBox}, ${curIndiv}, ${reqBox || 1})" title="실재고 반영을 위한 퀵 재고조정">⚡ 퀵재고</button>
+            </div>
+          `;
+        }
+      }
+
+      html += `
+        <tr style="${shortageRowStyle}">
+          <td><input type="checkbox" class="rowCheckbox" data-index="${idx}"></td>
+          <td>
+            <span style="font-weight: 600;">${rec.itemName}</span>
+            ${shortageBadge}
+          </td>
+          <td>${rec.color}</td>
+          <td contenteditable="true" class="editable" onblur="updateRecord(${idx}, 'boxQty', this.textContent)">${currentType === 'in' ? rec.boxQty : Math.abs(rec.boxQty)}</td>
+          <td contenteditable="true" class="editable" onblur="updateRecord(${idx}, 'individualQty', this.textContent)">${currentType === 'in' ? rec.individualQty : Math.abs(rec.individualQty)}</td>
+          <td contenteditable="true" class="editable" onblur="updateRecord(${idx}, 'boxContent', this.textContent)">${rec.boxContent}</td>
+          <td>${rec.location}</td>
+        </tr>
+      `;
+    }
   });
   tbody.innerHTML = html;
 }
@@ -3447,6 +3565,330 @@ function closeHotkeyConfigModal() {
   if (modal) modal.style.display = 'none';
 }
 
+// -------------------------------------------------------------------
+// ⚡ 퀵 재고조정 (실재고 즉시 반영 및 PendingSheet '재고조정' 기록)
+// -------------------------------------------------------------------
+
+let activeQuickAdjTarget = null;
+
+function openQuickAdjustModal(itemName, color, boxContent, currentBox, currentIndiv, requestedQty) {
+  activeQuickAdjTarget = { itemName, color, boxContent, currentBox, currentIndiv };
+  const titleEl = document.getElementById('qadjItemTitle');
+  const curEl = document.getElementById('qadjCurrentStock');
+  const reqEl = document.getElementById('qadjRequestedQty');
+  const targetBoxInput = document.getElementById('qadjTargetBox');
+  const targetIndivInput = document.getElementById('qadjTargetIndiv');
+
+  if (titleEl) titleEl.textContent = `${itemName} (${color}) - ${boxContent || 0}入`;
+  if (curEl) curEl.textContent = `${currentBox}상자 + ${currentIndiv}개`;
+  if (reqEl) reqEl.textContent = `${requestedQty}상자`;
+  if (targetBoxInput) targetBoxInput.value = Math.max(requestedQty, currentBox || 0);
+  if (targetIndivInput) targetIndivInput.value = currentIndiv || 0;
+
+  const modal = document.getElementById('quickStockModal');
+  const overlay = document.getElementById('modalOverlay');
+  if (modal) modal.style.display = 'block';
+  if (overlay) overlay.style.display = 'block';
+
+  setTimeout(() => {
+    if (targetBoxInput) { targetBoxInput.focus(); targetBoxInput.select(); }
+  }, 100);
+}
+
+function closeQuickStockModal() {
+  const modal = document.getElementById('quickStockModal');
+  const overlay = document.getElementById('modalOverlay');
+  if (modal) modal.style.display = 'none';
+  if (overlay) overlay.style.display = 'none';
+  activeQuickAdjTarget = null;
+}
+
+function submitQuickStockAdjustment() {
+  if (!activeQuickAdjTarget) return;
+  const targetBox = parseInt(document.getElementById('qadjTargetBox').value) || 0;
+  const targetIndiv = parseInt(document.getElementById('qadjTargetIndiv').value) || 0;
+  const adminSelect = document.getElementById('adminSelect');
+  const currentAdmin = adminSelect ? adminSelect.value : 'ADMIN';
+
+  const btn = document.getElementById('btnSubmitQuickAdj');
+  if (btn) { btn.disabled = true; btn.textContent = '조정 중...'; }
+
+  const payload = [{
+    itemName: activeQuickAdjTarget.itemName,
+    color: activeQuickAdjTarget.color,
+    boxContent: activeQuickAdjTarget.boxContent,
+    targetBox: targetBox,
+    targetIndividual: targetIndiv,
+    location: '재고조정',
+    admin: currentAdmin
+  }];
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (btn) { btn.disabled = false; btn.textContent = '💾 재고조정 실행'; }
+      closeQuickStockModal();
+
+      // In-memory stockDataCache 즉시 갱신
+      if (res && res.updatedItems) {
+        res.updatedItems.forEach(u => {
+          const item = stockDataCache.find(s => 
+            s.name.toLowerCase() === u.name.toLowerCase() && 
+            (s.color || 'SURTIDO').toLowerCase() === (u.color || 'SURTIDO').toLowerCase()
+          );
+          if (item) {
+            item.stockBox = u.box;
+            item.stockIndividual = u.individual;
+          } else {
+            stockDataCache.push({
+              name: u.name,
+              color: u.color,
+              stockBox: u.box,
+              stockIndividual: u.individual,
+              boxContent: u.boxContent,
+              safeStock: 0
+            });
+          }
+        });
+      }
+
+      // 테이블 새로고침 (경고 해제)
+      updateTable();
+      updateTotals();
+
+      alert(`✅ [${payload[0].itemName} (${payload[0].color})] 재고가 ${targetBox}상자로 즉시 조정되었습니다.\n\nPendingSheet에 '재고조정' 트랜잭션이 기록되었습니다.`);
+    })
+    .withFailureHandler(function(err) {
+      if (btn) { btn.disabled = false; btn.textContent = '💾 재고조정 실행'; }
+      alert('❌ 퀵 재고조정 실패: ' + (err.message || err));
+    })
+    .processQuickStockAdjustment(payload, currentAdmin);
+}
+
+// -------------------------------------------------------------------
+// 📷 손글씨 주문서 비전 AI 인식 & 자동 장바구니 주입 엔진
+// -------------------------------------------------------------------
+
+const COLOR_SYNONYMS = {
+  'sur': 'SURTIDO', 'sur.': 'SURTIDO', 'surt': 'SURTIDO', 'surt.': 'SURTIDO',
+  'st': 'SURTIDO', 'mix': 'SURTIDO', 'mix.': 'SURTIDO', 'mixed': 'SURTIDO',
+  'variado': 'SURTIDO', 'surtido': 'SURTIDO',
+  'neg': 'NEGRO', 'neg.': 'NEGRO', 'negro': 'NEGRO',
+  'bla': 'BLANCO', 'bla.': 'BLANCO', 'blanco': 'BLANCO',
+  'az': 'AZUL', 'az.': 'AZUL', 'azul': 'AZUL',
+  'mar': 'MARINO', 'mar.': 'MARINO', 'marino': 'MARINO',
+  'mez': 'MEZCLILLA', 'mez.': 'MEZCLILLA', 'mezclilla': 'MEZCLILLA',
+  'rojo': 'ROJO', 'roj': 'ROJO', 'gris': 'GRIS', 'rosa': 'ROSA',
+  'amarillo': 'AMARILLO', 'verde': 'VERDE', 'beige': 'BEIGE',
+  'cafe': 'CAFE', 'vino': 'VINO', 'palorosa': 'PALOROSA', 'palo rosa': 'PALOROSA',
+  'turquesa': 'TURQUEZA', 'turqueza': 'TURQUEZA', 'mostaza': 'MOSTAZA'
+};
+
+const KNOWN_COLORS = [
+  'NEGRO', 'BLANCO', 'AZUL', 'MARINO', 'MEZCLILLA', 'SURTIDO',
+  'ROJO', 'GRIS', 'ROSA', 'AMARILLO', 'VERDE', 'BEIGE', 'CAFE',
+  'VINO', 'PALOROSA', 'TURQUEZA', 'MOSTAZA'
+];
+
+function normalizeColor(text) {
+  if (!text) return '';
+  let cleanText = text.trim()
+    .replace(/palo\s+(de\s+)?rosa/gi, 'PALOROSA')
+    .replace(/azul\s+marino/gi, 'MARINO');
+  const words = cleanText.split(/\s+/);
+  const norm = words.map(w => {
+    const clean = w.toLowerCase().replace(/[,.-/]/g, '');
+    return COLOR_SYNONYMS[clean] || w.toUpperCase();
+  });
+  return norm.join(' ');
+}
+
+function extractColorAndBase(text) {
+  if (!text) return { base: '', color: '' };
+  const norm = normalizeColor(text);
+  const words = norm.split(/\s+/);
+  let foundColor = '';
+  const baseWords = [];
+  words.forEach(w => {
+    const up = w.toUpperCase().replace(/[,.-/]/g, '');
+    if (KNOWN_COLORS.includes(up)) {
+      foundColor = up;
+    } else {
+      baseWords.push(w);
+    }
+  });
+  return { base: baseWords.join(' ').trim(), color: foundColor };
+}
+
+function triggerHandwrittenImageUpload() {
+  const fileInput = document.getElementById('orderImageFileInput');
+  if (fileInput) fileInput.click();
+}
+
+function handleImageFileSelect(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  processHandwrittenImageFile(file);
+  e.target.value = '';
+}
+
+function processHandwrittenImageFile(fileOrBlob) {
+  const reader = new FileReader();
+  reader.onload = function(evt) {
+    const base64Data = evt.target.result;
+    showOcrLoadingModal(true, base64Data);
+    google.script.run
+      .withSuccessHandler(onHandwrittenExtracted)
+      .withFailureHandler(onHandwrittenError)
+      .analyzeHandwrittenOrder(base64Data);
+  };
+  reader.readAsDataURL(fileOrBlob);
+}
+
+function showOcrLoadingModal(show, previewSrc) {
+  const modal = document.getElementById('ocrLoadingModal');
+  const overlay = document.getElementById('modalOverlay');
+  if (!modal) return;
+  if (show) {
+    if (previewSrc) {
+      const img = document.getElementById('ocrPreviewImage');
+      if (img) img.src = previewSrc;
+    }
+    modal.style.display = 'block';
+    if (overlay) overlay.style.display = 'block';
+  } else {
+    modal.style.display = 'none';
+    if (overlay) overlay.style.display = 'none';
+  }
+}
+
+function onHandwrittenError(err) {
+  showOcrLoadingModal(false);
+  alert('❌ 손글씨 분석 중 오류가 발생했습니다:\n' + (err.message || err));
+}
+
+function onHandwrittenExtracted(data) {
+  showOcrLoadingModal(false);
+  if (!data || !data.results || data.results.length === 0) {
+    alert('⚠️ 이미지에서 주문서 행을 감지하지 못했습니다.\n선명한 이미지를 다시 시도해 주세요.');
+    return;
+  }
+
+  // 1. 지점명(출고처) 자동 선택
+  let matchedLocationName = '';
+  if (data.branch && currentType === 'out') {
+    const rawBranch = String(data.branch).trim().toLowerCase();
+    const locSelect = document.getElementById('location');
+    if (locSelect) {
+      for (let i = 0; i < locSelect.options.length; i++) {
+        const optText = locSelect.options[i].text.toLowerCase();
+        const optVal = locSelect.options[i].value.toLowerCase();
+        if (optText.includes(rawBranch) || rawBranch.includes(optText) || optVal.includes(rawBranch)) {
+          locSelect.selectedIndex = i;
+          matchedLocationName = locSelect.options[i].value;
+          saveMetadata();
+          break;
+        }
+      }
+    }
+  }
+
+  const currentLocation = document.getElementById('location') ? document.getElementById('location').value : '';
+
+  // 2. Forward-Fill 및 색상 정규화 파이프라인
+  let lastBaseModel = '';
+  let addedCount = 0;
+  const newRecords = [];
+
+  data.results.forEach(r => {
+    let rawModel = String(r.modelo || '').trim();
+    let rawColor = String(r.color || '').trim();
+    let { base, color } = extractColorAndBase(rawModel);
+
+    if (rawColor) {
+      let ext = extractColorAndBase(rawColor);
+      color = ext.color || normalizeColor(rawColor);
+    }
+
+    if (base) {
+      lastBaseModel = base;
+    } else {
+      base = lastBaseModel;
+    }
+
+    if (!color) color = 'SURTIDO';
+
+    let qty = parseInt(r.no_de_bultos || r.cant_oder || r.cantidad || 0, 10);
+    if (isNaN(qty) || qty <= 0) return;
+
+    // 3. stockDataCache에서 품명/컬러/박스당수량 매칭
+    let matchedItem = null;
+    if (stockDataCache && stockDataCache.length > 0) {
+      matchedItem = stockDataCache.find(s => 
+        s.name.toLowerCase() === base.toLowerCase() && 
+        (s.color || 'SURTIDO').toLowerCase() === color.toLowerCase()
+      );
+      if (!matchedItem) {
+        matchedItem = stockDataCache.find(s => 
+          (s.name.toLowerCase().includes(base.toLowerCase()) || base.toLowerCase().includes(s.name.toLowerCase())) &&
+          (s.color || 'SURTIDO').toLowerCase() === color.toLowerCase()
+        );
+      }
+      if (!matchedItem) {
+        matchedItem = stockDataCache.find(s => 
+          s.name.toLowerCase() === base.toLowerCase() || 
+          s.name.toLowerCase().includes(base.toLowerCase())
+        );
+      }
+    }
+
+    const finalItemName = matchedItem ? matchedItem.name : base;
+    const finalColor = matchedItem ? matchedItem.color : color;
+    const finalBoxContent = matchedItem ? matchedItem.boxContent : 0;
+
+    newRecords.push({
+      itemName: finalItemName,
+      color: finalColor,
+      boxQty: currentType === 'out' ? -Math.abs(qty) : Math.abs(qty),
+      individualQty: 0,
+      boxContent: finalBoxContent,
+      location: currentLocation || matchedLocationName || '',
+      unitType: 'box'
+    });
+    addedCount++;
+  });
+
+  if (addedCount > 0) {
+    records.push(...newRecords);
+    saveTableData();
+    updateTable();
+    updateTotals();
+    
+    let msg = `🎉 손글씨 주문서 인식 성공!\n\n총 ${addedCount}개 품목이 장바구니에 자동 입력되었습니다.`;
+    if (matchedLocationName) {
+      msg += `\n출고처: [${matchedLocationName}] 자동 선택됨`;
+    }
+    alert(msg);
+  } else {
+    alert('⚠️ 유효한 품목 또는 수량을 추출하지 못했습니다.');
+  }
+}
+
+// 전역 클립보드 붙여넣기(Ctrl+V) 이벤트 리스너 (이미지 감지)
+window.addEventListener('paste', function(e) {
+  if (!e.clipboardData || !e.clipboardData.items) return;
+  const items = e.clipboardData.items;
+  for (let i = 0; i < items.length; i++) {
+    if (items[i].type.indexOf('image') !== -1) {
+      const blob = items[i].getAsFile();
+      if (blob) {
+        e.preventDefault();
+        processHandwrittenImageFile(blob);
+        return;
+      }
+    }
+  }
+});
+
 // ---------------- 키보드 단축키 이벤트 ----------------
 
 function setupHotkeyShortcuts() {
@@ -3475,6 +3917,8 @@ function setupHotkeyShortcuts() {
     else if (e.key === 'Escape') {
       closeGridSelectionModal();
       closeHotkeyConfigModal();
+      closeQuickStockModal();
+      showOcrLoadingModal(false);
     }
     // Ctrl + Enter : 그리드 모달이 열려 있을 때 일괄 담기 실행
     else if (e.ctrlKey && e.key === 'Enter') {
