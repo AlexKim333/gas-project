@@ -636,6 +636,11 @@ function updateRecord(index, field, value) {
   const type = document.querySelector('input[name="recordType"]:checked').value;
   value = parseInt(value) || 0;
   records[index][field] = type === 'in' ? value : -value;
+  if (records[index].boxQty !== 0) {
+    records[index].unitType = 'box';
+  } else {
+    records[index].unitType = 'individual';
+  }
   updateTable();
   updateTotals();
   toggleScroll();
@@ -729,19 +734,41 @@ if (invoiceNumber.padStart(3, '0') !== loadedInvoiceNumber) {
   // 새 레코드에 대해 재고 검증
   if (typeValue === 'out') {
     for (const record of records) {
-      const stockInfo = checkItemAndStock(
-        record.itemName,
-        record.color,
-        record.boxContent,
-        Math.abs(record.boxQty),
-        record.unitType,
-        tempStockCache
-      );
-      if (!stockInfo.isSufficient) {
-        alert(`재고 부족: ${record.itemName} (${record.color})`);
-        originalButton.style.visibility = 'visible';
-        buttonContainer.removeChild(processingButton);
-        return;
+      const bQty = Math.abs(record.boxQty) || 0;
+      const iQty = Math.abs(record.individualQty) || 0;
+
+      if (bQty > 0) {
+        const boxInfo = checkItemAndStock(
+          record.itemName,
+          record.color,
+          record.boxContent,
+          bQty,
+          'box',
+          tempStockCache
+        );
+        if (!boxInfo.isSufficient) {
+          alert(`박스 재고 부족: ${record.itemName} (${record.color}) - 필요: ${bQty}박스`);
+          originalButton.style.visibility = 'visible';
+          buttonContainer.removeChild(processingButton);
+          return;
+        }
+      }
+
+      if (iQty > 0) {
+        const indInfo = checkItemAndStock(
+          record.itemName,
+          record.color,
+          record.boxContent,
+          iQty,
+          'individual',
+          tempStockCache
+        );
+        if (!indInfo.isSufficient) {
+          alert(`낱개 재고 부족: ${record.itemName} (${record.color}) - 필요: ${iQty}개`);
+          originalButton.style.visibility = 'visible';
+          buttonContainer.removeChild(processingButton);
+          return;
+        }
       }
     }
   }
