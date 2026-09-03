@@ -737,64 +737,338 @@
       background: white;
       width: 650px;
       max-height: 82%;
-      border-radius: 8px;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+      border-radius: 10px;
+      box-shadow: 0 15px 35px rgba(0,0,0,0.25);
       z-index: 1060;
-      padding: 16px;
+      padding: 16px 20px;
+      width: 780px;
+      max-height: 90vh;
       box-sizing: border-box;
+      flex-direction: column;
     }
     .config-modal-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
       padding-bottom: 8px;
-      border-bottom: 2px solid #2196F3;
+      border-bottom: 2px solid #2e7d32;
     }
-    .config-modal-body {
-      max-height: 400px;
-      overflow-y: auto;
+    .config-slot-chips-container {
       margin-top: 10px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 8px 10px;
     }
-    .config-slot-row {
+    .config-slot-chips-title {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 8.5pt;
+      font-weight: 700;
+      color: #334155;
+      margin-bottom: 6px;
+    }
+    .config-slot-chips-hint {
+      font-size: 7.8pt;
+      font-weight: normal;
+      color: #64748b;
+    }
+    .config-slot-chips-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 5px;
+    }
+    .cfg-slot-chip {
       display: flex;
       align-items: center;
-      gap: 8px;
-      margin-bottom: 6px;
-      padding: 4px 6px;
-      background: #fafafa;
-      border: 1px solid #eee;
-      border-radius: 4px;
+      gap: 6px;
+      background: #ffffff;
+      border: 1.5px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 4px 8px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      min-height: 38px;
+      position: relative;
     }
-    .config-slot-num {
-      width: 55px;
-      font-weight: bold;
-      font-size: 9pt;
-      color: #333;
+    .cfg-slot-chip:hover {
+      border-color: #94a3b8;
+      background: #f1f5f9;
     }
-    .config-slot-row select, .config-slot-row input {
+    .cfg-slot-chip.active {
+      border-color: #2e7d32;
+      background: #f0fdf4;
+      box-shadow: 0 0 0 2px rgba(46, 125, 50, 0.2);
+    }
+    .cfg-slot-chip.empty .cfg-chip-text {
+      color: #94a3b8;
+      font-style: italic;
+    }
+    .cfg-chip-num {
+      width: 18px;
+      height: 18px;
+      background: #e2e8f0;
+      color: #475569;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 7.5pt;
+      font-weight: 700;
+      flex: none;
+    }
+    .cfg-slot-chip.active .cfg-chip-num {
+      background: #2e7d32;
+      color: white;
+    }
+    .cfg-chip-info {
       flex: 1;
-      padding: 4px 6px;
+      min-width: 0;
+      overflow: hidden;
+    }
+    .cfg-chip-text {
+      font-size: 8.5pt;
+      font-weight: 700;
+      color: #1e293b;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .cfg-chip-sub {
+      font-size: 7.2pt;
+      color: #64748b;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .cfg-chip-del-btn {
+      background: none;
+      border: none;
+      color: #94a3b8;
+      font-size: 8.5pt;
+      cursor: pointer;
+      padding: 2px;
+      border-radius: 50%;
+      line-height: 1;
+      flex: none;
+    }
+    .cfg-chip-del-btn:hover {
+      background: #fee2e2;
+      color: #ef4444;
+    }
+
+    .config-search-bar-wrap {
+      margin-top: 10px;
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+    .config-search-icon {
+      position: absolute;
+      left: 10px;
+      font-size: 10pt;
+      color: #94a3b8;
+      pointer-events: none;
+    }
+    .cfg-live-search {
+      width: 100%;
+      padding: 8px 30px 8px 32px;
+      font-size: 9.5pt;
+      border: 1.5px solid #cbd5e1;
+      border-radius: 6px;
+      background: #ffffff;
+      outline: none;
+      transition: all 0.15s ease;
+      box-sizing: border-box;
+    }
+    .cfg-live-search:focus {
+      border-color: #2e7d32;
+      box-shadow: 0 0 0 3px rgba(46, 125, 50, 0.15);
+    }
+    .cfg-search-clear-btn {
+      position: absolute;
+      right: 8px;
+      background: none;
+      border: none;
+      color: #94a3b8;
+      font-size: 10pt;
+      cursor: pointer;
+      padding: 4px;
+    }
+    .cfg-search-clear-btn:hover {
+      color: #1e293b;
+    }
+
+    .config-matrix-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 8px;
+      margin-bottom: 4px;
+      padding: 0 2px;
+    }
+    .config-matrix-scroll {
+      max-height: 250px;
+      overflow-y: auto;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      background: #fafbfc;
+      padding: 6px;
+    }
+    .cfg-matrix-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+    .cfg-matrix-grid-loc {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+    }
+    .cfg-item-card {
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 6px 8px;
+      cursor: pointer;
+      transition: all 0.12s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .cfg-item-card:hover {
+      border-color: #2e7d32;
+      background: #f0fdf4;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    }
+    .cfg-item-card.assigned {
+      border-color: #86efac;
+      background: #f8fafc;
+    }
+    .cfg-card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .cfg-card-name {
       font-size: 9pt;
+      font-weight: 700;
+      color: #0f172a;
+    }
+    .cfg-card-badge-count {
+      font-size: 7.5pt;
+      background: #e0f2fe;
+      color: #0369a1;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 600;
+    }
+    .cfg-card-color {
+      font-size: 8pt;
+      background: #f1f5f9;
+      color: #475569;
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-weight: 600;
+    }
+    .cfg-card-colors-preview {
+      font-size: 7.5pt;
+      color: #64748b;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .cfg-card-bottom {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 7.5pt;
+      color: #64748b;
+      margin-top: 2px;
+    }
+    .cfg-card-stock strong {
+      color: #2e7d32;
+    }
+    .cfg-card-assigned-badge {
+      font-size: 7pt;
+      background: #dcfce7;
+      color: #15803d;
+      padding: 1px 4px;
+      border-radius: 3px;
+      font-weight: 600;
+    }
+    .cfg-card-assign-hint {
+      font-size: 7pt;
+      color: #0284c7;
+      font-weight: 600;
+    }
+    .cfg-item-card-loc {
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 8px 10px;
+      cursor: pointer;
+      transition: all 0.12s ease;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .cfg-item-card-loc:hover {
+      border-color: #2e7d32;
+      background: #f0fdf4;
+      transform: translateY(-1px);
+    }
+    .cfg-item-card-loc.assigned {
+      border-color: #86efac;
+      background: #f8fafc;
+    }
+    .cfg-no-results {
+      padding: 30px;
+      text-align: center;
+      font-size: 9pt;
+      color: #94a3b8;
     }
     .config-modal-footer {
       display: flex;
       justify-content: flex-end;
+      align-items: center;
       gap: 8px;
       margin-top: 12px;
       padding-top: 8px;
-      border-top: 1px solid #eee;
+      border-top: 1px solid #e2e8f0;
+    }
+    .btn-clear-all-slots {
+      background: #f1f5f9;
+      color: #64748b;
+      border: 1px solid #cbd5e1;
+      padding: 6px 12px;
+      border-radius: 4px;
+      font-size: 8.5pt;
+      cursor: pointer;
+      margin-right: auto;
+    }
+    .btn-clear-all-slots:hover {
+      background: #fee2e2;
+      color: #dc2626;
+      border-color: #fca5a5;
     }
     .btn-reset-slots {
-      background: #ff9800;
+      background: #f59e0b;
       color: white;
       border: none;
       padding: 6px 12px;
       border-radius: 4px;
-      font-size: 9pt;
+      font-size: 8.5pt;
+      font-weight: 600;
       cursor: pointer;
     }
+    .btn-reset-slots:hover {
+      background: #d97706;
+    }
     .btn-save-slots {
-      background: #2196F3;
+      background: #2e7d32;
       color: white;
       border: none;
       padding: 6px 16px;
@@ -802,15 +1076,22 @@
       font-size: 9pt;
       font-weight: bold;
       cursor: pointer;
+      box-shadow: 0 1px 3px rgba(46, 125, 50, 0.3);
+    }
+    .btn-save-slots:hover {
+      background: #1b5e20;
     }
     .btn-cancel-slots {
-      background: #9e9e9e;
+      background: #64748b;
       color: white;
       border: none;
       padding: 6px 12px;
       border-radius: 4px;
-      font-size: 9pt;
+      font-size: 8.5pt;
       cursor: pointer;
+    }
+    .btn-cancel-slots:hover {
+      background: #475569;
     }
   </style>
 </head>
@@ -998,16 +1279,41 @@
     </div>
 
     <!-- 핫키 슬롯 설정 모달 -->
+    <!-- 핫키 슬롯 설정 모달 (동적 입력 검색 매트릭스) -->
     <div id="hotkeyConfigModal" class="config-modal">
       <div class="config-modal-header">
-        <h3 id="configModalTitle" style="margin: 0; font-size: 11pt;">⚙️ 핫키 슬롯 설정</h3>
+        <h3 id="configModalTitle" style="margin: 0; font-size: 11.5pt; font-weight: bold; color: #1e293b;">⚙️ 핫키 슬롯 설정</h3>
         <button type="button" class="close-btn" onclick="closeHotkeyConfigModal()" style="background:none; border:none; font-size:14pt; cursor:pointer; color:#666;">✕</button>
       </div>
-      <div class="config-modal-body" id="configModalBody"></div>
+
+      <!-- 상단: 8개 슬롯 퀵 셀렉터 칩 바 -->
+      <div class="config-slot-chips-container">
+        <div class="config-slot-chips-title">
+          <span>배정 대상 슬롯 선택:</span>
+          <span class="config-slot-chips-hint">슬롯 클릭 후 아래 검색 결과에서 항목을 클릭하면 즉시 배정됩니다</span>
+        </div>
+        <div class="config-slot-chips-grid" id="configSlotChipsGrid"></div>
+      </div>
+
+      <!-- 중단: 실시간 검색 인풋 바 -->
+      <div class="config-search-bar-wrap">
+        <span class="config-search-icon">🔍</span>
+        <input type="text" id="cfgLiveSearchInput" class="cfg-live-search" placeholder="품목명 / 코드 / 거래처 실시간 검색 (타이핑 시 즉시 필터링)..." oninput="onLiveSearchInput(this.value)" autocomplete="off">
+        <button type="button" class="cfg-search-clear-btn" onclick="clearLiveSearch()" title="검색어 지우기">✕</button>
+      </div>
+
+      <!-- 실시간 검색 결과 매트릭스 -->
+      <div class="config-matrix-header">
+        <span id="cfgMatrixResultCount" style="font-size: 8.5pt; color: #64748b; font-weight: 600;">전체 목록</span>
+        <span style="font-size: 8pt; color: #94a3b8;">항목을 클릭하면 활성 슬롯에 등록됩니다</span>
+      </div>
+      <div class="config-matrix-scroll" id="configMatrixContainer"></div>
+
       <div class="config-modal-footer">
+        <button type="button" class="btn-clear-all-slots" onclick="clearAllHotkeySlots()">전체 비우기</button>
         <button type="button" class="btn-reset-slots" onclick="resetCurrentHotkeySlots()">기본값 자동 채우기</button>
-        <button type="button" class="btn-save-slots" onclick="saveHotkeyConfig()">저장 완료</button>
-        <button type="button" class="btn-cancel-slots" onclick="closeHotkeyConfigModal()">취소</button>
+        <button type="button" class="btn-save-slots" onclick="saveHotkeyConfig()">💾 저장 완료</button>
+        <button type="button" class="btn-cancel-slots" onclick="closeHotkeyConfigModal()">취소 (닫기)</button>
       </div>
     </div>
     <iframe id="printFrame" style="display: none;"></iframe>
@@ -2787,104 +3093,304 @@ function closeGridSelectionModal() {
   if (modal) modal.style.display = 'none';
 }
 
-// ---------------- 핫키 슬롯 설정 모달 ----------------
+// ---------------- 핫키 슬롯 설정 모달 (동적 입력 검색 매트릭스) ----------------
+
+let configActiveSlotIndex = 0; // 현재 배정할 대상 슬롯 (0 ~ 7)
+let configTempSlots = [];      // 모달 내에서 편집 중인 8개 슬롯 임시 배열
+let currentLiveSearchQuery = '';
 
 function openHotkeyConfigModal(type) {
-  currentConfigType = type || 'location';
+  currentConfigType = type || currentActiveHotkeyTab || 'location';
   const modal = document.getElementById('hotkeyConfigModal');
   const title = document.getElementById('configModalTitle');
   if (!modal || !title) return;
 
   if (currentConfigType === 'location') {
     title.textContent = (currentType === 'in' ? '🏢 빠른 입고처' : '🏢 빠른 출고처') + ' 핫키 슬롯 설정 (8개)';
+    configTempSlots = [...(hotkeyLocations || [])];
+    while (configTempSlots.length < 8) configTempSlots.push('');
   } else if (currentConfigType === 'bestseller') {
     title.textContent = '⭐ 베스트셀러 단일 품목 슬롯 설정 (8개)';
+    configTempSlots = (hotkeyBestsellers || []).map(item => item ? { ...item } : null);
+    while (configTempSlots.length < 8) configTempSlots.push(null);
   } else if (currentConfigType === 'grid') {
     title.textContent = '📦 그리드 묶음 대표 상품 슬롯 설정 (8개)';
+    configTempSlots = [...(hotkeyGridItems || [])];
+    while (configTempSlots.length < 8) configTempSlots.push('');
   }
 
-  renderConfigModalBody();
-  modal.style.display = 'block';
+  // 첫 번째 비어있는 슬롯 자동 포커스
+  let firstEmpty = configTempSlots.findIndex(s => !s || (typeof s === 'string' && !s.trim()));
+  configActiveSlotIndex = firstEmpty !== -1 ? firstEmpty : 0;
+  currentLiveSearchQuery = '';
+
+  const searchInput = document.getElementById('cfgLiveSearchInput');
+  if (searchInput) {
+    searchInput.value = '';
+    searchInput.placeholder = currentConfigType === 'location' 
+      ? '🔍 거래처명 실시간 검색 (타이핑 시 즉시 필터링)...' 
+      : '🔍 품목명 / 코드 실시간 검색 (타이핑 시 즉시 필터링)...';
+  }
+
+  renderConfigSlotChips();
+  renderConfigSearchMatrix();
+
+  modal.style.display = 'flex';
+  setTimeout(() => {
+    if (searchInput) searchInput.focus();
+  }, 100);
 }
 
-function renderConfigModalBody() {
-  const body = document.getElementById('configModalBody');
-  if (!body) return;
+function selectActiveConfigSlot(index) {
+  configActiveSlotIndex = index;
+  renderConfigSlotChips();
+  renderConfigSearchMatrix();
+  const searchInput = document.getElementById('cfgLiveSearchInput');
+  if (searchInput) searchInput.focus();
+}
+
+function clearSingleConfigSlot(index, event) {
+  if (event) event.stopPropagation();
+  configTempSlots[index] = currentConfigType === 'bestseller' ? null : '';
+  renderConfigSlotChips();
+  renderConfigSearchMatrix();
+}
+
+function clearAllHotkeySlots() {
+  if (!confirm('8개 슬롯을 모두 비우시겠습니까?')) return;
+  for (let i = 0; i < 8; i++) {
+    configTempSlots[i] = currentConfigType === 'bestseller' ? null : '';
+  }
+  configActiveSlotIndex = 0;
+  renderConfigSlotChips();
+  renderConfigSearchMatrix();
+}
+
+function renderConfigSlotChips() {
+  const container = document.getElementById('configSlotChipsGrid');
+  if (!container) return;
   let html = '';
 
   for (let i = 0; i < 8; i++) {
-    html += `<div class="config-slot-row"><span class="config-slot-num">슬롯 ${i + 1}:</span>`;
+    const slotData = configTempSlots[i];
+    const isActive = (i === configActiveSlotIndex);
+    let label = '(비어있음)';
+    let sub = '';
+    let hasVal = false;
 
     if (currentConfigType === 'location') {
-      const curLoc = hotkeyLocations[i] || '';
-      html += `<select id="cfgSlot_${i}"><option value="">(비어있음)</option>`;
-      (locationCache || []).forEach(loc => {
-        html += `<option value="${loc}" ${loc === curLoc ? 'selected' : ''}>${loc}</option>`;
-      });
-      html += `</select>`;
+      if (slotData && slotData.trim()) {
+        label = slotData;
+        hasVal = true;
+      }
     } else if (currentConfigType === 'bestseller') {
-      const curItem = hotkeyBestsellers[i];
-      const curKey = curItem && curItem.name ? `${curItem.name}_${curItem.color || 'SURTIDO'}_${curItem.boxContent || 0}` : '';
-      html += `<select id="cfgSlot_${i}"><option value="">(비어있음)</option>`;
-      (stockDataCache || []).forEach(item => {
-        const itemKey = `${item.name}_${item.color}_${item.boxContent}`;
-        html += `<option value="${itemKey}" ${itemKey === curKey ? 'selected' : ''}>${item.name} (${item.color}, ${item.boxContent}入) [현재고: ${item.stockBox}상자]</option>`;
-      });
-      html += `</select>`;
+      if (slotData && slotData.name) {
+        label = slotData.name;
+        sub = `${slotData.color || 'SURTIDO'} (${slotData.boxContent || 0}入)`;
+        hasVal = true;
+      }
     } else if (currentConfigType === 'grid') {
-      const curName = hotkeyGridItems[i] || '';
-      // 고유 품명 추출
-      const uniqueNames = Array.from(new Set((stockDataCache || []).map(item => item.name))).filter(Boolean);
-      html += `<select id="cfgSlot_${i}"><option value="">(비어있음)</option>`;
-      uniqueNames.forEach(uName => {
-        const vCount = (stockDataCache || []).filter(item => item.name === uName).length;
-        html += `<option value="${uName}" ${uName === curName ? 'selected' : ''}>${uName} (${vCount}개 컬러)</option>`;
-      });
-      html += `</select>`;
+      if (slotData && slotData.trim()) {
+        label = slotData;
+        const count = (stockDataCache || []).filter(item => item.name === slotData).length;
+        sub = `${count}컬러`;
+        hasVal = true;
+      }
     }
 
-    html += `</div>`;
+    html += `
+      <div class="cfg-slot-chip ${isActive ? 'active' : ''} ${hasVal ? 'filled' : 'empty'}" onclick="selectActiveConfigSlot(${i})" title="클릭하여 ${i + 1}번 슬롯 선택">
+        <div class="cfg-chip-num">${i + 1}</div>
+        <div class="cfg-chip-info">
+          <div class="cfg-chip-text">${label}</div>
+          ${sub ? `<div class="cfg-chip-sub">${sub}</div>` : ''}
+        </div>
+        ${hasVal ? `<button type="button" class="cfg-chip-del-btn" onclick="clearSingleConfigSlot(${i}, event)" title="이 슬롯 비우기">✕</button>` : ''}
+      </div>
+    `;
   }
-  body.innerHTML = html;
+  container.innerHTML = html;
+}
+
+function onLiveSearchInput(val) {
+  currentLiveSearchQuery = (val || '').trim().toLowerCase();
+  renderConfigSearchMatrix();
+}
+
+function clearLiveSearch() {
+  const searchInput = document.getElementById('cfgLiveSearchInput');
+  if (searchInput) {
+    searchInput.value = '';
+    searchInput.focus();
+  }
+  currentLiveSearchQuery = '';
+  renderConfigSearchMatrix();
+}
+
+function renderConfigSearchMatrix() {
+  const container = document.getElementById('configMatrixContainer');
+  const countSpan = document.getElementById('cfgMatrixResultCount');
+  if (!container) return;
+
+  const query = currentLiveSearchQuery;
+
+  if (currentConfigType === 'location') {
+    const locList = locationCache || [];
+    const itemsToRender = locList.filter(loc => !query || loc.toLowerCase().includes(query));
+    if (countSpan) countSpan.textContent = `거래처 검색 결과: ${itemsToRender.length}개`;
+
+    if (itemsToRender.length === 0) {
+      container.innerHTML = `<div class="cfg-no-results">일치하는 거래처가 없습니다.</div>`;
+      return;
+    }
+
+    let html = '<div class="cfg-matrix-grid-loc">';
+    itemsToRender.forEach(loc => {
+      const assignedSlot = configTempSlots.findIndex(s => s === loc);
+      const isAssigned = (assignedSlot !== -1);
+      html += `
+        <div class="cfg-item-card-loc ${isAssigned ? 'assigned' : ''}" onclick="assignLocationToSlot('${loc.replace(/'/g, "\\'")}')">
+          <div class="cfg-card-name">${loc}</div>
+          ${isAssigned ? `<span class="cfg-card-assigned-badge">슬롯 ${assignedSlot + 1}</span>` : `<span class="cfg-card-assign-hint">+ 슬롯 ${configActiveSlotIndex + 1}</span>`}
+        </div>
+      `;
+    });
+    html += '</div>';
+    container.innerHTML = html;
+
+  } else if (currentConfigType === 'bestseller') {
+    const stockList = stockDataCache || [];
+    const itemsToRender = stockList.filter(item => {
+      if (!query) return true;
+      return (item.name && item.name.toLowerCase().includes(query)) ||
+             (item.color && item.color.toLowerCase().includes(query));
+    });
+    if (countSpan) countSpan.textContent = `베스트셀러 품목: ${itemsToRender.length}개`;
+
+    if (itemsToRender.length === 0) {
+      container.innerHTML = `<div class="cfg-no-results">일치하는 품목이 없습니다.</div>`;
+      return;
+    }
+
+    let html = '<div class="cfg-matrix-grid">';
+    itemsToRender.slice(0, 80).forEach(item => {
+      const assignedSlot = configTempSlots.findIndex(s => s && s.name === item.name && s.color === item.color && s.boxContent === item.boxContent);
+      const isAssigned = (assignedSlot !== -1);
+      html += `
+        <div class="cfg-item-card ${isAssigned ? 'assigned' : ''}" onclick="assignBestsellerToSlot('${item.name.replace(/'/g, "\\'")}', '${(item.color || 'SURTIDO').replace(/'/g, "\\'")}', ${item.boxContent || 0})">
+          <div class="cfg-card-top">
+            <span class="cfg-card-name">${item.name}</span>
+            <span class="cfg-card-color">${item.color}</span>
+          </div>
+          <div class="cfg-card-bottom">
+            <span class="cfg-card-boxcnt">📦 ${item.boxContent}개입</span>
+            <span class="cfg-card-stock">재고: <strong>${item.stockBox}</strong>상자 (${item.stockIndividual}개)</span>
+            ${isAssigned ? `<span class="cfg-card-assigned-badge">슬롯 ${assignedSlot + 1}</span>` : `<span class="cfg-card-assign-hint">+ 슬롯 ${configActiveSlotIndex + 1}</span>`}
+          </div>
+        </div>
+      `;
+    });
+    html += '</div>';
+    container.innerHTML = html;
+
+  } else if (currentConfigType === 'grid') {
+    const stockList = stockDataCache || [];
+    const uniqueNames = Array.from(new Set(stockList.map(item => item.name))).filter(Boolean);
+    const itemsToRender = uniqueNames.filter(uName => !query || uName.toLowerCase().includes(query));
+    if (countSpan) countSpan.textContent = `그리드 품목: ${itemsToRender.length}개`;
+
+    if (itemsToRender.length === 0) {
+      container.innerHTML = `<div class="cfg-no-results">일치하는 품목이 없습니다.</div>`;
+      return;
+    }
+
+    let html = '<div class="cfg-matrix-grid">';
+    itemsToRender.slice(0, 80).forEach(uName => {
+      const variants = stockList.filter(item => item.name === uName);
+      const variantCount = variants.length;
+      const totalBoxes = variants.reduce((sum, v) => sum + (v.stockBox || 0), 0);
+      const totalInd = variants.reduce((sum, v) => sum + (v.stockIndividual || 0), 0);
+      const sampleColors = variants.slice(0, 3).map(v => v.color).join(', ');
+      const assignedSlot = configTempSlots.findIndex(s => s === uName);
+      const isAssigned = (assignedSlot !== -1);
+
+      html += `
+        <div class="cfg-item-card ${isAssigned ? 'assigned' : ''}" onclick="assignGridToSlot('${uName.replace(/'/g, "\\'")}')">
+          <div class="cfg-card-top">
+            <span class="cfg-card-name">${uName}</span>
+            <span class="cfg-card-badge-count">${variantCount}개 컬러</span>
+          </div>
+          <div class="cfg-card-colors-preview">색상: ${sampleColors}${variantCount > 3 ? ' 외' : ''}</div>
+          <div class="cfg-card-bottom">
+            <span class="cfg-card-stock">총재고: <strong>${totalBoxes}</strong>박스 + <strong>${totalInd}</strong>개</span>
+            ${isAssigned ? `<span class="cfg-card-assigned-badge">슬롯 ${assignedSlot + 1}</span>` : `<span class="cfg-card-assign-hint">+ 슬롯 ${configActiveSlotIndex + 1}</span>`}
+          </div>
+        </div>
+      `;
+    });
+    html += '</div>';
+    container.innerHTML = html;
+  }
+}
+
+function advanceToNextSlot() {
+  let next = -1;
+  // 현재 슬롯 이후 빈 슬롯 탐색
+  for (let i = configActiveSlotIndex + 1; i < 8; i++) {
+    const s = configTempSlots[i];
+    if (!s || (typeof s === 'string' && !s.trim())) {
+      next = i;
+      break;
+    }
+  }
+  // 처음부터 탐색
+  if (next === -1) {
+    for (let i = 0; i < 8; i++) {
+      const s = configTempSlots[i];
+      if (!s || (typeof s === 'string' && !s.trim())) {
+        next = i;
+        break;
+      }
+    }
+  }
+  // 빈 슬롯이 없으면 순환
+  configActiveSlotIndex = (next !== -1) ? next : ((configActiveSlotIndex + 1) % 8);
+  renderConfigSlotChips();
+  renderConfigSearchMatrix();
+
+  const searchInput = document.getElementById('cfgLiveSearchInput');
+  if (searchInput) {
+    searchInput.focus();
+    searchInput.select();
+  }
+}
+
+function assignLocationToSlot(loc) {
+  configTempSlots[configActiveSlotIndex] = loc;
+  advanceToNextSlot();
+}
+
+function assignBestsellerToSlot(name, color, boxContent) {
+  configTempSlots[configActiveSlotIndex] = { name, color, boxContent };
+  advanceToNextSlot();
+}
+
+function assignGridToSlot(name) {
+  configTempSlots[configActiveSlotIndex] = name;
+  advanceToNextSlot();
 }
 
 function saveHotkeyConfig() {
   if (currentConfigType === 'location') {
-    hotkeyLocations = [];
-    for (let i = 0; i < 8; i++) {
-      const sel = document.getElementById(`cfgSlot_${i}`);
-      hotkeyLocations.push(sel ? sel.value : '');
-    }
+    hotkeyLocations = [...configTempSlots];
     localStorage.setItem(HOTKEY_STORAGE_KEYS.LOCATION, JSON.stringify(hotkeyLocations));
     renderLocationHotkeys();
   } else if (currentConfigType === 'bestseller') {
-    hotkeyBestsellers = [];
-    for (let i = 0; i < 8; i++) {
-      const sel = document.getElementById(`cfgSlot_${i}`);
-      const val = sel ? sel.value : '';
-      if (val) {
-        const target = (stockDataCache || []).find(item => `${item.name}_${item.color}_${item.boxContent}` === val);
-        if (target) {
-          hotkeyBestsellers.push({
-            name: target.name,
-            color: target.color,
-            boxContent: target.boxContent
-          });
-        } else {
-          hotkeyBestsellers.push(null);
-        }
-      } else {
-        hotkeyBestsellers.push(null);
-      }
-    }
+    hotkeyBestsellers = configTempSlots.filter(Boolean);
     localStorage.setItem(HOTKEY_STORAGE_KEYS.BESTSELLER, JSON.stringify(hotkeyBestsellers));
     renderBestsellerHotkeys();
   } else if (currentConfigType === 'grid') {
-    hotkeyGridItems = [];
-    for (let i = 0; i < 8; i++) {
-      const sel = document.getElementById(`cfgSlot_${i}`);
-      hotkeyGridItems.push(sel ? sel.value : '');
-    }
+    hotkeyGridItems = [...configTempSlots];
     localStorage.setItem(HOTKEY_STORAGE_KEYS.GRID, JSON.stringify(hotkeyGridItems));
     renderGridHotkeys();
   }
@@ -2894,14 +3400,20 @@ function saveHotkeyConfig() {
 }
 
 function resetCurrentHotkeySlots() {
+  if (!confirm('현재 탭의 8개 슬롯을 추천 기본값으로 자동 채우시겠습니까?')) return;
   if (currentConfigType === 'location') {
     autoPopulateLocationHotkeys();
+    configTempSlots = [...hotkeyLocations];
   } else if (currentConfigType === 'bestseller') {
     autoPopulateBestsellerHotkeys();
+    configTempSlots = hotkeyBestsellers.map(b => b ? { ...b } : null);
   } else if (currentConfigType === 'grid') {
     autoPopulateGridHotkeys();
+    configTempSlots = [...hotkeyGridItems];
   }
-  renderConfigModalBody();
+  configActiveSlotIndex = 0;
+  renderConfigSlotChips();
+  renderConfigSearchMatrix();
 }
 
 function closeHotkeyConfigModal() {
