@@ -278,6 +278,315 @@
       border: 1px solid #ccc;
       z-index: 1000;
     }
+
+    /* =======================================================
+       3대 고속 핫키 시스템 스타일 (출고처 / 베스트셀러 / 그리드)
+       ======================================================= */
+    .hotkey-section {
+      margin-top: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      overflow-y: auto;
+      max-height: 480px;
+      padding-right: 4px;
+    }
+    .hotkey-group {
+      background: #ffffff;
+      border: 1px solid #dcdcdc;
+      border-radius: 6px;
+      padding: 6px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .hotkey-group-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+      padding-bottom: 3px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .hotkey-group-title {
+      font-size: 9pt;
+      font-weight: bold;
+      color: #333;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .hotkey-badge {
+      font-size: 7.5pt;
+      font-weight: normal;
+      background: #eef2f7;
+      color: #4b6584;
+      padding: 1px 5px;
+      border-radius: 3px;
+    }
+    .hotkey-config-link {
+      font-size: 7.5pt;
+      color: #555;
+      background: #f7f9fb;
+      border: 1px solid #ccc;
+      border-radius: 3px;
+      padding: 2px 5px;
+      cursor: pointer;
+    }
+    .hotkey-config-link:hover {
+      background: #e2e8f0;
+      color: #111;
+    }
+    .hotkey-grid-2col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 3px;
+    }
+    .hotkey-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      justify-content: center;
+      background: #fafbfc;
+      border: 1px solid #cfd8dc;
+      border-radius: 4px;
+      padding: 3px 5px;
+      font-size: 8pt;
+      color: #2c3e50;
+      cursor: pointer;
+      text-align: left;
+      min-height: 28px;
+      transition: all 0.12s ease;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .hotkey-btn:hover {
+      background: #e8f5e9;
+      border-color: #81c784;
+      transform: translateY(-1px);
+    }
+    .hotkey-btn.active {
+      background: #e8f5e9;
+      border-color: #4CAF50;
+      color: #2e7d32;
+      font-weight: bold;
+    }
+    .hotkey-btn.empty {
+      color: #aaa;
+      border-style: dashed;
+      background: #fafafa;
+    }
+    .hotkey-btn .btn-num {
+      font-size: 7pt;
+      color: #888;
+      font-weight: bold;
+      margin-right: 2px;
+    }
+    .hotkey-btn .btn-text {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      width: 100%;
+      font-weight: 500;
+    }
+    .hotkey-btn .btn-sub {
+      font-size: 6.8pt;
+      color: #78909c;
+    }
+
+    /* 그리드 상품 일괄 입력 모달 */
+    .grid-modal {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: white;
+      width: 820px;
+      max-height: 85%;
+      border-radius: 8px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+      z-index: 1050;
+      padding: 16px;
+      box-sizing: border-box;
+    }
+    .grid-modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 10px;
+      border-bottom: 2px solid #4CAF50;
+    }
+    .grid-modal-title {
+      font-size: 11.5pt;
+      font-weight: bold;
+      color: #2c3e50;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .grid-modal-loc-badge {
+      font-size: 9pt;
+      background: #e3f2fd;
+      color: #1976d2;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-weight: normal;
+    }
+    .grid-modal-body {
+      max-height: 380px;
+      overflow-y: auto;
+      margin-top: 10px;
+    }
+    .grid-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .grid-table th {
+      background: #f5f6fa;
+      color: #333;
+      padding: 7px 5px;
+      font-size: 9pt;
+      border: 1px solid #ddd;
+    }
+    .grid-table td {
+      padding: 5px;
+      font-size: 9pt;
+      border: 1px solid #e0e0e0;
+      text-align: center;
+    }
+    .grid-input {
+      width: 75px;
+      padding: 4px 6px;
+      font-size: 9.5pt;
+      text-align: right;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    .grid-input:focus {
+      border-color: #4CAF50;
+      outline: none;
+      background-color: #f1f8e9;
+    }
+    .grid-modal-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 12px;
+      padding-top: 8px;
+      border-top: 1px solid #eee;
+    }
+    .btn-grid-submit {
+      background-color: #4CAF50;
+      color: white;
+      padding: 8px 18px;
+      font-size: 9.5pt;
+      font-weight: bold;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .btn-grid-submit:hover {
+      background-color: #43a047;
+    }
+    .btn-grid-close {
+      background-color: #78909c;
+      color: white;
+      padding: 8px 16px;
+      font-size: 9.5pt;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .btn-grid-close:hover {
+      background-color: #607d8b;
+    }
+
+    /* 설정 모달 */
+    .config-modal {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: white;
+      width: 650px;
+      max-height: 82%;
+      border-radius: 8px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+      z-index: 1060;
+      padding: 16px;
+      box-sizing: border-box;
+    }
+    .config-modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #2196F3;
+    }
+    .config-modal-body {
+      max-height: 400px;
+      overflow-y: auto;
+      margin-top: 10px;
+    }
+    .config-slot-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+      padding: 4px 6px;
+      background: #fafafa;
+      border: 1px solid #eee;
+      border-radius: 4px;
+    }
+    .config-slot-num {
+      width: 55px;
+      font-weight: bold;
+      font-size: 9pt;
+      color: #333;
+    }
+    .config-slot-row select, .config-slot-row input {
+      flex: 1;
+      padding: 4px 6px;
+      font-size: 9pt;
+    }
+    .config-modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 12px;
+      padding-top: 8px;
+      border-top: 1px solid #eee;
+    }
+    .btn-reset-slots {
+      background: #ff9800;
+      color: white;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 4px;
+      font-size: 9pt;
+      cursor: pointer;
+    }
+    .btn-save-slots {
+      background: #2196F3;
+      color: white;
+      border: none;
+      padding: 6px 16px;
+      border-radius: 4px;
+      font-size: 9pt;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .btn-cancel-slots {
+      background: #9e9e9e;
+      color: white;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 4px;
+      font-size: 9pt;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
@@ -301,6 +610,36 @@
       <div class="input-area">
         <div class="input-section">
           <div class="form-group" id="formInputs"></div>
+
+          <!-- 3대 고속 핫키 섹션 (출고처 / 베스트셀러 / 그리드 상품) -->
+          <div id="hotkeySection" class="hotkey-section">
+            <!-- 1. 빠른 출고/입고처 핫키 (8 슬롯) -->
+            <div class="hotkey-group" id="locationHotkeyGroup">
+              <div class="hotkey-group-header">
+                <span class="hotkey-group-title" id="locationHotkeyTitle">🏢 빠른 거래처 <span class="hotkey-badge">Alt+1~8</span></span>
+                <button type="button" class="hotkey-config-link" onclick="openHotkeyConfigModal('location')" title="거래처 슬롯 설정">⚙️ 설정</button>
+              </div>
+              <div class="hotkey-grid-2col" id="locationHotkeyGrid"></div>
+            </div>
+
+            <!-- 2. 베스트셀러 단일 품목 핫키 (8 슬롯) -->
+            <div class="hotkey-group" id="bestsellerHotkeyGroup">
+              <div class="hotkey-group-header">
+                <span class="hotkey-group-title">⭐ 베스트셀러 <span class="hotkey-badge">단일품목 퀵입력</span></span>
+                <button type="button" class="hotkey-config-link" onclick="openHotkeyConfigModal('bestseller')" title="베스트셀러 슬롯 설정">⚙️ 설정</button>
+              </div>
+              <div class="hotkey-grid-2col" id="bestsellerHotkeyGrid"></div>
+            </div>
+
+            <!-- 3. 그리드 상품 묶음 핫키 (8 슬롯) -->
+            <div class="hotkey-group" id="gridHotkeyGroup">
+              <div class="hotkey-group-header">
+                <span class="hotkey-group-title">📦 그리드 상품 <span class="hotkey-badge">컬러일괄입력</span></span>
+                <button type="button" class="hotkey-config-link" onclick="openHotkeyConfigModal('grid')" title="그리드 상품 슬롯 설정">⚙️ 설정</button>
+              </div>
+              <div class="hotkey-grid-2col" id="gridHotkeyGrid"></div>
+            </div>
+          </div>
         </div>
         <div class="table-section">
           <div class="buttons">
@@ -378,6 +717,52 @@
     <div id="stockWarningModal" class="modal">
       <p id="warningMessage"></p>
       <button onclick="closeStockWarningModal()">닫기</button>
+    </div>
+
+    <!-- 그리드 상품 일괄 입력 모달 -->
+    <div id="gridSelectionModal" class="grid-modal">
+      <div class="grid-modal-header">
+        <div class="grid-modal-title">
+          <span>📦 그리드 상품 일괄 입력: <strong id="gridActiveItemName" style="color: #2e7d32;">-</strong></span>
+          <span class="grid-modal-loc-badge" id="gridActiveLocationBadge">거래처: -</span>
+        </div>
+        <button type="button" class="btn-grid-submit" onclick="submitGridSelection()">✓ 확인 (일괄 담기)</button>
+      </div>
+      <div class="grid-modal-body">
+        <table class="grid-table">
+          <thead>
+            <tr>
+              <th style="width: 140px;">색상 (컬러)</th>
+              <th style="width: 85px;">박스당수량</th>
+              <th style="width: 140px;">현재고 (가용)</th>
+              <th style="width: 100px;">상자 수량 (Box)</th>
+              <th style="width: 100px;">낱개 수량 (Pzs)</th>
+              <th style="width: 100px;">총 낱개 합산</th>
+            </tr>
+          </thead>
+          <tbody id="gridTableBody"></tbody>
+        </table>
+      </div>
+      <div class="grid-modal-footer">
+        <div class="grid-total-summary">
+          <span>입력 합계: 상자 <strong id="gridTotalBox" style="color:#2e7d32;">0</strong> / 낱개 <strong id="gridTotalInd" style="color:#2e7d32;">0</strong> (총 <strong id="gridTotalPieces" style="color:#1976d2;">0</strong>개)</span>
+        </div>
+        <button type="button" class="btn-grid-close" onclick="closeGridSelectionModal()">닫기 (취소)</button>
+      </div>
+    </div>
+
+    <!-- 핫키 슬롯 설정 모달 -->
+    <div id="hotkeyConfigModal" class="config-modal">
+      <div class="config-modal-header">
+        <h3 id="configModalTitle" style="margin: 0; font-size: 11pt;">⚙️ 핫키 슬롯 설정</h3>
+        <button type="button" class="close-btn" onclick="closeHotkeyConfigModal()" style="background:none; border:none; font-size:14pt; cursor:pointer; color:#666;">✕</button>
+      </div>
+      <div class="config-modal-body" id="configModalBody"></div>
+      <div class="config-modal-footer">
+        <button type="button" class="btn-reset-slots" onclick="resetCurrentHotkeySlots()">기본값 자동 채우기</button>
+        <button type="button" class="btn-save-slots" onclick="saveHotkeyConfig()">저장 완료</button>
+        <button type="button" class="btn-cancel-slots" onclick="closeHotkeyConfigModal()">취소</button>
+      </div>
     </div>
     <iframe id="printFrame" style="display: none;"></iframe>
   </div>
@@ -480,6 +865,7 @@ function loadStockData() {
       stockDataCache = data;
       isLoadingStockData = false;
       document.body.removeChild(loadingIndicator);
+      initProductHotkeys();
     })
     .catch(err => {
       isLoadingStockData = false;
@@ -531,6 +917,7 @@ function saveMetadata() {
       admin: adminSelect ? adminSelect.value : 'ADMIN'
     };
     localStorage.setItem(storageKey, JSON.stringify(metadata));
+    if (typeof highlightActiveLocationButton === 'function') highlightActiveLocationButton();
   } catch (e) {
   }
 }
@@ -551,6 +938,7 @@ function restoreMetadata() {
         adminSelect.value = metadata.admin;
       }
     }
+    if (typeof highlightActiveLocationButton === 'function') highlightActiveLocationButton();
   } catch (e) {
     localStorage.removeItem(storageKey);
   }
@@ -579,6 +967,15 @@ function setPage(page, initialData = null) {
     if (banner) banner.style.backgroundColor = config.bannerColor || '#f0f0f0';
     if (formInputs) formInputs.innerHTML = config.inputs;
     if (invoiceRow) invoiceRow.style.display = currentType === 'product' ? 'none' : 'block';
+
+    const hotkeySection = document.getElementById('hotkeySection');
+    if (hotkeySection) {
+      hotkeySection.style.display = currentType === 'product' ? 'none' : 'flex';
+    }
+    const locTitle = document.getElementById('locationHotkeyTitle');
+    if (locTitle) {
+      locTitle.innerHTML = (currentType === 'in' ? '🏢 빠른 입고처' : '🏢 빠른 출고처') + ' <span class="hotkey-badge">Alt+1~8</span>';
+    }
 
     document.querySelectorAll('.menu button').forEach(btn => btn.classList.remove('active'));
     const activeButton = document.querySelector(`.menu button[onclick="setPage('${page}')"]`);
@@ -731,6 +1128,7 @@ function loadDropdowns() {
     const select = document.getElementById('location');
     select.innerHTML = '<option value="">선택</option>' + locationCache.map(loc => `<option value="${loc}">${loc}</option>`).join('');
     restoreMetadata();
+    initLocationHotkeys();
     return;
   }
   google.script.run.withSuccessHandler(data => {
@@ -738,6 +1136,7 @@ function loadDropdowns() {
     const select = document.getElementById('location');
     select.innerHTML = '<option value="">선택</option>' + data.map(loc => `<option value="${loc}">${loc}</option>`).join('');
     restoreMetadata();
+    initLocationHotkeys();
   }).withFailureHandler(handleError)[typeConfig[currentType].locationsFunction]();
 }
 
@@ -834,8 +1233,13 @@ function updateUnitType() {
 }
 
 function checkItemAndStock(itemName, color, boxContent, qty, unitType) {
-  const key = `${itemName}_${color || 'SURTIDO'}_${boxContent || 0}`;
-  const item = stockDataCache.find(item => item.key === key);
+  const normColor = color || 'SURTIDO';
+  const normBoxContent = Number(boxContent) || 0;
+  const item = stockDataCache.find(item => 
+    item.key === `${itemName}_${normColor}_${normBoxContent}` ||
+    (item.name === itemName && item.color === normColor && Number(item.boxContent) === normBoxContent) ||
+    (item.name === itemName && item.color === normColor)
+  );
 
   if (!item) {
     return { isRegistered: false };
@@ -1693,8 +2097,584 @@ function setupMetadataEvents() {
   if (adminSelect) adminSelect.addEventListener('change', saveMetadata);
 }
 
-document.addEventListener('DOMContentLoaded', initPage);
-window.onload = initPage;
+// =======================================================
+// 3대 고속 핫키 시스템 자바스크립트 (출고처 / 베스트셀러 / 그리드)
+// =======================================================
+
+const HOTKEY_STORAGE_KEYS = {
+  LOCATION: 'wms_hotkeys_locations',
+  BESTSELLER: 'wms_hotkeys_bestsellers',
+  GRID: 'wms_hotkeys_grid'
+};
+
+let hotkeyLocations = [];
+let hotkeyBestsellers = [];
+let hotkeyGridItems = [];
+let currentConfigType = 'location';
+let activeGridVariants = [];
+
+function initAllHotkeys() {
+  initLocationHotkeys();
+  initProductHotkeys();
+  setupHotkeyShortcuts();
+}
+
+// ---------------- 출고/입고처 핫키 ----------------
+
+function initLocationHotkeys() {
+  try {
+    const saved = localStorage.getItem(HOTKEY_STORAGE_KEYS.LOCATION);
+    if (saved) {
+      hotkeyLocations = JSON.parse(saved);
+    } else {
+      autoPopulateLocationHotkeys();
+    }
+  } catch (e) {
+    autoPopulateLocationHotkeys();
+  }
+  renderLocationHotkeys();
+  highlightActiveLocationButton();
+}
+
+function autoPopulateLocationHotkeys() {
+  hotkeyLocations = [];
+  if (Array.isArray(locationCache) && locationCache.length > 0) {
+    for (let i = 0; i < 8; i++) {
+      hotkeyLocations.push(locationCache[i] || '');
+    }
+  } else {
+    for (let i = 0; i < 8; i++) hotkeyLocations.push('');
+  }
+  try {
+    localStorage.setItem(HOTKEY_STORAGE_KEYS.LOCATION, JSON.stringify(hotkeyLocations));
+  } catch (e) {}
+}
+
+function renderLocationHotkeys() {
+  const grid = document.getElementById('locationHotkeyGrid');
+  if (!grid) return;
+  let html = '';
+  for (let i = 0; i < 8; i++) {
+    const loc = hotkeyLocations[i] || '';
+    const isEmpty = !loc;
+    html += `
+      <button type="button" class="hotkey-btn ${isEmpty ? 'empty' : ''}" 
+        id="locBtn_${i}"
+        onclick="selectLocationHotkey(${i})" 
+        oncontextmenu="event.preventDefault(); openHotkeyConfigModal('location');"
+        title="${loc ? `${i + 1}번 거래처 선택 (Alt+${i + 1})` : '클릭하여 거래처 설정'}">
+        <div class="btn-text"><span class="btn-num">${i + 1}.</span>${loc || '+ 슬롯 설정'}</div>
+      </button>
+    `;
+  }
+  grid.innerHTML = html;
+  highlightActiveLocationButton();
+}
+
+function selectLocationHotkey(idx) {
+  const loc = hotkeyLocations[idx];
+  if (!loc) {
+    openHotkeyConfigModal('location');
+    return;
+  }
+  const select = document.getElementById('location');
+  if (!select) return;
+
+  // 옵션에 없으면 동적 추가
+  if (!Array.from(select.options).some(opt => opt.value === loc)) {
+    const newOpt = document.createElement('option');
+    newOpt.value = loc;
+    newOpt.text = loc;
+    select.add(newOpt);
+  }
+  select.value = loc;
+  saveMetadata();
+  highlightActiveLocationButton();
+}
+
+function highlightActiveLocationButton() {
+  const select = document.getElementById('location');
+  const activeLoc = select ? select.value : '';
+  for (let i = 0; i < 8; i++) {
+    const btn = document.getElementById(`locBtn_${i}`);
+    if (btn) {
+      if (activeLoc && hotkeyLocations[i] === activeLoc) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    }
+  }
+}
+
+// ---------------- 상품 핫키 (베스트셀러 & 그리드) ----------------
+
+function initProductHotkeys() {
+  initBestsellerHotkeys();
+  initGridHotkeys();
+}
+
+function initBestsellerHotkeys() {
+  try {
+    const saved = localStorage.getItem(HOTKEY_STORAGE_KEYS.BESTSELLER);
+    if (saved) {
+      hotkeyBestsellers = JSON.parse(saved);
+    } else {
+      autoPopulateBestsellerHotkeys();
+    }
+  } catch (e) {
+    autoPopulateBestsellerHotkeys();
+  }
+  renderBestsellerHotkeys();
+}
+
+function autoPopulateBestsellerHotkeys() {
+  hotkeyBestsellers = [];
+  if (Array.isArray(stockDataCache) && stockDataCache.length > 0) {
+    for (let i = 0; i < Math.min(8, stockDataCache.length); i++) {
+      const item = stockDataCache[i];
+      hotkeyBestsellers.push({
+        name: item.name,
+        color: item.color,
+        boxContent: item.boxContent
+      });
+    }
+  }
+  while (hotkeyBestsellers.length < 8) {
+    hotkeyBestsellers.push(null);
+  }
+  try {
+    localStorage.setItem(HOTKEY_STORAGE_KEYS.BESTSELLER, JSON.stringify(hotkeyBestsellers));
+  } catch (e) {}
+}
+
+function renderBestsellerHotkeys() {
+  const grid = document.getElementById('bestsellerHotkeyGrid');
+  if (!grid) return;
+  let html = '';
+  for (let i = 0; i < 8; i++) {
+    const item = hotkeyBestsellers[i];
+    const hasItem = item && item.name;
+    html += `
+      <button type="button" class="hotkey-btn ${!hasItem ? 'empty' : ''}" 
+        onclick="selectBestsellerHotkey(${i})"
+        oncontextmenu="event.preventDefault(); openHotkeyConfigModal('bestseller');"
+        title="${hasItem ? `${item.name} (${item.color}) 선택` : '클릭하여 베스트셀러 설정'}">
+        <div class="btn-text"><span class="btn-num">${i + 1}.</span>${hasItem ? item.name : '+ 슬롯 설정'}</div>
+        ${hasItem ? `<div class="btn-sub">${item.color} (${item.boxContent}入)</div>` : ''}
+      </button>
+    `;
+  }
+  grid.innerHTML = html;
+}
+
+function selectBestsellerHotkey(idx) {
+  const item = hotkeyBestsellers[idx];
+  if (!item || !item.name) {
+    openHotkeyConfigModal('bestseller');
+    return;
+  }
+  const itemNameInput = document.getElementById('itemName');
+  const colorInput = document.getElementById('color');
+  const boxContentInput = document.getElementById('boxContent');
+  const qtyInput = document.getElementById('qty');
+
+  if (itemNameInput) itemNameInput.value = item.name;
+  if (colorInput) colorInput.value = item.color || 'SURTIDO';
+  if (boxContentInput) boxContentInput.value = item.boxContent || '';
+  if (qtyInput) {
+    qtyInput.focus();
+    qtyInput.select();
+  }
+}
+
+// ---------------- 그리드 묶음 상품 핫키 ----------------
+
+function initGridHotkeys() {
+  try {
+    const saved = localStorage.getItem(HOTKEY_STORAGE_KEYS.GRID);
+    if (saved) {
+      hotkeyGridItems = JSON.parse(saved);
+    } else {
+      autoPopulateGridHotkeys();
+    }
+  } catch (e) {
+    autoPopulateGridHotkeys();
+  }
+  renderGridHotkeys();
+}
+
+function autoPopulateGridHotkeys() {
+  hotkeyGridItems = [];
+  if (Array.isArray(stockDataCache) && stockDataCache.length > 0) {
+    const groupCount = {};
+    stockDataCache.forEach(item => {
+      groupCount[item.name] = (groupCount[item.name] || 0) + 1;
+    });
+    // 변형 컬러가 많은 순으로 정렬
+    const sortedNames = Object.keys(groupCount).sort((a, b) => groupCount[b] - groupCount[a]);
+    for (let i = 0; i < Math.min(8, sortedNames.length); i++) {
+      hotkeyGridItems.push(sortedNames[i]);
+    }
+  }
+  while (hotkeyGridItems.length < 8) {
+    hotkeyGridItems.push('');
+  }
+  try {
+    localStorage.setItem(HOTKEY_STORAGE_KEYS.GRID, JSON.stringify(hotkeyGridItems));
+  } catch (e) {}
+}
+
+function renderGridHotkeys() {
+  const grid = document.getElementById('gridHotkeyGrid');
+  if (!grid) return;
+  let html = '';
+  for (let i = 0; i < 8; i++) {
+    const itemName = hotkeyGridItems[i] || '';
+    const hasItem = Boolean(itemName);
+    const variantCount = hasItem ? stockDataCache.filter(item => item.name === itemName).length : 0;
+    html += `
+      <button type="button" class="hotkey-btn ${!hasItem ? 'empty' : ''}" 
+        onclick="openGridSelectionModal(${i})"
+        oncontextmenu="event.preventDefault(); openHotkeyConfigModal('grid');"
+        title="${hasItem ? `${itemName} (${variantCount}개 컬러) 일괄입력 열기` : '클릭하여 그리드 상품 설정'}">
+        <div class="btn-text"><span class="btn-num">${i + 1}.</span>${hasItem ? itemName : '+ 슬롯 설정'}</div>
+        ${hasItem ? `<div class="btn-sub" style="color: #00897b; font-weight: bold;">${variantCount}개 컬러 일괄입력</div>` : ''}
+      </button>
+    `;
+  }
+  grid.innerHTML = html;
+}
+
+// ---------------- 그리드 선택 모달 대화상자 ----------------
+
+function openGridSelectionModal(idx) {
+  const itemName = hotkeyGridItems[idx];
+  if (!itemName) {
+    openHotkeyConfigModal('grid');
+    return;
+  }
+  const locationSelect = document.getElementById('location');
+  const loc = locationSelect ? locationSelect.value : '';
+  if (!loc) {
+    alert('먼저 상단의 입/출고처를 선택해 주세요.');
+    if (locationSelect) locationSelect.focus();
+    return;
+  }
+
+  activeGridVariants = stockDataCache.filter(item => item.name === itemName);
+  if (activeGridVariants.length === 0) {
+    alert(`[${itemName}] 상품의 재고 정보를 찾을 수 없습니다.`);
+    return;
+  }
+
+  document.getElementById('gridActiveItemName').textContent = itemName;
+  document.getElementById('gridActiveLocationBadge').textContent = (currentType === 'in' ? '입고처: ' : '출고처: ') + loc;
+
+  const tbody = document.getElementById('gridTableBody');
+  let html = '';
+  activeGridVariants.forEach((v, vIdx) => {
+    html += `
+      <tr>
+        <td style="font-weight: bold; text-align: left; padding-left: 10px;">${v.color}</td>
+        <td>${v.boxContent}개입</td>
+        <td style="color: #555;">${v.stockBox}상자 (${v.stockIndividual}개)</td>
+        <td><input type="number" min="0" class="grid-input" id="gridBox_${vIdx}" oninput="calcGridRowTotal(${vIdx})" placeholder="0"></td>
+        <td><input type="number" min="0" class="grid-input" id="gridInd_${vIdx}" oninput="calcGridRowTotal(${vIdx})" placeholder="0"></td>
+        <td id="gridRowTotal_${vIdx}" style="font-weight: bold; color: #1976d2;">0개</td>
+      </tr>
+    `;
+  });
+  tbody.innerHTML = html;
+  calcGridOverallTotal();
+
+  const modal = document.getElementById('gridSelectionModal');
+  if (modal) modal.style.display = 'flex';
+
+  setTimeout(() => {
+    const firstInput = document.getElementById('gridBox_0');
+    if (firstInput) firstInput.focus();
+  }, 100);
+}
+
+function calcGridRowTotal(vIdx) {
+  const boxInput = document.getElementById(`gridBox_${vIdx}`);
+  const indInput = document.getElementById(`gridInd_${vIdx}`);
+  const boxVal = boxInput ? (parseInt(boxInput.value, 10) || 0) : 0;
+  const indVal = indInput ? (parseInt(indInput.value, 10) || 0) : 0;
+  const boxContent = activeGridVariants[vIdx] ? (activeGridVariants[vIdx].boxContent || 1) : 1;
+
+  const totalPieces = (boxVal * boxContent) + indVal;
+  const totalCell = document.getElementById(`gridRowTotal_${vIdx}`);
+  if (totalCell) totalCell.textContent = totalPieces + '개';
+
+  calcGridOverallTotal();
+}
+
+function calcGridOverallTotal() {
+  let totalBoxes = 0;
+  let totalIndividuals = 0;
+  let totalPieces = 0;
+
+  activeGridVariants.forEach((v, vIdx) => {
+    const boxInput = document.getElementById(`gridBox_${vIdx}`);
+    const indInput = document.getElementById(`gridInd_${vIdx}`);
+    const box = boxInput ? (parseInt(boxInput.value, 10) || 0) : 0;
+    const ind = indInput ? (parseInt(indInput.value, 10) || 0) : 0;
+    const boxContent = v.boxContent || 1;
+
+    totalBoxes += box;
+    totalIndividuals += ind;
+    totalPieces += (box * boxContent) + ind;
+  });
+
+  const totalBoxSpan = document.getElementById('gridTotalBox');
+  const totalIndSpan = document.getElementById('gridTotalInd');
+  const totalPiecesSpan = document.getElementById('gridTotalPieces');
+
+  if (totalBoxSpan) totalBoxSpan.textContent = totalBoxes;
+  if (totalIndSpan) totalIndSpan.textContent = totalIndividuals;
+  if (totalPiecesSpan) totalPiecesSpan.textContent = totalPieces;
+}
+
+function submitGridSelection() {
+  const locationSelect = document.getElementById('location');
+  const location = locationSelect ? locationSelect.value : '';
+  let addedCount = 0;
+
+  for (let vIdx = 0; vIdx < activeGridVariants.length; vIdx++) {
+    const v = activeGridVariants[vIdx];
+    const boxInput = document.getElementById(`gridBox_${vIdx}`);
+    const indInput = document.getElementById(`gridInd_${vIdx}`);
+    const boxQty = boxInput ? (parseInt(boxInput.value, 10) || 0) : 0;
+    const indQty = indInput ? (parseInt(indInput.value, 10) || 0) : 0;
+
+    // 출고 시 사전 재고 검증
+    if (currentType === 'out') {
+      if (boxQty > 0) {
+        const stockInfo = checkItemAndStock(v.name, v.color, v.boxContent, boxQty, 'box');
+        if (!stockInfo.isSufficient) {
+          alert(`[${v.color}] 박스 재고가 부족합니다. (현재: ${v.stockBox}상자, 요청: ${boxQty}상자)`);
+          if (boxInput) boxInput.focus();
+          return;
+        }
+      }
+      if (indQty > 0) {
+        const stockInfo = checkItemAndStock(v.name, v.color, v.boxContent, indQty, 'individual');
+        if (!stockInfo.isSufficient) {
+          alert(`[${v.color}] 낱개 재고가 부족합니다. (요청: ${indQty}개)`);
+          if (indInput) indInput.focus();
+          return;
+        }
+      }
+    }
+
+    if (boxQty > 0) {
+      records.push({
+        itemName: v.name,
+        color: v.color,
+        boxQty: boxQty,
+        individualQty: 0,
+        boxContent: v.boxContent,
+        location: location,
+        unitType: 'box'
+      });
+      addedCount++;
+    }
+    if (indQty > 0) {
+      records.push({
+        itemName: v.name,
+        color: v.color,
+        boxQty: 0,
+        individualQty: indQty,
+        boxContent: v.boxContent,
+        location: location,
+        unitType: 'individual'
+      });
+      addedCount++;
+    }
+  }
+
+  if (addedCount === 0) {
+    alert('수량을 1개 이상 입력해 주세요.');
+    return;
+  }
+
+  saveTableData();
+  updateTable();
+  toggleScroll();
+  updateTotals();
+  closeGridSelectionModal();
+  alert(`총 ${addedCount}개 품목(색상)이 일괄 추가되었습니다.`);
+}
+
+function closeGridSelectionModal() {
+  const modal = document.getElementById('gridSelectionModal');
+  if (modal) modal.style.display = 'none';
+}
+
+// ---------------- 핫키 슬롯 설정 모달 ----------------
+
+function openHotkeyConfigModal(type) {
+  currentConfigType = type || 'location';
+  const modal = document.getElementById('hotkeyConfigModal');
+  const title = document.getElementById('configModalTitle');
+  if (!modal || !title) return;
+
+  if (currentConfigType === 'location') {
+    title.textContent = (currentType === 'in' ? '🏢 빠른 입고처' : '🏢 빠른 출고처') + ' 핫키 슬롯 설정 (8개)';
+  } else if (currentConfigType === 'bestseller') {
+    title.textContent = '⭐ 베스트셀러 단일 품목 슬롯 설정 (8개)';
+  } else if (currentConfigType === 'grid') {
+    title.textContent = '📦 그리드 묶음 대표 상품 슬롯 설정 (8개)';
+  }
+
+  renderConfigModalBody();
+  modal.style.display = 'block';
+}
+
+function renderConfigModalBody() {
+  const body = document.getElementById('configModalBody');
+  if (!body) return;
+  let html = '';
+
+  for (let i = 0; i < 8; i++) {
+    html += `<div class="config-slot-row"><span class="config-slot-num">슬롯 ${i + 1}:</span>`;
+
+    if (currentConfigType === 'location') {
+      const curLoc = hotkeyLocations[i] || '';
+      html += `<select id="cfgSlot_${i}"><option value="">(비어있음)</option>`;
+      (locationCache || []).forEach(loc => {
+        html += `<option value="${loc}" ${loc === curLoc ? 'selected' : ''}>${loc}</option>`;
+      });
+      html += `</select>`;
+    } else if (currentConfigType === 'bestseller') {
+      const curItem = hotkeyBestsellers[i];
+      const curKey = curItem && curItem.name ? `${curItem.name}_${curItem.color || 'SURTIDO'}_${curItem.boxContent || 0}` : '';
+      html += `<select id="cfgSlot_${i}"><option value="">(비어있음)</option>`;
+      (stockDataCache || []).forEach(item => {
+        const itemKey = `${item.name}_${item.color}_${item.boxContent}`;
+        html += `<option value="${itemKey}" ${itemKey === curKey ? 'selected' : ''}>${item.name} (${item.color}, ${item.boxContent}入) [현재고: ${item.stockBox}상자]</option>`;
+      });
+      html += `</select>`;
+    } else if (currentConfigType === 'grid') {
+      const curName = hotkeyGridItems[i] || '';
+      // 고유 품명 추출
+      const uniqueNames = Array.from(new Set((stockDataCache || []).map(item => item.name))).filter(Boolean);
+      html += `<select id="cfgSlot_${i}"><option value="">(비어있음)</option>`;
+      uniqueNames.forEach(uName => {
+        const vCount = (stockDataCache || []).filter(item => item.name === uName).length;
+        html += `<option value="${uName}" ${uName === curName ? 'selected' : ''}>${uName} (${vCount}개 컬러)</option>`;
+      });
+      html += `</select>`;
+    }
+
+    html += `</div>`;
+  }
+  body.innerHTML = html;
+}
+
+function saveHotkeyConfig() {
+  if (currentConfigType === 'location') {
+    hotkeyLocations = [];
+    for (let i = 0; i < 8; i++) {
+      const sel = document.getElementById(`cfgSlot_${i}`);
+      hotkeyLocations.push(sel ? sel.value : '');
+    }
+    localStorage.setItem(HOTKEY_STORAGE_KEYS.LOCATION, JSON.stringify(hotkeyLocations));
+    renderLocationHotkeys();
+  } else if (currentConfigType === 'bestseller') {
+    hotkeyBestsellers = [];
+    for (let i = 0; i < 8; i++) {
+      const sel = document.getElementById(`cfgSlot_${i}`);
+      const val = sel ? sel.value : '';
+      if (val) {
+        const target = (stockDataCache || []).find(item => `${item.name}_${item.color}_${item.boxContent}` === val);
+        if (target) {
+          hotkeyBestsellers.push({
+            name: target.name,
+            color: target.color,
+            boxContent: target.boxContent
+          });
+        } else {
+          hotkeyBestsellers.push(null);
+        }
+      } else {
+        hotkeyBestsellers.push(null);
+      }
+    }
+    localStorage.setItem(HOTKEY_STORAGE_KEYS.BESTSELLER, JSON.stringify(hotkeyBestsellers));
+    renderBestsellerHotkeys();
+  } else if (currentConfigType === 'grid') {
+    hotkeyGridItems = [];
+    for (let i = 0; i < 8; i++) {
+      const sel = document.getElementById(`cfgSlot_${i}`);
+      hotkeyGridItems.push(sel ? sel.value : '');
+    }
+    localStorage.setItem(HOTKEY_STORAGE_KEYS.GRID, JSON.stringify(hotkeyGridItems));
+    renderGridHotkeys();
+  }
+
+  closeHotkeyConfigModal();
+  alert('핫키 슬롯 설정이 성공적으로 저장되었습니다.');
+}
+
+function resetCurrentHotkeySlots() {
+  if (currentConfigType === 'location') {
+    autoPopulateLocationHotkeys();
+  } else if (currentConfigType === 'bestseller') {
+    autoPopulateBestsellerHotkeys();
+  } else if (currentConfigType === 'grid') {
+    autoPopulateGridHotkeys();
+  }
+  renderConfigModalBody();
+}
+
+function closeHotkeyConfigModal() {
+  const modal = document.getElementById('hotkeyConfigModal');
+  if (modal) modal.style.display = 'none';
+}
+
+// ---------------- 키보드 단축키 이벤트 ----------------
+
+function setupHotkeyShortcuts() {
+  window.addEventListener('keydown', (e) => {
+    // Alt + 1 ~ Alt + 8 : 거래처 핫키 선택
+    if (e.altKey && !e.shiftKey && !e.ctrlKey && e.key >= '1' && e.key <= '8') {
+      e.preventDefault();
+      const idx = parseInt(e.key, 10) - 1;
+      selectLocationHotkey(idx);
+    }
+    // Alt + Shift + 1 ~ 8 : 베스트셀러 핫키 선택
+    else if (e.altKey && e.shiftKey && !e.ctrlKey && e.key >= '1' && e.key <= '8') {
+      e.preventDefault();
+      const idx = parseInt(e.key, 10) - 1;
+      selectBestsellerHotkey(idx);
+    }
+    // Escape : 열린 모달 닫기
+    else if (e.key === 'Escape') {
+      closeGridSelectionModal();
+      closeHotkeyConfigModal();
+    }
+    // Ctrl + Enter : 그리드 모달이 열려 있을 때 일괄 담기 실행
+    else if (e.ctrlKey && e.key === 'Enter') {
+      const gridModal = document.getElementById('gridSelectionModal');
+      if (gridModal && gridModal.style.display === 'flex') {
+        e.preventDefault();
+        submitGridSelection();
+      }
+    }
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  initPage();
+  initAllHotkeys();
+});
+window.onload = () => {
+  initPage();
+  initAllHotkeys();
+};
 </script>
 </body>
 </html>
