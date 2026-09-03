@@ -9,138 +9,350 @@
       --banner-out: #e0ffe0;
       --highlight-color: #e0ffe0;
     }
+    * {
+      box-sizing: border-box;
+    }
+    :root {
+      --primary-color: #2e7d32;
+      --submit-color: #0284c7;
+      --banner-in: #fef2f2;
+      --banner-out: #f0fdf4;
+      --highlight-color: #dcfce7;
+    }
     body {
-      font-family: Arial, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
       padding: 0;
       margin: 0;
-      background-color: #f0f0f0;
-      height: 851px;
-      width: 1075px;
+      background-color: #f8fafc;
+      height: 100vh;
+      max-height: 100vh;
+      width: 100%;
+      overflow: hidden;
+      color: #1e293b;
+    }
+    .container {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      max-height: 100vh;
+      width: 100%;
       overflow: hidden;
     }
-    .container { display: flex; flex-direction: column; height: 100%; }
     .banner {
       width: 100%;
-      height: 90px;
-      border-bottom: 1px solid #000;
-      padding: 10px;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      align-items: flex-start;
-      font-size: 12pt;
-      font-weight: bold;
-    }
-    .banner div { display: flex; align-items: center; }
-    .content { flex: 1; display: flex; width: 1075px; }
-    .admin-input {margin-left:100px;}
-    .admin-select {
-      margin-left: 10px;
-      width: 200px;
-      padding: 5px;
-      font-size: 10pt;
-    }
-    .menu {
-      width: 131px;
-      padding: 10px;
-      background-color: #ddd;
-      border-right: 1px solid #000;
-      display: flex;
-      flex-direction: column;
-      justify-content: flex-start;
-    }
-    .menu button {
-      width: 100px;
-      padding: 10px;
-      margin-bottom: 20px;
-      background-color: var(--primary-color);
-      color: white;
-      border: none;
-      cursor: pointer;
-      font-size: 10pt;
-      white-space: nowrap;
-    }
-    .menu button:hover, .menu button.active { background-color: #45a049; }
-    .input-area {
-      flex: 1;
-      padding: 10px;
+      height: 52px;
+      border-bottom: 1px solid #cbd5e1;
+      padding: 0 16px;
       display: flex;
       flex-direction: row;
-      gap: 10px;
-      height: calc(100% - 20px);
+      justify-content: space-between;
+      align-items: center;
+      background-color: #ffffff;
+      flex: none;
+    }
+    .banner-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .banner-title {
+      font-size: 13pt;
+      font-weight: 800;
+      color: #0f172a;
+    }
+    .invoice-badge {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      color: #1d4ed8;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 9pt;
+      font-weight: 600;
+    }
+    .banner-right {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .banner-field {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 9pt;
+      color: #475569;
+    }
+    .banner-field label {
+      width: auto;
+      margin: 0;
+      font-weight: 600;
+      color: #64748b;
+    }
+    .datetime-input {
+      width: 175px;
+      padding: 3px 6px;
+      font-size: 8.5pt;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      background: #f8fafc;
+      color: #334155;
+      text-align: center;
+    }
+    .admin-select {
+      width: 120px;
+      padding: 3px 6px;
+      font-size: 8.5pt;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      background: #ffffff;
+    }
+    .content {
+      flex: 1;
+      display: flex;
+      width: 100%;
+      height: calc(100vh - 52px);
       overflow: hidden;
     }
-    .input-section { flex: 3; display: flex; flex-direction: column; }
-    .table-section { flex: 7; display: flex; flex-direction: column; overflow: hidden; }
-    .form-group { margin-bottom: 20px; }
+    .menu {
+      width: 110px;
+      padding: 10px 8px;
+      background-color: #f1f5f9;
+      border-right: 1px solid #e2e8f0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      flex: none;
+    }
+    .menu button {
+      width: 100%;
+      padding: 10px 6px;
+      background-color: #ffffff;
+      color: #475569;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 9.5pt;
+      font-weight: 600;
+      white-space: nowrap;
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .menu button:hover {
+      background-color: #f8fafc;
+      border-color: #94a3b8;
+    }
+    .menu button.active {
+      background-color: var(--primary-color);
+      color: #ffffff;
+      border-color: var(--primary-color);
+      box-shadow: 0 2px 4px rgba(46, 125, 50, 0.25);
+    }
+    .input-area {
+      flex: 1;
+      padding: 10px 14px;
+      display: flex;
+      flex-direction: row;
+      gap: 14px;
+      height: 100%;
+      overflow: hidden;
+    }
+    .input-section {
+      width: 300px;
+      flex: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      overflow: hidden;
+    }
+    .table-section {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      min-width: 0;
+    }
+    .form-group {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 10px 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+      flex: none;
+    }
+    .input-row {
+      margin-bottom: 7px;
+      display: flex;
+      align-items: center;
+      position: relative;
+    }
+    .input-row:last-child {
+      margin-bottom: 0;
+    }
+    .unit-options {
+      margin-bottom: 7px;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      padding-left: 88px;
+      font-size: 9pt;
+      font-weight: 600;
+      color: #334155;
+    }
+    .unit-options label {
+      width: auto;
+      margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+    }
     label {
       display: inline-block;
-      width: 100px;
-      margin-right: 10px;
-      font-size: 10pt;
+      width: 85px;
+      margin-right: 6px;
+      font-size: 8.8pt;
+      font-weight: 600;
+      color: #475569;
+      flex: none;
     }
     select, input[type="text"], input[type="number"] {
-      width: 200px;
-      padding: 5px;
-      font-size: 10pt;
+      width: 190px;
+      padding: 4px 8px;
+      font-size: 9pt;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      background: #ffffff;
+      outline: none;
+      transition: border-color 0.15s;
     }
-    .input-row { margin-bottom: 10px; display: flex; align-items: center; position: relative; }
-    .unit-options { margin-bottom: 10px; display: flex; align-items: center; }
-    table { width: 100%; border-collapse: collapse; }
-    th, td {
-      border: 1px solid #ddd;
-      padding: 8px;
-      text-align: center;
-      font-size: 10pt;
+    select:focus, input[type="text"]:focus, input[type="number"]:focus {
+      border-color: #2e7d32;
+      box-shadow: 0 0 0 2px rgba(46, 125, 50, 0.12);
+    }
+    .dropdown-container {
+      background-color: white;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      max-height: 200px;
+      overflow-y: auto;
+      z-index: 100;
+      width: 380px;
+      margin-top: 2px;
+      position: absolute;
+      left: 92px;
+      top: 100%;
+    }
+    .dropdown-container ul { list-style: none; padding: 0; margin: 0; }
+    .dropdown-container li { padding: 6px 10px; font-size: 9pt; cursor: pointer; border-bottom: 1px solid #f1f5f9; }
+    .dropdown-container li:hover { background-color: #f0fdf4; color: #15803d; }
+    .editable { background-color: #fff; cursor: text; }
+    .editable:focus { outline: 2px solid var(--submit-color); }
+
+    .table-top-bar {
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      flex: none;
+      white-space: nowrap;
+    }
+    .action-buttons {
+      display: flex;
+      gap: 5px;
+      align-items: center;
+    }
+    .action-btn {
+      padding: 6px 12px;
+      font-size: 8.8pt;
+      font-weight: 700;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .action-btn:hover {
+      opacity: 0.9;
+      transform: translateY(-1px);
+    }
+    .btn-add { background-color: #2e7d32; color: white; }
+    .btn-delete { background-color: #dc2626; color: white; }
+    .btn-submit { background-color: #0284c7; color: white; }
+    .btn-pending { background-color: #ea580c; color: white; }
+    .btn-pending-search { background-color: #475569; color: white; }
+
+    .totals-pill-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      padding: 5px 12px;
+      border-radius: 20px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+      white-space: nowrap;
+    }
+    .total-pill {
+      font-size: 8.5pt;
+      color: #475569;
+      font-weight: 500;
+    }
+    .total-pill strong {
+      color: #0f172a;
+      font-weight: 700;
+    }
+    .total-divider {
+      color: #cbd5e1;
+      font-size: 8pt;
+    }
+    .scrollable-table {
+      flex: 1;
+      overflow-y: auto;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      background: #ffffff;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
     }
     th {
-      background-color: #f2f2f2;
-      height: 40px;
+      background-color: #f1f5f9;
+      color: #1e293b;
+      font-size: 8.8pt;
+      font-weight: 700;
+      padding: 7px 6px;
+      border: 1px solid #cbd5e1;
       position: sticky;
       top: 0;
       z-index: 1;
+      white-space: nowrap;
     }
-    td { height: 40px; }
-    .scrollable-table {
-      overflow-y: hidden;
-      border: 1px solid #ddd;
-      flex: 1;
+    td {
+      font-size: 8.8pt;
+      padding: 6px;
+      border: 1px solid #e2e8f0;
+      text-align: center;
+      white-space: nowrap;
     }
-    .scrollable-table.scroll-enabled { max-height: 300px; overflow-y: auto; }
-    .buttons { margin-bottom: 10px; display: flex; gap: 10px; align-items: center; }
-    button {
-      padding: 10px 20px;
-      background-color: var(--primary-color);
-      color: white;
-      border: none;
-      cursor: pointer;
-      font-size: 10pt;
+    tr:hover td {
+      background-color: #f8fafc;
     }
-    button.submit { background-color: var(--submit-color); }
-    button:hover { background-color: #45a049; }
-    .total-label { margin-left: 10px; font-size: 10pt; font-weight: bold; }
-    .dropdown-container {
-      background-color: white;
-      border: 1px solid #ddd;
-      max-height: 200px;
-      overflow-y: auto;
-      z-index: 10;
-      width: 400px;
-      margin-top: 0;
-      position: absolute;
-      left: 110px;
-    }
-    .dropdown-container ul { list-style: none; padding: 0; margin: 0; }
-    .dropdown-container li { padding: 5px 10px; font-size: 10pt; cursor: pointer; }
-    .dropdown-container li:hover { background-color: #f0f0f0; }
-    .editable { background-color: #fff; cursor: text; }
-    .editable:focus { outline: 2px solid var(--submit-color); }
-    #recordTable th:nth-child(1), #recordTable td:nth-child(1) { width: 30px; }
-    #recordTable th:nth-child(2), #recordTable td:nth-child(2) { width: 200px; }
-    #recordTable th:nth-child(3), #recordTable td:nth-child(3) { width: 150px; }
-    #recordTable th:nth-child(4), #recordTable td:nth-child(4) { width: 120px; }
-    #recordTable th:nth-child(5), #recordTable td:nth-child(5) { width: 120px; }
-    #recordTable th:nth-child(6), #recordTable td:nth-child(6) { width: 100px; }
+    #recordTable th:nth-child(1), #recordTable td:nth-child(1) { width: 34px; }
+    #recordTable th:nth-child(2), #recordTable td:nth-child(2) { width: 190px; }
+    #recordTable th:nth-child(3), #recordTable td:nth-child(3) { width: 120px; }
+    #recordTable th:nth-child(4), #recordTable td:nth-child(4) { width: 90px; }
+    #recordTable th:nth-child(5), #recordTable td:nth-child(5) { width: 90px; }
+    #recordTable th:nth-child(6), #recordTable td:nth-child(6) { width: 90px; }
     #recordTable th:nth-child(7), #recordTable td:nth-child(7) { width: 120px; }
     .modal {
       display: none;
@@ -280,80 +492,92 @@
     }
 
     /* =======================================================
-       3대 고속 핫키 시스템 스타일 (출고처 / 베스트셀러 / 그리드)
+       3대 고속 핫키 탭 카드 스타일 (출고처 / 베스트셀러 / 그리드)
        ======================================================= */
-    .hotkey-section {
-      margin-top: 6px;
+    .hotkey-tabbed-card {
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
       display: flex;
       flex-direction: column;
       gap: 6px;
-      overflow-y: auto;
-      max-height: 480px;
-      padding-right: 4px;
+      flex: none;
     }
-    .hotkey-group {
-      background: #ffffff;
-      border: 1px solid #dcdcdc;
-      border-radius: 6px;
-      padding: 6px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-    }
-    .hotkey-group-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 4px;
-      padding-bottom: 3px;
-      border-bottom: 1px solid #f0f0f0;
-    }
-    .hotkey-group-title {
-      font-size: 9pt;
-      font-weight: bold;
-      color: #333;
+    .hotkey-tabs-bar {
       display: flex;
       align-items: center;
-      gap: 4px;
+      gap: 3px;
+      border-bottom: 1px solid #e2e8f0;
+      padding-bottom: 6px;
     }
-    .hotkey-badge {
-      font-size: 7.5pt;
-      font-weight: normal;
-      background: #eef2f7;
-      color: #4b6584;
-      padding: 1px 5px;
-      border-radius: 3px;
-    }
-    .hotkey-config-link {
-      font-size: 7.5pt;
-      color: #555;
-      background: #f7f9fb;
-      border: 1px solid #ccc;
-      border-radius: 3px;
-      padding: 2px 5px;
+    .hotkey-tab-btn {
+      flex: 1;
+      padding: 5px 3px;
+      font-size: 8.2pt;
+      font-weight: 700;
+      color: #64748b;
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      border-radius: 5px;
       cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s ease;
+      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
-    .hotkey-config-link:hover {
+    .hotkey-tab-btn:hover {
+      background: #f1f5f9;
+      color: #1e293b;
+    }
+    .hotkey-tab-btn.active {
+      background: #2e7d32;
+      color: #ffffff;
+      border-color: #2e7d32;
+    }
+    .hotkey-tab-cfg-btn {
+      padding: 5px 7px;
+      font-size: 8pt;
+      font-weight: 600;
+      color: #475569;
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      border-radius: 5px;
+      cursor: pointer;
+      flex: none;
+    }
+    .hotkey-tab-cfg-btn:hover {
       background: #e2e8f0;
-      color: #111;
+      color: #0f172a;
+    }
+    .hotkey-tab-content {
+      width: 100%;
+    }
+    .hotkey-panel {
+      width: 100%;
     }
     .hotkey-grid-2col {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 3px;
+      gap: 4px;
     }
     .hotkey-btn {
       display: flex;
       flex-direction: column;
       align-items: flex-start;
       justify-content: center;
-      background: #fafbfc;
-      border: 1px solid #cfd8dc;
-      border-radius: 4px;
-      padding: 3px 5px;
-      font-size: 8pt;
-      color: #2c3e50;
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 5px;
+      padding: 4px 6px;
+      font-size: 8.5pt;
+      color: #334155;
       cursor: pointer;
       text-align: left;
-      min-height: 28px;
+      min-height: 35px;
       transition: all 0.12s ease;
       overflow: hidden;
       white-space: nowrap;
@@ -362,36 +586,37 @@
       box-sizing: border-box;
     }
     .hotkey-btn:hover {
-      background: #e8f5e9;
-      border-color: #81c784;
+      background: #f0fdf4;
+      border-color: #86efac;
       transform: translateY(-1px);
     }
     .hotkey-btn.active {
-      background: #e8f5e9;
-      border-color: #4CAF50;
-      color: #2e7d32;
+      background: #dcfce7;
+      border-color: #22c55e;
+      color: #15803d;
       font-weight: bold;
     }
     .hotkey-btn.empty {
-      color: #aaa;
+      color: #94a3b8;
       border-style: dashed;
-      background: #fafafa;
+      background: #f8fafc;
     }
     .hotkey-btn .btn-num {
-      font-size: 7pt;
-      color: #888;
-      font-weight: bold;
-      margin-right: 2px;
+      font-size: 7.5pt;
+      color: #94a3b8;
+      font-weight: 700;
+      margin-right: 3px;
     }
     .hotkey-btn .btn-text {
       overflow: hidden;
       text-overflow: ellipsis;
       width: 100%;
-      font-weight: 500;
+      font-weight: 600;
     }
     .hotkey-btn .btn-sub {
-      font-size: 6.8pt;
-      color: #78909c;
+      font-size: 7pt;
+      color: #64748b;
+      margin-top: 1px;
     }
 
     /* 그리드 상품 일괄 입력 모달 */
@@ -592,65 +817,86 @@
 <body>
   <div class="container">
     <div class="banner">
-      <div id="formTitle"></div>
-      <div>
-        <div><label>날짜/시간:</label><input type="text" id="datetime" readonly style="width: 200px;"></div>
-        <div style="margin-top: 5px;" id="invoiceRow"><span id="invoiceLabel"></span><span id="invoiceNumber">001</span></div>
-        <div style="margin-top: 5px;"><label>관리자:</label><select id="adminSelect" class="admin-select">
-        <option value="ADMIN">ADMIN</option>
-      </select></div>
+      <div class="banner-left">
+        <span id="formTitle" class="banner-title">출고입력</span>
+        <div id="invoiceRow" class="invoice-badge">
+          <span id="invoiceLabel">출고증번호:</span> <strong id="invoiceNumber">001</strong>
+        </div>
+      </div>
+      <div class="banner-right">
+        <div class="banner-field">
+          <label>일시:</label>
+          <input type="text" id="datetime" readonly class="datetime-input">
+        </div>
+        <div class="banner-field">
+          <label>관리자:</label>
+          <select id="adminSelect" class="admin-select">
+            <option value="ADMIN">ADMIN</option>
+          </select>
+        </div>
       </div>
     </div>
     <div class="content">
       <div class="menu">
-        <button onclick="setPage('입고입력')" class="active">입고입력</button>
-        <button onclick="setPage('출고입력')">출고입력</button>
-        <button onclick="setPage('상품등록')">상품등록</button>
+        <button onclick="setPage('입고입력')" class="active">📥 입고입력</button>
+        <button onclick="setPage('출고입력')">📤 출고입력</button>
+        <button onclick="setPage('상품등록')">🏷️ 상품등록</button>
       </div>
       <div class="input-area">
         <div class="input-section">
           <div class="form-group" id="formInputs"></div>
 
-          <!-- 3대 고속 핫키 섹션 (출고처 / 베스트셀러 / 그리드 상품) -->
-          <div id="hotkeySection" class="hotkey-section">
-            <!-- 1. 빠른 출고/입고처 핫키 (8 슬롯) -->
-            <div class="hotkey-group" id="locationHotkeyGroup">
-              <div class="hotkey-group-header">
-                <span class="hotkey-group-title" id="locationHotkeyTitle">🏢 빠른 거래처 <span class="hotkey-badge">Alt+1~8</span></span>
-                <button type="button" class="hotkey-config-link" onclick="openHotkeyConfigModal('location')" title="거래처 슬롯 설정">⚙️ 설정</button>
-              </div>
-              <div class="hotkey-grid-2col" id="locationHotkeyGrid"></div>
+          <!-- 3대 고속 핫키 탭 카드 (출고처 / 베스트셀러 / 그리드 상품) -->
+          <div id="hotkeySection" class="hotkey-tabbed-card">
+            <div class="hotkey-tabs-bar">
+              <button type="button" class="hotkey-tab-btn active" id="tabBtn_location" onclick="switchHotkeyTab('location')">
+                🏢 <span id="locationTabLabel">출고처</span> (8)
+              </button>
+              <button type="button" class="hotkey-tab-btn" id="tabBtn_bestseller" onclick="switchHotkeyTab('bestseller')">
+                ⭐ 베스트 (8)
+              </button>
+              <button type="button" class="hotkey-tab-btn" id="tabBtn_grid" onclick="switchHotkeyTab('grid')">
+                📦 그리드 (8)
+              </button>
+              <button type="button" class="hotkey-tab-cfg-btn" onclick="openCurrentHotkeyConfig()" title="현재 탭 슬롯 설정">
+                ⚙️
+              </button>
             </div>
 
-            <!-- 2. 베스트셀러 단일 품목 핫키 (8 슬롯) -->
-            <div class="hotkey-group" id="bestsellerHotkeyGroup">
-              <div class="hotkey-group-header">
-                <span class="hotkey-group-title">⭐ 베스트셀러 <span class="hotkey-badge">단일품목 퀵입력</span></span>
-                <button type="button" class="hotkey-config-link" onclick="openHotkeyConfigModal('bestseller')" title="베스트셀러 슬롯 설정">⚙️ 설정</button>
+            <div class="hotkey-tab-content">
+              <!-- 탭 1: 거래처 핫키 -->
+              <div id="hotkeyPanel_location" class="hotkey-panel active">
+                <div class="hotkey-grid-2col" id="locationHotkeyGrid"></div>
               </div>
-              <div class="hotkey-grid-2col" id="bestsellerHotkeyGrid"></div>
-            </div>
 
-            <!-- 3. 그리드 상품 묶음 핫키 (8 슬롯) -->
-            <div class="hotkey-group" id="gridHotkeyGroup">
-              <div class="hotkey-group-header">
-                <span class="hotkey-group-title">📦 그리드 상품 <span class="hotkey-badge">컬러일괄입력</span></span>
-                <button type="button" class="hotkey-config-link" onclick="openHotkeyConfigModal('grid')" title="그리드 상품 슬롯 설정">⚙️ 설정</button>
+              <!-- 탭 2: 베스트셀러 핫키 -->
+              <div id="hotkeyPanel_bestseller" class="hotkey-panel" style="display: none;">
+                <div class="hotkey-grid-2col" id="bestsellerHotkeyGrid"></div>
               </div>
-              <div class="hotkey-grid-2col" id="gridHotkeyGrid"></div>
+
+              <!-- 탭 3: 그리드 묶음 핫키 -->
+              <div id="hotkeyPanel_grid" class="hotkey-panel" style="display: none;">
+                <div class="hotkey-grid-2col" id="gridHotkeyGrid"></div>
+              </div>
             </div>
           </div>
         </div>
         <div class="table-section">
-          <div class="buttons">
-            <button onclick="addRecord()" tabindex="7">추가</button>
-            <button onclick="deleteRecord()" tabindex="8">삭제</button>
-            <button class="submit" onclick="submitForm()" tabindex="9">제출</button>
-            <button onclick="savePending()" tabindex="10">보류</button>
-            <button onclick="showPendingModal()" tabindex="11" id="pendingSearchButton">보류 검색 (<span id="pendingCount">0</span>)</button>
-            <span class="total-label">품목합산: <span id="totalItems">0</span></span>
-            <span class="total-label" id="totalBoxesLabel"></span>
-            <span class="total-label" id="totalIndividualsLabel"></span>
+          <div class="table-top-bar">
+            <div class="action-buttons">
+              <button type="button" class="action-btn btn-add" onclick="addRecord()" tabindex="7">➕ 추가</button>
+              <button type="button" class="action-btn btn-delete" onclick="deleteRecord()" tabindex="8">🗑️ 삭제</button>
+              <button type="button" class="action-btn btn-submit" onclick="submitForm()" tabindex="9">🚀 제출</button>
+              <button type="button" class="action-btn btn-pending" onclick="savePending()" tabindex="10">⏸️ 보류</button>
+              <button type="button" class="action-btn btn-pending-search" onclick="showPendingModal()" tabindex="11" id="pendingSearchButton">🔍 보류검색 (<span id="pendingCount">0</span>)</button>
+            </div>
+            <div class="totals-pill-bar">
+              <span class="total-pill">품목: <strong id="totalItems">0</strong></span>
+              <span class="total-divider">|</span>
+              <span class="total-pill"><span id="totalBoxesLabel">상자: 0</span></span>
+              <span class="total-divider">|</span>
+              <span class="total-pill"><span id="totalIndividualsLabel">낱개: 0</span></span>
+            </div>
           </div>
           <div class="scrollable-table" id="scrollableTable">
             <table id="recordTable">
@@ -785,8 +1031,8 @@ const typeConfig = {
     title: '입고입력', bannerColor: 'var(--banner-in)', processFunction: 'processInForm',
     locationsFunction: 'getInLocations', invoiceFunction: 'getInitialInvoiceNumber',
     locationLabel: '입고처:', qtyLabel: '입고수량:', invoiceLabel: '입고증번호:',
-    totalBoxesLabel: '박스수합산: ', totalIndividualsLabel: '갯수입고합산: ',
-    tableHeaders: ['품명', '컬러', '박스입고수량', '낱개입고수량', '박스당내용물개수', '입고처'],
+    totalBoxesLabel: '상자: ', totalIndividualsLabel: '낱개: ',
+    tableHeaders: ['품명', '컬러', '상자입고', '낱개입고', '박스당수량', '입고처'],
     confirmTitle: '입고사항 확인',
     pendingStorageKey: 'pendingInRecordsList',
     sessionStorageKey: 'pendingInRecords',
@@ -800,15 +1046,15 @@ const typeConfig = {
       <div class="input-row"><label for="itemName">품명:</label><input type="text" id="itemName" name="itemName" autocomplete="off" oninput="filterItems(this.value)" onchange="autoFillColor()" tabindex="2"><div id="customDropdown" class="dropdown-container" style="display: none;"><ul id="itemSuggestionsList"></ul></div></div>
       <div class="input-row"><label for="color">색상:</label><input type="text" id="color" name="color" value="SURTIDO" tabindex="3"></div>
       <div class="input-row"><label id="qtyLabel"></label><input type="number" id="qty" name="qty" tabindex="4"></div>
-      <div class="input-row"><label for="boxContent"> 박스당내용개수:</label><input type="number" id="boxContent" name="boxContent" tabindex="5"></div>
+      <div class="input-row"><label for="boxContent">박스당수량:</label><input type="number" id="boxContent" name="boxContent" tabindex="5"></div>
     `
   },
   'out': {
     title: '출고입력', bannerColor: 'var(--banner-out)', processFunction: 'processOutForm',
     locationsFunction: 'getOutLocations', invoiceFunction: 'getInitialOutInvoiceNumber',
     locationLabel: '출고처:', qtyLabel: '출고수량:', invoiceLabel: '출고증번호:',
-    totalBoxesLabel: '박스수합산: ', totalIndividualsLabel: '갯수출고합산: ',
-    tableHeaders: ['품명', '컬러', '박스출고수량', '낱개출고수량', '박스당물개수', '출고처'],
+    totalBoxesLabel: '상자: ', totalIndividualsLabel: '낱개: ',
+    tableHeaders: ['품명', '컬러', '상자출고', '낱개출고', '박스당수량', '출고처'],
     confirmTitle: '출고사항 확인',
     pendingStorageKey: 'pendingOutRecordsList',
     sessionStorageKey: 'pendingOutRecords',
@@ -822,7 +1068,7 @@ const typeConfig = {
       <div class="input-row"><label for="itemName">품명:</label><input type="text" id="itemName" name="itemName" autocomplete="off" oninput="filterItems(this.value)" onchange="autoFillColor()" tabindex="2"><div id="customDropdown" class="dropdown-container" style="display: none;"><ul id="itemSuggestionsList"></ul></div></div>
       <div class="input-row"><label for="color">색상:</label><input type="text" id="color" name="color" value="SURTIDO" tabindex="3"></div>
       <div class="input-row"><label id="qtyLabel"></label><input type="number" id="qty" name="qty" tabindex="4"></div>
-      <div class="input-row"><label for="boxContent"> 박스당내용개수:</label><input type="number" id="boxContent" name="boxContent" tabindex="5"></div>
+      <div class="input-row"><label for="boxContent">박스당수량:</label><input type="number" id="boxContent" name="boxContent" tabindex="5"></div>
     `
   },
   'product': {
@@ -972,9 +1218,9 @@ function setPage(page, initialData = null) {
     if (hotkeySection) {
       hotkeySection.style.display = currentType === 'product' ? 'none' : 'flex';
     }
-    const locTitle = document.getElementById('locationHotkeyTitle');
-    if (locTitle) {
-      locTitle.innerHTML = (currentType === 'in' ? '🏢 빠른 입고처' : '🏢 빠른 출고처') + ' <span class="hotkey-badge">Alt+1~8</span>';
+    const locTabLabel = document.getElementById('locationTabLabel');
+    if (locTabLabel) {
+      locTabLabel.textContent = currentType === 'in' ? '입고처' : '출고처';
     }
 
     document.querySelectorAll('.menu button').forEach(btn => btn.classList.remove('active'));
@@ -2112,11 +2358,39 @@ let hotkeyBestsellers = [];
 let hotkeyGridItems = [];
 let currentConfigType = 'location';
 let activeGridVariants = [];
+let currentActiveHotkeyTab = 'location';
 
 function initAllHotkeys() {
   initLocationHotkeys();
   initProductHotkeys();
   setupHotkeyShortcuts();
+}
+
+// ---------------- 핫키 탭 전환 ----------------
+
+function switchHotkeyTab(tabName) {
+  currentActiveHotkeyTab = tabName;
+  ['location', 'bestseller', 'grid'].forEach(tab => {
+    const btn = document.getElementById(`tabBtn_${tab}`);
+    const panel = document.getElementById(`hotkeyPanel_${tab}`);
+    if (btn) {
+      if (tab === tabName) btn.classList.add('active');
+      else btn.classList.remove('active');
+    }
+    if (panel) {
+      if (tab === tabName) {
+        panel.style.display = 'block';
+        panel.classList.add('active');
+      } else {
+        panel.style.display = 'none';
+        panel.classList.remove('active');
+      }
+    }
+  });
+}
+
+function openCurrentHotkeyConfig() {
+  openHotkeyConfigModal(currentActiveHotkeyTab);
 }
 
 // ---------------- 출고/입고처 핫키 ----------------
@@ -2639,6 +2913,14 @@ function closeHotkeyConfigModal() {
 
 function setupHotkeyShortcuts() {
   window.addEventListener('keydown', (e) => {
+    // Alt + Q/W/E : 핫키 탭 전환
+    if (e.altKey && !e.shiftKey && !e.ctrlKey) {
+      const key = e.key.toLowerCase();
+      if (key === 'q') { e.preventDefault(); switchHotkeyTab('location'); return; }
+      if (key === 'w') { e.preventDefault(); switchHotkeyTab('bestseller'); return; }
+      if (key === 'e') { e.preventDefault(); switchHotkeyTab('grid'); return; }
+    }
+
     // Alt + 1 ~ Alt + 8 : 거래처 핫키 선택
     if (e.altKey && !e.shiftKey && !e.ctrlKey && e.key >= '1' && e.key <= '8') {
       e.preventDefault();
