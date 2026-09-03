@@ -339,6 +339,17 @@
       0% { transform: translateX(-100%); }
       100% { transform: translateX(250%); }
     }
+    .stock-avail-tag {
+      font-size: 8pt;
+      font-weight: 700;
+      color: #0284c7;
+      margin-left: 4px;
+      letter-spacing: -0.2px;
+      display: inline-block;
+    }
+    @media print {
+      .no-print { display: none !important; }
+    }
 
     .totals-pill-bar {
       display: flex;
@@ -2069,25 +2080,34 @@ function updateTable() {
     } else {
       let shortageBadge = '';
       let shortageRowStyle = '';
-      if (currentType === 'out' && stockDataCache && stockDataCache.length > 0) {
+      let stockDisplay = '';
+
+      if (stockDataCache && stockDataCache.length > 0) {
         const sInfo = stockDataCache.find(s => 
           s.name.toLowerCase() === rec.itemName.toLowerCase() && 
           (s.color || 'SURTIDO').toLowerCase() === (rec.color || 'SURTIDO').toLowerCase()
         );
         const curBox = sInfo ? (sInfo.stockBox || 0) : 0;
         const curIndiv = sInfo ? (sInfo.stockIndividual || 0) : 0;
-        const reqBox = Math.abs(rec.boxQty || 0);
-        const reqIndiv = Math.abs(rec.individualQty || 0);
-        const isShort = (rec.unitType === 'box' && reqBox > curBox) ||
-                        (rec.unitType === 'individual' && reqIndiv > (curBox * (rec.boxContent || 0) + curIndiv));
-        if (isShort) {
-          shortageRowStyle = 'background-color: #fff1f2;';
-          shortageBadge = `
-            <div style="margin-top: 2px; display: flex; align-items: center; gap: 4px;">
-              <span style="font-size: 7.2pt; background: #fee2e2; color: #b91c1c; padding: 1px 5px; border-radius: 3px; font-weight: 700;">재고부족(${curBox}상자)</span>
-              <button type="button" class="btn-quick-adj" onclick="openQuickAdjustModal('${rec.itemName}', '${rec.color}', ${rec.boxContent || 0}, ${curBox}, ${curIndiv}, ${reqBox || 1})" title="실재고 반영을 위한 퀵 재고조정">⚡ 퀵재고</button>
-            </div>
-          `;
+
+        // "(00+00)" 괄호 안에 숫자의 형식으로만 가용재고(상자+낱개) 표시 (프린트 제외)
+        stockDisplay = `<span class="no-print stock-avail-tag">(${curBox}+${curIndiv})</span>`;
+
+        if (currentType === 'out') {
+          const reqBox = Math.abs(rec.boxQty || 0);
+          const reqIndiv = Math.abs(rec.individualQty || 0);
+          const isShort = (rec.unitType === 'box' && reqBox > curBox) ||
+                          (rec.unitType === 'individual' && reqIndiv > (curBox * (rec.boxContent || 0) + curIndiv));
+          if (isShort) {
+            shortageRowStyle = 'background-color: #fff1f2;';
+            stockDisplay = `<span class="no-print stock-avail-tag" style="color: #dc2626;">(${curBox}+${curIndiv})</span>`;
+            shortageBadge = `
+              <div style="margin-top: 2px; display: flex; align-items: center; gap: 4px;">
+                <span style="font-size: 7.2pt; background: #fee2e2; color: #b91c1c; padding: 1px 5px; border-radius: 3px; font-weight: 700;">재고부족(${curBox}상자)</span>
+                <button type="button" class="btn-quick-adj no-print" onclick="openQuickAdjustModal('${rec.itemName}', '${rec.color}', ${rec.boxContent || 0}, ${curBox}, ${curIndiv}, ${reqBox || 1})" title="실재고 반영을 위한 퀵 재고조정">⚡ 퀵재고</button>
+              </div>
+            `;
+          }
         }
       }
 
@@ -2096,6 +2116,7 @@ function updateTable() {
           <td><input type="checkbox" class="rowCheckbox" data-index="${idx}"></td>
           <td>
             <span style="font-weight: 600;">${rec.itemName}</span>
+            ${stockDisplay}
             ${shortageBadge}
           </td>
           <td>${rec.color}</td>
