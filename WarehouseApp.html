@@ -1446,6 +1446,10 @@ let unitType = 'box';
 let pendingRecord = <?!= pendingRecord ?>;
 let selectedPendingIndex = -1;
 let stockDataCache = [];
+try {
+  const cachedStock = localStorage.getItem('cached_stock_data') || sessionStorage.getItem('cached_stock_data');
+  if (cachedStock) stockDataCache = JSON.parse(cachedStock);
+} catch (e) {}
 let locationCache = [];
 let debounceTimeout;
 let isLoadingStockData = false;
@@ -1535,7 +1539,12 @@ function loadStockData() {
       stockDataCache = data;
       isLoadingStockData = false;
       document.body.removeChild(loadingIndicator);
+      try {
+        localStorage.setItem('cached_stock_data', JSON.stringify(data));
+      } catch (e) {}
       initProductHotkeys();
+      updateTable();
+      updateTotals();
     })
     .catch(err => {
       isLoadingStockData = false;
