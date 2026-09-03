@@ -770,29 +770,39 @@
       position: sticky;
       top: 0;
       z-index: 1;
+      box-sizing: border-box;
     }
     .grid-table td {
       padding: 6px 4px;
       font-size: 8.8pt;
       border: 1px solid #e2e8f0;
       text-align: center;
+      vertical-align: middle;
+      box-sizing: border-box;
     }
     .grid-table tr:hover td {
       background-color: #f8fafc;
     }
-    .grid-input {
-      width: 70px;
+    .grid-table input.grid-input,
+    .grid-table input[type="number"] {
+      width: 76px !important;
+      max-width: 100% !important;
+      box-sizing: border-box;
       padding: 4px 6px;
       font-size: 9.5pt;
       text-align: right;
-      border: 1px solid #cbd5e1;
+      border: 1.5px solid #cbd5e1;
       border-radius: 4px;
       font-weight: 600;
+      margin: 0 auto;
+      display: block;
+      transition: all 0.15s ease;
     }
-    .grid-input:focus {
+    .grid-table input.grid-input:focus,
+    .grid-table input[type="number"]:focus {
       border-color: #2e7d32;
       outline: none;
-      box-shadow: 0 0 0 2px rgba(46, 125, 50, 0.15);
+      box-shadow: 0 0 0 2px rgba(46, 125, 50, 0.2);
       background-color: #f0fdf4;
     }
     .grid-modal-footer {
