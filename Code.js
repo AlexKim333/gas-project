@@ -904,7 +904,7 @@ Return ONLY valid JSON:
   ]
 }`;
 
-  const models = ['gemini-3.6-flash', 'gemini-3-flash'];
+  const models = ['gemini-3.7-flash', 'gemini-3.8-flash', 'gemini-3.6-flash'];
   let rawResponse = '';
   let lastError = '';
 

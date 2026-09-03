@@ -1372,7 +1372,7 @@
     <div id="ocrLoadingModal" class="modal" style="display: none; width: 380px; text-align: center; padding: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.25);">
       <div style="font-size: 26pt; margin-bottom: 6px;">📷 🤖</div>
       <h3 style="margin: 0 0 6px 0; color: #1e293b; font-size: 12pt; font-weight: bold;">손글씨 주문서 비전 AI 분석 중...</h3>
-      <p style="margin: 0 0 12px 0; color: #64748b; font-size: 8.5pt;">Gemini 3.6 Flash가 지점명 및 품목/수량 표를 분석하고 있습니다.</p>
+      <p style="margin: 0 0 12px 0; color: #64748b; font-size: 8.5pt;">Gemini 3.7 Flash가 지점명 및 품목/수량 표를 분석하고 있습니다.</p>
       <div style="width: 100%; height: 140px; max-height: 140px; overflow: hidden; border: 1px solid #e2e8f0; border-radius: 6px; margin-bottom: 12px; background: #f8fafc; display: flex; align-items: center; justify-content: center;">
         <img id="ocrPreviewImage" src="" style="max-width: 100%; max-height: 100%; object-fit: contain;">
       </div>
@@ -3719,6 +3719,127 @@ function extractColorAndBase(text) {
   return { base: baseWords.join(' ').trim(), color: foundColor };
 }
 
+function levenshteinDistance(s1, s2) {
+  const a = (s1 || '').toLowerCase().trim();
+  const b = (s2 || '').toLowerCase().trim();
+  if (a === b) return 1.0;
+  if (!a.length || !b.length) return 0;
+
+  const matrix = [];
+  for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+  for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      if (b.charAt(i - 1) === a.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1,
+          matrix[i][j - 1] + 1,
+          matrix[i - 1][j] + 1
+        );
+      }
+    }
+  }
+
+  const dist = matrix[b.length][a.length];
+  const maxLen = Math.max(a.length, b.length);
+  return maxLen === 0 ? 1.0 : Math.max(0, 1.0 - dist / maxLen);
+}
+
+function matchFuzzyColor(colorText) {
+  if (!colorText) return 'SURTIDO';
+  let norm = normalizeColor(colorText);
+  if (KNOWN_COLORS.includes(norm)) return norm;
+
+  let bestColor = norm;
+  let bestScore = 0;
+  for (let i = 0; i < KNOWN_COLORS.length; i++) {
+    const score = levenshteinDistance(norm, KNOWN_COLORS[i]);
+    if (score > bestScore) {
+      bestScore = score;
+      bestColor = KNOWN_COLORS[i];
+    }
+  }
+  return bestScore >= 0.55 ? bestColor : norm;
+}
+
+function findBestCatalogMatch(rawModel, rawColor, catalog) {
+  if (!catalog || catalog.length === 0) return null;
+  const targetColor = matchFuzzyColor(rawColor);
+  const cleanModel = (rawModel || '').trim().toUpperCase();
+
+  // 1. 완벽 일치 (Exact Match)
+  let found = catalog.find(s => 
+    s.name.toUpperCase() === cleanModel && 
+    (s.color || 'SURTIDO').toUpperCase() === targetColor
+  );
+  if (found) return found;
+
+  // 2. OCR 문자 오인식 보정 (0 <-> D, O <-> 0, 하이픈/공백 차이)
+  // 예: P-4070 -> P-4D70
+  const variations = [
+    cleanModel.replace(/0/g, 'D'),
+    cleanModel.replace(/D/g, '0'),
+    cleanModel.replace(/O/g, '0'),
+    cleanModel.replace(/0/g, 'O'),
+    cleanModel.replace(/-/g, ''),
+    cleanModel.replace(/\s+/g, '')
+  ];
+
+  for (let v of variations) {
+    found = catalog.find(s => 
+      s.name.toUpperCase().replace(/[-\s]/g, '') === v.replace(/[-\s]/g, '') &&
+      (s.color || 'SURTIDO').toUpperCase() === targetColor
+    );
+    if (found) return found;
+  }
+
+  // 3. 가중 Levenshtein 퍼지 매칭 (품명 65%, 컬러 35%)
+  let bestItem = null;
+  let maxScore = 0;
+
+  for (let i = 0; i < catalog.length; i++) {
+    const item = catalog[i];
+    const mScore = levenshteinDistance(cleanModel, item.name);
+    const cScore = levenshteinDistance(targetColor, item.color || 'SURTIDO');
+    const totalScore = mScore * 0.65 + cScore * 0.35;
+
+    if (totalScore > maxScore) {
+      maxScore = totalScore;
+      bestItem = item;
+    }
+  }
+
+  if (maxScore >= 0.58 && bestItem) {
+    return bestItem;
+  }
+
+  // 4. 품명만이라도 높은 유사도로 일치하는 경우
+  let bestModelOnly = null;
+  let maxModelScore = 0;
+  for (let i = 0; i < catalog.length; i++) {
+    const item = catalog[i];
+    const mScore = levenshteinDistance(cleanModel, item.name);
+    if (mScore > maxModelScore) {
+      maxModelScore = mScore;
+      bestModelOnly = item;
+    }
+  }
+  if (maxModelScore >= 0.70 && bestModelOnly) {
+    return {
+      name: bestModelOnly.name,
+      color: targetColor,
+      boxContent: bestModelOnly.boxContent,
+      stockBox: bestModelOnly.stockBox,
+      stockIndividual: bestModelOnly.stockIndividual
+    };
+  }
+
+  return null;
+}
+
 function triggerHandwrittenImageUpload() {
   const fileInput = document.getElementById('orderImageFileInput');
   if (fileInput) fileInput.click();
@@ -3820,29 +3941,11 @@ function onHandwrittenExtracted(data) {
     let qty = parseInt(r.no_de_bultos || r.cant_oder || r.cantidad || 0, 10);
     if (isNaN(qty) || qty <= 0) return;
 
-    // 3. stockDataCache에서 품명/컬러/박스당수량 매칭
-    let matchedItem = null;
-    if (stockDataCache && stockDataCache.length > 0) {
-      matchedItem = stockDataCache.find(s => 
-        s.name.toLowerCase() === base.toLowerCase() && 
-        (s.color || 'SURTIDO').toLowerCase() === color.toLowerCase()
-      );
-      if (!matchedItem) {
-        matchedItem = stockDataCache.find(s => 
-          (s.name.toLowerCase().includes(base.toLowerCase()) || base.toLowerCase().includes(s.name.toLowerCase())) &&
-          (s.color || 'SURTIDO').toLowerCase() === color.toLowerCase()
-        );
-      }
-      if (!matchedItem) {
-        matchedItem = stockDataCache.find(s => 
-          s.name.toLowerCase() === base.toLowerCase() || 
-          s.name.toLowerCase().includes(base.toLowerCase())
-        );
-      }
-    }
+    // 3. stockDataCache에서 지능형 퍼지 매칭 (문자 오인식 0<->D 및 색상 오인식 marmo->MARINO 자동 보정)
+    const matchedItem = findBestCatalogMatch(base, color, stockDataCache);
 
     const finalItemName = matchedItem ? matchedItem.name : base;
-    const finalColor = matchedItem ? matchedItem.color : color;
+    const finalColor = matchedItem ? matchedItem.color : matchFuzzyColor(color);
     const finalBoxContent = matchedItem ? matchedItem.boxContent : 0;
 
     newRecords.push({
