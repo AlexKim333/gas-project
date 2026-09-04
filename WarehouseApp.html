@@ -1504,50 +1504,52 @@
     <!-- 🏢 외부(서브)창고 8대 실시간 재고 매트릭스 & 발주 모달 (1차 대형 모달 - 풀스크린 와이드) -->
     <div id="subWarehouseMatrixModal" class="modal" style="display: none; width: 99vw; max-width: 99vw; height: 98vh; max-height: 98vh; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 10px 14px; box-shadow: 0 25px 60px rgba(0,0,0,0.5); flex-direction: column; z-index: 1050; box-sizing: border-box; border-radius: 8px;">
       <!-- 상단 헤더 -->
-      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 10px; flex-shrink: 0;">
-        <div style="display: flex; align-items: center; gap: 10px;">
-          <h3 style="margin: 0; color: #0f766e; font-size: 12pt; font-weight: bold; display: flex; align-items: center; gap: 6px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px solid #e2e8f0; padding-bottom: 6px; margin-bottom: 6px; flex-shrink: 0;">
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: nowrap;">
+          <h3 style="margin: 0; color: #0f766e; font-size: 11.5pt; font-weight: bold; display: flex; align-items: center; gap: 6px; white-space: nowrap;">
             <span>🏢</span> <span>외부(서브)창고 8대 실시간 재고 & 발주 매트릭스</span>
           </h3>
-          <span id="subWhSyncBadge" style="font-size: 8pt; color: #64748b; background: #f1f5f9; padding: 2px 8px; border-radius: 4px;">동기화: 준비중</span>
+          <span id="subWhSyncBadge" style="font-size: 8pt; color: #64748b; background: #f1f5f9; padding: 2px 8px; border-radius: 4px; white-space: nowrap;">동기화: 준비중</span>
+          
+          <!-- ⭐ 사장님 요청: 동기화 시각 표시 바로 옆으로 이동한 [서브창고 재고 있는 품목만] 체크박스 -->
+          <label style="display: inline-flex; align-items: center; gap: 5px; font-size: 8.2pt; color: #1e293b; background: #f8fafc; border: 1px solid #cbd5e1; padding: 2px 8px; border-radius: 4px; cursor: pointer; white-space: nowrap; margin-left: 4px;">
+            <input type="checkbox" id="chkOnlyInStock" onchange="filterSubWarehouseTable()" checked style="margin: 0; cursor: pointer;">
+            <span style="font-weight: 600;">서브창고 재고 있는 품목만</span>
+          </label>
         </div>
-        <div style="display: flex; align-items: center; gap: 8px;">
+        <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
           <button type="button" onclick="loadSubWarehouseMatrix(true)" style="padding: 4px 10px; background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; border-radius: 4px; font-size: 8pt; font-weight: 600; cursor: pointer;" title="서브창고 최신 재고 즉시 새로고침">🔄 새로고침</button>
-          <button type="button" onclick="closeSubWarehouseMatrixModal()" style="border: none; background: none; font-size: 18pt; cursor: pointer; color: #94a3b8; line-height: 1;">&times;</button>
+          <button type="button" onclick="closeSubWarehouseMatrixModal()" style="border: none; background: none; font-size: 18pt; cursor: pointer; color: #94a3b8; line-height: 1; padding: 0 4px;">&times;</button>
         </div>
       </div>
 
-      <!-- 🚛 8대 창고별 트럭 1대(100상자) 적재율 실시간 게이지 바 -->
-      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; flex-shrink: 0;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-          <span style="font-size: 8.5pt; font-weight: bold; color: #334155; display: flex; align-items: center; gap: 4px;">
+      <!-- 🚛 8대 창고별 트럭 1대(100상자) 적재율 실시간 게이지 바 (슬림 높이) -->
+      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 4px 8px; margin-bottom: 5px; flex-shrink: 0;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;">
+          <span style="font-size: 8pt; font-weight: bold; color: #334155; display: flex; align-items: center; gap: 4px;">
             <span>🚛</span> <span>창고별 트럭 적재율 (물류비 절약 목표: 창고당 100상자)</span>
           </span>
-          <span id="truckTotalSummary" style="font-size: 8pt; color: #0f766e; font-weight: 600;">전체 발주 담김: 0상자</span>
+          <span id="truckTotalSummary" style="font-size: 7.8pt; color: #0f766e; font-weight: 600;">전체 발주 담김: 0상자</span>
         </div>
         <div id="truckGaugeContainer" style="display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px;">
           <!-- 8개 창고 카드가 동적으로 채워짐 -->
         </div>
       </div>
 
-      <!-- 툴바: 검색창, 발주필요 필터, 재고유무 필터 -->
-      <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 8px; flex-shrink: 0; background: #ffffff;">
-        <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
+      <!-- 툴바: 검색창, 장바구니 발주필요 필터, 품목수 카운트 (슬림 1줄 28px 레이아웃) -->
+      <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 6px; height: 30px; flex-shrink: 0; background: #ffffff;">
+        <div style="display: flex; align-items: center; gap: 8px; flex: 1;">
           <div style="position: relative; width: 240px;">
-            <input type="text" id="subWhSearchInput" placeholder="품명 / 색상 검색..." oninput="onSubWhSearchInput()" style="width: 100%; padding: 5px 8px 5px 26px; border: 1px solid #cbd5e1; border-radius: 5px; font-size: 8.8pt; box-sizing: border-box;">
-            <span style="position: absolute; left: 8px; top: 6px; color: #94a3b8; font-size: 9pt;">🔍</span>
+            <input type="text" id="subWhSearchInput" placeholder="품명 / 색상 검색..." oninput="onSubWhSearchInput()" style="width: 100%; height: 28px; padding: 0 8px 0 24px; border: 1px solid #cbd5e1; border-radius: 5px; font-size: 8.8pt; box-sizing: border-box;">
+            <span style="position: absolute; left: 7px; top: 6px; color: #94a3b8; font-size: 9pt;">🔍</span>
           </div>
-          <label style="display: flex; align-items: center; gap: 4px; font-size: 8.5pt; color: #b45309; background: #fef3c7; border: 1px solid #fde68a; padding: 4px 10px; border-radius: 5px; cursor: pointer; font-weight: 600;">
-            <input type="checkbox" id="chkOnlyNeeded" onchange="filterSubWarehouseTable()">
-            <span>🛒 장바구니 발주필요 품목만 보기 (<span id="neededItemsCount">0</span>)</span>
-          </label>
-          <label style="display: flex; align-items: center; gap: 4px; font-size: 8.5pt; color: #475569; cursor: pointer;">
-            <input type="checkbox" id="chkOnlyInStock" onchange="filterSubWarehouseTable()" checked>
-            <span>서브창고 재고 있는 품목만</span>
+          <label style="display: inline-flex; align-items: center; gap: 5px; font-size: 8.5pt; color: #92400e; background: #fef3c7; border: 1px solid #fde68a; height: 28px; padding: 0 10px; border-radius: 5px; cursor: pointer; font-weight: 600; white-space: nowrap; box-sizing: border-box;">
+            <input type="checkbox" id="chkOnlyNeeded" onchange="filterSubWarehouseTable()" style="margin: 0; cursor: pointer;">
+            <span>🛒 장바구니 발주필요 품목만 보기 (<span id="neededItemsCount" style="color: #b45309; font-weight: 800;">0</span>)</span>
           </label>
         </div>
-        <div style="font-size: 8.2pt; color: #64748b; white-space: nowrap;">
-          표시: <strong id="subWhFilteredCount" style="color: #0f766e; font-size: 9pt;">0</strong> / 전체 <span id="subWhTotalCount" style="font-weight: 600; color: #334155;">0</span>개
+        <div style="font-size: 8.5pt; color: #64748b; white-space: nowrap; flex-shrink: 0;">
+          표시: <strong id="subWhFilteredCount" style="color: #0f766e; font-size: 9.5pt;">0</strong> / 전체 <span id="subWhTotalCount" style="font-weight: 600; color: #334155;">0</span>개
         </div>
       </div>
 
@@ -4556,15 +4558,15 @@ function updateTruckGauges() {
     const badgeText = isFull ? '✅ 1대 완료!' : (qty > 0 ? `부족 ${100 - qty}` : '0 / 100');
 
     html += `
-      <div style="background: #ffffff; border: 1.5px solid ${isFull ? '#10b981' : (qty > 0 ? '#99f6e4' : '#e2e8f0')}; border-radius: 6px; padding: 6px 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-          <strong style="font-size: 8.2pt; color: ${isFull ? '#065f46' : '#1e293b'};">${wh}</strong>
-          <span style="font-size: 7.2pt; font-weight: bold; color: ${isFull ? '#047857' : (qty > 0 ? '#0f766e' : '#94a3b8')};">${badgeText}</span>
+      <div style="background: #ffffff; border: 1.5px solid ${isFull ? '#10b981' : (qty > 0 ? '#99f6e4' : '#e2e8f0')}; border-radius: 5px; padding: 3px 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.04);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+          <strong style="font-size: 8pt; color: ${isFull ? '#065f46' : '#1e293b'};">${wh}</strong>
+          <span style="font-size: 7pt; font-weight: bold; color: ${isFull ? '#047857' : (qty > 0 ? '#0f766e' : '#94a3b8')};">${badgeText}</span>
         </div>
-        <div style="font-size: 9pt; font-weight: 800; color: ${qty > 0 ? '#0f766e' : '#64748b'}; margin-bottom: 4px;">
-          ${qty} <span style="font-size: 7.5pt; font-weight: normal; color: #94a3b8;">/ 100 상자</span>
+        <div style="font-size: 8.5pt; font-weight: 800; color: ${qty > 0 ? '#0f766e' : '#64748b'}; margin-bottom: 2px; line-height: 1.1;">
+          ${qty} <span style="font-size: 7pt; font-weight: normal; color: #94a3b8;">/ 100</span>
         </div>
-        <div style="height: 5px; background: #e2e8f0; border-radius: 3px; overflow: hidden;">
+        <div style="height: 4px; background: #e2e8f0; border-radius: 2px; overflow: hidden;">
           <div style="width: ${pct}%; height: 100%; background: ${barColor}; transition: width 0.3s ease;"></div>
         </div>
       </div>
