@@ -874,7 +874,7 @@ function updatePendingRecords(invoiceNumber, type, newRecords, admin) {
 // -------------------------------------------------------------------
 
 const SUB_WAREHOUSE_CONFIG = {
-  SPREADSHEET_ID: '17_FjWFFbuMvvVhQ7Bn7CKmh59c9hzHDvWv68y11v4CX8',
+  SPREADSHEET_ID: '17_FjWEFbuMvVhQZBnZCkmh59c9hzHDvWv68y11v4CX8',
   TARGET_WAREHOUSES: ['PANTACO', 'IKEA', 'LERMA', 'PINO', 'YARE', 'ALMINTER', 'TLANE', 'STAR']
 };
 
