@@ -1243,7 +1243,7 @@
         <button onclick="setPage('입고입력')" class="active">📥 입고입력</button>
         <button onclick="setPage('출고입력')">📤 출고입력</button>
         <button onclick="setPage('상품등록')">🏷️ 상품등록</button>
-        <button type="button" onclick="openOrderDraftModal()" id="btnNavOrderDraft" title="외부창고 주문서 작성 목록">
+        <button type="button" onclick="openSubWarehouseMatrixModal()" id="btnNavOrderDraft" title="외부창고 8대 재고 매트릭스 & 주문서 작성">
           <span>📝 주문서작성</span>
           <span id="orderDraftBadge" class="nav-badge" style="display: none;">0</span>
         </button>
@@ -1501,8 +1501,142 @@
       </div>
     </div>
 
+    <!-- 🏢 외부(서브)창고 8대 실시간 재고 매트릭스 & 발주 모달 (1차 대형 모달) -->
+    <div id="subWarehouseMatrixModal" class="modal" style="display: none; width: 1260px; max-width: 96vw; height: 90vh; padding: 16px; box-shadow: 0 15px 40px rgba(0,0,0,0.35); flex-direction: column; z-index: 1050; box-sizing: border-box;">
+      <!-- 상단 헤더 -->
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 10px; flex-shrink: 0;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <h3 style="margin: 0; color: #0f766e; font-size: 12pt; font-weight: bold; display: flex; align-items: center; gap: 6px;">
+            <span>🏢</span> <span>외부(서브)창고 8대 실시간 재고 & 발주 매트릭스</span>
+          </h3>
+          <span id="subWhSyncBadge" style="font-size: 8pt; color: #64748b; background: #f1f5f9; padding: 2px 8px; border-radius: 4px;">동기화: 준비중</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <button type="button" onclick="loadSubWarehouseMatrix(true)" style="padding: 4px 10px; background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; border-radius: 4px; font-size: 8pt; font-weight: 600; cursor: pointer;" title="서브창고 최신 재고 즉시 새로고침">🔄 새로고침</button>
+          <button type="button" onclick="closeSubWarehouseMatrixModal()" style="border: none; background: none; font-size: 18pt; cursor: pointer; color: #94a3b8; line-height: 1;">&times;</button>
+        </div>
+      </div>
+
+      <!-- 🚛 8대 창고별 트럭 1대(100상자) 적재율 실시간 게이지 바 -->
+      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; flex-shrink: 0;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <span style="font-size: 8.5pt; font-weight: bold; color: #334155; display: flex; align-items: center; gap: 4px;">
+            <span>🚛</span> <span>창고별 트럭 적재율 (물류비 절약 목표: 창고당 100상자)</span>
+          </span>
+          <span id="truckTotalSummary" style="font-size: 8pt; color: #0f766e; font-weight: 600;">전체 발주 담김: 0상자</span>
+        </div>
+        <div id="truckGaugeContainer" style="display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px;">
+          <!-- 8개 창고 카드가 동적으로 채워짐 -->
+        </div>
+      </div>
+
+      <!-- 툴바: 검색창, 발주필요 필터, 재고유무 필터 -->
+      <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 8px; flex-shrink: 0; background: #ffffff;">
+        <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
+          <div style="position: relative; width: 240px;">
+            <input type="text" id="subWhSearchInput" placeholder="품명 / 색상 검색..." oninput="onSubWhSearchInput()" style="width: 100%; padding: 5px 8px 5px 26px; border: 1px solid #cbd5e1; border-radius: 5px; font-size: 8.8pt; box-sizing: border-box;">
+            <span style="position: absolute; left: 8px; top: 6px; color: #94a3b8; font-size: 9pt;">🔍</span>
+          </div>
+          <label style="display: flex; align-items: center; gap: 4px; font-size: 8.5pt; color: #b45309; background: #fef3c7; border: 1px solid #fde68a; padding: 4px 10px; border-radius: 5px; cursor: pointer; font-weight: 600;">
+            <input type="checkbox" id="chkOnlyNeeded" onchange="filterSubWarehouseTable()">
+            <span>🛒 장바구니 발주필요 품목만 보기 (<span id="neededItemsCount">0</span>)</span>
+          </label>
+          <label style="display: flex; align-items: center; gap: 4px; font-size: 8.5pt; color: #475569; cursor: pointer;">
+            <input type="checkbox" id="chkOnlyInStock" onchange="filterSubWarehouseTable()" checked>
+            <span>서브창고 재고 있는 품목만</span>
+          </label>
+        </div>
+        <div style="font-size: 8.2pt; color: #64748b;">
+          표시 품목: <strong id="subWhFilteredCount" style="color: #0f172a;">0</strong>개
+        </div>
+      </div>
+
+      <!-- 매트릭스 테이블 컨테이너 (가로 세로 스크롤 & 고정 컬럼) -->
+      <div id="subWhTableContainer" style="flex: 1; overflow: auto; border: 1px solid #cbd5e1; border-radius: 6px; position: relative; background: #ffffff;">
+        <div id="subWhLoadingSpinner" style="display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100%; min-height: 240px; color: #0f766e; font-size: 9.5pt; font-weight: 600;">
+          <div class="loading-spinner" style="border-top-color: #0d9488; margin-bottom: 10px;"></div>
+          <span>8개 서브창고 실시간 재고 & PENDING 이동수량 로딩 중...</span>
+        </div>
+        <table id="subWhTable" style="display: none; width: 100%; border-collapse: separate; border-spacing: 0; font-size: 8.5pt;">
+          <thead id="subWhThead"></thead>
+          <tbody id="subWhTbody"></tbody>
+        </table>
+      </div>
+
+      <!-- 하단 액션 바 -->
+      <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 10px; margin-top: 6px; border-top: 1px solid #e2e8f0; flex-shrink: 0;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <span style="font-size: 8.8pt; color: #475569;">
+            현재 담긴 품목: <strong id="draftItemsSummaryCount" style="color: #0f766e;">0</strong>개 / 
+            총 발주: <strong id="draftItemsSummaryBoxes" style="color: #0f766e;">0</strong>상자
+          </span>
+          <button type="button" onclick="openOrderDraftModal()" style="padding: 5px 14px; background: #0f766e; color: #ffffff; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 8.5pt; display: flex; align-items: center; gap: 5px;">
+            <span>📋 발주서 작성목록 확인/전송</span>
+            <span id="subWhDraftBadge" style="background: #ffffff; color: #0f766e; border-radius: 10px; padding: 0 6px; font-size: 7.5pt; font-weight: 800;">0</span>
+          </button>
+        </div>
+        <div>
+          <button type="button" onclick="closeSubWarehouseMatrixModal()" style="padding: 6px 18px; background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 5px; font-weight: 600; cursor: pointer; font-size: 8.5pt;">창 닫기</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 📦 2차 미니 모달: 발주 수량 입력 팝업 -->
+    <div id="subWarehouseQtyModal" class="modal" style="display: none; width: 430px; max-width: 90%; padding: 18px; box-shadow: 0 15px 40px rgba(0,0,0,0.35); z-index: 1060; box-sizing: border-box;">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px solid #e2e8f0; padding-bottom: 6px; margin-bottom: 12px;">
+        <h4 style="margin: 0; color: #0f766e; font-size: 11pt; font-weight: bold; display: flex; align-items: center; gap: 6px;">
+          <span>📦</span> <span>서브창고 발주 수량 입력</span>
+        </h4>
+        <button type="button" onclick="closeSubWarehouseQtyModal()" style="border: none; background: none; font-size: 16pt; cursor: pointer; color: #94a3b8; line-height: 1;">&times;</button>
+      </div>
+
+      <!-- 선택 품목 및 창고 상세 카드 -->
+      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px 12px; margin-bottom: 12px; font-size: 8.8pt;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+          <span style="color: #64748b;">출고 서브창고:</span>
+          <strong id="qtyModalWarehouse" style="color: #0f766e; font-size: 10pt;">IKEA</strong>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+          <span style="color: #64748b;">품목 / 색상:</span>
+          <strong id="qtyModalItemName" style="color: #0f172a;">CK928N (SURTIDO)</strong>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 6px; border-top: 1px dashed #cbd5e1; padding-top: 6px;">
+          <span style="color: #64748b;">출고창고 보유 재고:</span>
+          <strong id="qtyModalAvailStock" style="color: #15803d; font-size: 10pt;">6 상자</strong>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 8.2pt; color: #64748b;">
+          <span>현재 메인 유효재고:</span>
+          <span id="qtyModalEffectiveStock">실재고 0 + 이동중 0 = 0상자</span>
+        </div>
+      </div>
+
+      <!-- 수량 입력 컨트롤 -->
+      <div style="margin-bottom: 14px;">
+        <label style="display: block; font-size: 8.5pt; font-weight: bold; color: #334155; margin-bottom: 6px;">
+          발주 상자(Box) 수량:
+        </label>
+        <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 8px;">
+          <button type="button" onclick="adjustQtyInput(-1)" style="width: 38px; height: 38px; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 5px; font-size: 15pt; font-weight: bold; cursor: pointer; color: #334155;">-</button>
+          <input type="number" id="subWhQtyInput" min="1" value="1" style="flex: 1; height: 38px; text-align: center; font-size: 14pt; font-weight: bold; color: #0f766e; border: 2px solid #0d9488; border-radius: 5px; box-sizing: border-box;" oninput="validateQtyInput()">
+          <button type="button" onclick="adjustQtyInput(1)" style="width: 38px; height: 38px; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 5px; font-size: 15pt; font-weight: bold; cursor: pointer; color: #334155;">+</button>
+        </div>
+        <div style="display: flex; gap: 6px;">
+          <button type="button" onclick="setQuickQty(5)" style="flex: 1; padding: 5px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 8pt; cursor: pointer; color: #475569;">+5 상자</button>
+          <button type="button" onclick="setQuickQty(10)" style="flex: 1; padding: 5px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 8pt; cursor: pointer; color: #475569;">+10 상자</button>
+          <button type="button" onclick="setQuickQty('max')" style="flex: 1; padding: 5px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 4px; font-size: 8pt; font-weight: bold; cursor: pointer; color: #15803d;">전량(최대)</button>
+        </div>
+        <div id="qtyModalWarning" style="color: #ef4444; font-size: 8pt; margin-top: 6px; display: none; font-weight: 600;"></div>
+      </div>
+
+      <!-- 액션 버튼 -->
+      <div style="display: flex; justify-content: flex-end; gap: 8px;">
+        <button type="button" onclick="closeSubWarehouseQtyModal()" style="padding: 7px 16px; background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 5px; font-weight: 600; cursor: pointer; font-size: 8.5pt;">취소</button>
+        <button type="button" onclick="confirmAddSubWarehouseOrder()" style="padding: 7px 20px; background: #0d9488; color: #ffffff; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 8.8pt;">📥 발주목록에 담기</button>
+      </div>
+    </div>
+
     <!-- 📝 외부창고 주문서 작성 목록 모달 -->
-    <div id="orderDraftModal" class="modal" style="display: none; width: 620px; max-width: 90%; padding: 18px; box-shadow: 0 10px 30px rgba(0,0,0,0.25);">
+    <div id="orderDraftModal" class="modal" style="display: none; width: 680px; max-width: 90%; padding: 18px; box-shadow: 0 10px 30px rgba(0,0,0,0.25); z-index: 1070;">
       <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 12px;">
         <h3 style="margin: 0; color: #0f766e; font-size: 11.5pt; font-weight: bold; display: flex; align-items: center; gap: 6px;">
           <span>📝</span> <span>외부창고 주문서 작성 목록 (<span id="orderDraftModalCount">0</span>개 품목)</span>
@@ -1513,18 +1647,19 @@
         <table style="width: 100%; border-collapse: collapse; font-size: 8.8pt;">
           <thead>
             <tr style="background: #f1f5f9; position: sticky; top: 0; z-index: 1;">
-              <th style="padding: 6px 8px; border-bottom: 1px solid #cbd5e1; text-align: left; width: 30%;">품명</th>
-              <th style="padding: 6px 8px; border-bottom: 1px solid #cbd5e1; text-align: center; width: 22%;">색상</th>
-              <th style="padding: 6px 8px; border-bottom: 1px solid #cbd5e1; text-align: right; width: 20%;">발주상자</th>
-              <th style="padding: 6px 8px; border-bottom: 1px solid #cbd5e1; text-align: center; width: 18%;">담은시간</th>
-              <th style="padding: 6px 8px; border-bottom: 1px solid #cbd5e1; text-align: center; width: 10%;">삭제</th>
+              <th style="padding: 6px 8px; border-bottom: 1px solid #cbd5e1; text-align: center; width: 16%;">출고창고</th>
+              <th style="padding: 6px 8px; border-bottom: 1px solid #cbd5e1; text-align: left; width: 28%;">품명</th>
+              <th style="padding: 6px 8px; border-bottom: 1px solid #cbd5e1; text-align: center; width: 18%;">색상</th>
+              <th style="padding: 6px 8px; border-bottom: 1px solid #cbd5e1; text-align: right; width: 16%;">발주상자</th>
+              <th style="padding: 6px 8px; border-bottom: 1px solid #cbd5e1; text-align: center; width: 14%;">담은시간</th>
+              <th style="padding: 6px 8px; border-bottom: 1px solid #cbd5e1; text-align: center; width: 8%;">삭제</th>
             </tr>
           </thead>
           <tbody id="orderDraftModalTableBody"></tbody>
         </table>
       </div>
       <div style="background: #f0fdfa; border: 1px solid #ccfbf1; border-radius: 6px; padding: 7px 10px; margin-bottom: 12px; font-size: 7.8pt; color: #0f766e; line-height: 1.4;">
-        ℹ️ <strong>외부창고 발주 연동 준비 완료</strong>: 선택된 품목들이 주문서에 등록되었습니다. 내일 8개 창고 재고 대조 및 시트 자동 전송이 연결됩니다.
+        ℹ️ <strong>외부창고 발주 준비 완료</strong>: 출고 서브창고별로 담긴 품목들이 대기 중입니다. 창고당 100상자 트럭 적재율을 확인하세요.
       </div>
       <div style="display: flex; justify-content: space-between; align-items: center;">
         <button type="button" onclick="clearAllOrderDraftItems()" style="padding: 5px 12px; background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; border-radius: 5px; font-weight: 600; cursor: pointer; font-size: 8.2pt;">전체 비우기</button>
@@ -4245,9 +4380,9 @@ function renderOrderDraftTable() {
   if (!items.length) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="5" style="padding: 24px 10px; text-align: center; color: #94a3b8; font-size: 9pt;">
+        <td colspan="6" style="padding: 24px 10px; text-align: center; color: #94a3b8; font-size: 9pt;">
           현재 주문서에 담긴 품목이 없습니다.<br>
-          <span style="font-size: 8pt; color: #cbd5e1;">장바구니에서 원하는 품목을 체크 후 [📋 주문목록추가]를 눌러주세요.</span>
+          <span style="font-size: 8pt; color: #cbd5e1;">[📝 주문서작성] 매트릭스에서 원하는 창고와 품목을 선택하여 담아주세요.</span>
         </td>
       </tr>
     `;
@@ -4258,6 +4393,7 @@ function renderOrderDraftTable() {
   items.forEach((item, idx) => {
     html += `
       <tr style="border-bottom: 1px solid #f1f5f9;">
+        <td style="padding: 7px 8px; text-align: center; font-weight: bold; color: #0f766e; background: #f0fdf4;">${item.warehouse || '미지정'}</td>
         <td style="padding: 7px 8px; text-align: left; font-weight: 600; color: #0f172a;">${item.itemName}</td>
         <td style="padding: 7px 8px; text-align: center; color: #475569;">${item.color || 'SURTIDO'}</td>
         <td style="padding: 7px 8px; text-align: right; font-weight: bold; color: #0f766e;">${item.boxQty} 상자</td>
@@ -4277,6 +4413,8 @@ function removeOrderDraftItem(index) {
     items.splice(index, 1);
     saveOrderDraftItems(items);
     renderOrderDraftTable();
+    updateTruckGauges();
+    filterSubWarehouseTable();
   }
 }
 
@@ -4284,6 +4422,429 @@ function clearAllOrderDraftItems() {
   if (!confirm('주문서에 담긴 모든 품목을 비우시겠습니까?')) return;
   saveOrderDraftItems([]);
   renderOrderDraftTable();
+  updateTruckGauges();
+  filterSubWarehouseTable();
+}
+
+// -------------------------------------------------------------------
+// 🏢 외부(서브)창고 8대 재고 매트릭스 & 100상자 트럭 게이지 관리
+// -------------------------------------------------------------------
+
+let subWhMatrixData = null;
+let subWhFilteredItems = [];
+let currentSubWhTarget = null; // { item, warehouse, availStock }
+
+function openSubWarehouseMatrixModal() {
+  const modal = document.getElementById('subWarehouseMatrixModal');
+  const overlay = document.getElementById('modalOverlay');
+  if (!modal) return;
+  modal.style.display = 'flex';
+  if (overlay) overlay.style.display = 'block';
+
+  // 캐시된 데이터가 있으면 먼저 즉시 렌더링하고 백그라운드 갱신
+  if (subWhMatrixData) {
+    updateTruckGauges();
+    filterSubWarehouseTable();
+    const spinner = document.getElementById('subWhLoadingSpinner');
+    const table = document.getElementById('subWhTable');
+    if (spinner) spinner.style.display = 'none';
+    if (table) table.style.display = 'table';
+  } else {
+    loadSubWarehouseMatrix(false);
+  }
+}
+
+function closeSubWarehouseMatrixModal() {
+  const modal = document.getElementById('subWarehouseMatrixModal');
+  const overlay = document.getElementById('modalOverlay');
+  if (modal) modal.style.display = 'none';
+  if (overlay && (!document.getElementById('orderDraftModal') || document.getElementById('orderDraftModal').style.display === 'none')) {
+    overlay.style.display = 'none';
+  }
+}
+
+function loadSubWarehouseMatrix(forceRefresh) {
+  const spinner = document.getElementById('subWhLoadingSpinner');
+  const table = document.getElementById('subWhTable');
+  const badge = document.getElementById('subWhSyncBadge');
+  if (spinner) spinner.style.display = 'flex';
+  if (table) table.style.display = 'none';
+  if (badge) badge.textContent = '동기화: 불러오는 중...';
+
+  google.script.run
+    .withSuccessHandler(onSubWhMatrixLoaded)
+    .withFailureHandler(onSubWhMatrixError)
+    .getSubWarehouseStockMatrix(forceRefresh || false);
+}
+
+function onSubWhMatrixError(err) {
+  const spinner = document.getElementById('subWhLoadingSpinner');
+  if (spinner) {
+    spinner.innerHTML = `
+      <div style="color: #ef4444; text-align: center; padding: 20px;">
+        <div style="font-size: 20pt; margin-bottom: 8px;">⚠️</div>
+        <div style="font-weight: bold; margin-bottom: 6px;">서브창고 재고 로드 실패</div>
+        <div style="font-size: 8.5pt; color: #64748b;">${err.message || err}</div>
+        <button type="button" onclick="loadSubWarehouseMatrix(true)" style="margin-top: 12px; padding: 6px 14px; background: #0f766e; color: #ffffff; border: none; border-radius: 4px; cursor: pointer; font-size: 8.5pt;">다시 시도</button>
+      </div>
+    `;
+  }
+}
+
+function onSubWhMatrixLoaded(data) {
+  subWhMatrixData = data;
+  const spinner = document.getElementById('subWhLoadingSpinner');
+  const table = document.getElementById('subWhTable');
+  const badge = document.getElementById('subWhSyncBadge');
+  if (spinner) spinner.style.display = 'none';
+  if (table) table.style.display = 'table';
+  if (badge) badge.textContent = `동기화: ${data.updatedAt || '방금 전'}`;
+
+  updateTruckGauges();
+  filterSubWarehouseTable();
+}
+
+/**
+ * 🚛 8대 창고별 트럭 1대(100상자) 적재율 게이지 바 렌더링
+ */
+function updateTruckGauges() {
+  const container = document.getElementById('truckGaugeContainer');
+  if (!container || !subWhMatrixData || !subWhMatrixData.warehouses) return;
+
+  const draftItems = getOrderDraftItems();
+  const whTotals = {};
+  subWhMatrixData.warehouses.forEach(wh => whTotals[wh] = 0);
+
+  let grandTotalBoxes = 0;
+  draftItems.forEach(item => {
+    const wh = item.warehouse;
+    const qty = parseInt(item.boxQty, 10) || 0;
+    if (wh && whTotals[wh] !== undefined) {
+      whTotals[wh] += qty;
+    }
+    grandTotalBoxes += qty;
+  });
+
+  const totalSummary = document.getElementById('truckTotalSummary');
+  if (totalSummary) {
+    totalSummary.textContent = `전체 발주 담김: ${grandTotalBoxes}상자 (${draftItems.length}개 품목)`;
+  }
+
+  const draftCountSpan = document.getElementById('draftItemsSummaryCount');
+  const draftBoxesSpan = document.getElementById('draftItemsSummaryBoxes');
+  const draftBadge = document.getElementById('subWhDraftBadge');
+  if (draftCountSpan) draftCountSpan.textContent = draftItems.length;
+  if (draftBoxesSpan) draftBoxesSpan.textContent = grandTotalBoxes;
+  if (draftBadge) draftBadge.textContent = draftItems.length;
+
+  let html = '';
+  subWhMatrixData.warehouses.forEach(wh => {
+    const qty = whTotals[wh] || 0;
+    const pct = Math.min(100, Math.round((qty / 100) * 100));
+    const isFull = qty >= 100;
+    const barColor = isFull ? '#10b981' : (qty > 0 ? '#0d9488' : '#cbd5e1');
+    const badgeText = isFull ? '✅ 1대 완료!' : (qty > 0 ? `부족 ${100 - qty}` : '0 / 100');
+
+    html += `
+      <div style="background: #ffffff; border: 1.5px solid ${isFull ? '#10b981' : (qty > 0 ? '#99f6e4' : '#e2e8f0')}; border-radius: 6px; padding: 6px 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+          <strong style="font-size: 8.2pt; color: ${isFull ? '#065f46' : '#1e293b'};">${wh}</strong>
+          <span style="font-size: 7.2pt; font-weight: bold; color: ${isFull ? '#047857' : (qty > 0 ? '#0f766e' : '#94a3b8')};">${badgeText}</span>
+        </div>
+        <div style="font-size: 9pt; font-weight: 800; color: ${qty > 0 ? '#0f766e' : '#64748b'}; margin-bottom: 4px;">
+          ${qty} <span style="font-size: 7.5pt; font-weight: normal; color: #94a3b8;">/ 100 상자</span>
+        </div>
+        <div style="height: 5px; background: #e2e8f0; border-radius: 3px; overflow: hidden;">
+          <div style="width: ${pct}%; height: 100%; background: ${barColor}; transition: width 0.3s ease;"></div>
+        </div>
+      </div>
+    `;
+  });
+
+  container.innerHTML = html;
+}
+
+/**
+ * 실시간 검색 및 필터링
+ */
+function onSubWhSearchInput() {
+  clearTimeout(debounceTimeout);
+  debounceTimeout = setTimeout(filterSubWarehouseTable, 150);
+}
+
+function filterSubWarehouseTable() {
+  if (!subWhMatrixData || !subWhMatrixData.items) return;
+
+  const query = (document.getElementById('subWhSearchInput') ? document.getElementById('subWhSearchInput').value : '').toLowerCase().trim();
+  const onlyNeeded = document.getElementById('chkOnlyNeeded') ? document.getElementById('chkOnlyNeeded').checked : false;
+  const onlyInStock = document.getElementById('chkOnlyInStock') ? document.getElementById('chkOnlyInStock').checked : false;
+
+  // 장바구니에서 담겨온 품목(records) 키 세트 구성
+  const cartKeyMap = {};
+  if (records && records.length > 0) {
+    records.forEach(r => {
+      const k = `${r.itemName}___${r.color || 'SURTIDO'}`.toUpperCase();
+      const needQty = Math.abs(r.boxQty) || 1;
+      cartKeyMap[k] = needQty;
+    });
+  }
+
+  const neededCountEl = document.getElementById('neededItemsCount');
+  if (neededCountEl) neededCountEl.textContent = Object.keys(cartKeyMap).length;
+
+  subWhFilteredItems = subWhMatrixData.items.filter(item => {
+    const itemKey = `${item.codigo}___${item.color}`.toUpperCase();
+    const isNeeded = cartKeyMap[itemKey] !== undefined;
+
+    if (onlyNeeded && !isNeeded) return false;
+    if (onlyInStock && item.totalSubStock <= 0) return false;
+
+    if (query) {
+      const matchText = `${item.codigo} ${item.color}`.toLowerCase();
+      if (matchText.indexOf(query) === -1) return false;
+    }
+
+    return true;
+  });
+
+  const countEl = document.getElementById('subWhFilteredCount');
+  if (countEl) countEl.textContent = subWhFilteredItems.length;
+
+  renderSubWhTable(subWhFilteredItems, cartKeyMap);
+}
+
+/**
+ * 8대 창고 매트릭스 테이블 렌더링
+ */
+function renderSubWhTable(items, cartKeyMap) {
+  const thead = document.getElementById('subWhThead');
+  const tbody = document.getElementById('subWhTbody');
+  if (!thead || !tbody || !subWhMatrixData) return;
+
+  const warehouses = subWhMatrixData.warehouses || [];
+
+  // 1. 헤더 구성 (Sticky Columns 적용)
+  thead.innerHTML = `
+    <tr style="position: sticky; top: 0; z-index: 20; background: #0f172a; color: #ffffff; font-size: 8.2pt; text-align: center;">
+      <th style="padding: 8px 6px; position: sticky; left: 0; z-index: 25; background: #0f172a; width: 140px; text-align: left; border-right: 1px solid #334155;">품명</th>
+      <th style="padding: 8px 6px; position: sticky; left: 140px; z-index: 25; background: #0f172a; width: 90px; border-right: 1.5px solid #475569;">색상</th>
+      <th style="padding: 8px 6px; position: sticky; left: 230px; z-index: 25; background: #1e3a8a; width: 85px; color: #93c5fd; border-right: 1px solid #3b82f6;">🏢 메인실재고</th>
+      <th style="padding: 8px 6px; position: sticky; left: 315px; z-index: 25; background: #1e3a8a; width: 85px; color: #fdba74; border-right: 1px solid #3b82f6;">🚚 이동중</th>
+      <th style="padding: 8px 6px; position: sticky; left: 400px; z-index: 25; background: #1e3a8a; width: 85px; color: #86efac; border-right: 2.5px solid #0d9488;">⭐ 유효재고</th>
+      ${warehouses.map(wh => `<th style="padding: 8px 6px; min-width: 80px; background: #134e4a; color: #ccfbf1; border-right: 1px solid #0f766e;">${wh}</th>`).join('')}
+    </tr>
+  `;
+
+  if (!items.length) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="${5 + warehouses.length}" style="padding: 40px; text-align: center; color: #94a3b8; font-size: 9pt;">
+          일치하는 품목이 없습니다.
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  // 이미 주문서(드래프트)에 담긴 목록 키 매핑
+  const draftItems = getOrderDraftItems();
+  const draftMap = {}; // { "IKEA___CK928N___SURTIDO": qty }
+  draftItems.forEach(d => {
+    const k = `${d.warehouse}___${d.itemName}___${d.color || 'SURTIDO'}`.toUpperCase();
+    draftMap[k] = (draftMap[k] || 0) + (parseInt(d.boxQty, 10) || 0);
+  });
+
+  let html = '';
+  items.forEach((item, itemIdx) => {
+    const itemKey = `${item.codigo}___${item.color}`.toUpperCase();
+    const neededQty = cartKeyMap ? cartKeyMap[itemKey] : null;
+    const isNeeded = neededQty !== undefined && neededQty !== null;
+
+    // 행 배경색: 장바구니 품목은 골드 하이라이트
+    const rowBg = isNeeded ? '#fef3c7' : (itemIdx % 2 === 0 ? '#ffffff' : '#f8fafc');
+    const stickyBg = isNeeded ? '#fef3c7' : (itemIdx % 2 === 0 ? '#ffffff' : '#f8fafc');
+
+    html += `<tr style="background: ${rowBg}; border-bottom: 1px solid #e2e8f0;">`;
+
+    // 1. 품명 (Sticky 0px)
+    html += `
+      <td style="padding: 6px 8px; position: sticky; left: 0; z-index: 10; background: ${stickyBg}; border-right: 1px solid #e2e8f0; font-weight: 700; color: #0f172a; white-space: nowrap;">
+        ${item.codigo}
+        ${isNeeded ? `<span style="display: inline-block; margin-left: 4px; font-size: 7.2pt; background: #f59e0b; color: #ffffff; padding: 1px 5px; border-radius: 3px; font-weight: bold;">발주필요:${neededQty}</span>` : ''}
+      </td>
+    `;
+
+    // 2. 색상 (Sticky 140px)
+    html += `
+      <td style="padding: 6px 8px; position: sticky; left: 140px; z-index: 10; background: ${stickyBg}; border-right: 1.5px solid #cbd5e1; text-align: center; color: #475569; white-space: nowrap;">
+        ${item.color}
+      </td>
+    `;
+
+    // 3. 메인 실재고 (Sticky 230px)
+    html += `
+      <td style="padding: 6px 8px; position: sticky; left: 230px; z-index: 10; background: ${isNeeded ? '#fef3c7' : '#f0f9ff'}; border-right: 1px solid #bfdbfe; text-align: right; font-weight: bold; color: ${item.mainStock > 0 ? '#0284c7' : '#94a3b8'};">
+        ${item.mainStock}
+      </td>
+    `;
+
+    // 4. 이동중 (PENDING) (Sticky 315px)
+    html += `
+      <td style="padding: 6px 8px; position: sticky; left: 315px; z-index: 10; background: ${isNeeded ? '#fef3c7' : '#fff7ed'}; border-right: 1px solid #fed7aa; text-align: right; font-weight: bold; color: ${item.inTransit > 0 ? '#ea580c' : '#cbd5e1'};">
+        ${item.inTransit > 0 ? `+${item.inTransit}` : '-'}
+      </td>
+    `;
+
+    // 5. 유효재고 (Sticky 400px)
+    html += `
+      <td style="padding: 6px 8px; position: sticky; left: 400px; z-index: 10; background: ${isNeeded ? '#fef3c7' : '#f0fdf4'}; border-right: 2.5px solid #0d9488; text-align: right; font-weight: 800; color: ${item.effectiveStock > 0 ? '#15803d' : '#ef4444'};">
+        ${item.effectiveStock}
+      </td>
+    `;
+
+    // 6. 8대 서브창고 열들
+    warehouses.forEach(wh => {
+      const stock = item.stocks ? (item.stocks[wh] || 0) : 0;
+      const cellDraftKey = `${wh}___${item.codigo}___${item.color}`.toUpperCase();
+      const draftedQty = draftMap[cellDraftKey] || 0;
+
+      if (stock > 0) {
+        html += `
+          <td style="padding: 5px 6px; text-align: center; border-right: 1px solid #e2e8f0;">
+            <button type="button" onclick="onSubWhCellClick(${itemIdx}, '${wh}', ${stock})" style="width: 100%; padding: 4px 2px; background: ${draftedQty > 0 ? '#dbeafe' : '#ccfbf1'}; border: 1px solid ${draftedQty > 0 ? '#93c5fd' : '#5eead4'}; border-radius: 4px; font-weight: bold; color: ${draftedQty > 0 ? '#1d4ed8' : '#0f766e'}; cursor: pointer; font-size: 8.5pt; transition: all 0.15s ease;" title="${wh} 창고: 클릭하여 발주 수량 입력">
+              ${stock}
+              ${draftedQty > 0 ? `<div style="font-size: 6.8pt; color: #1d4ed8; font-weight: 800;">담김:${draftedQty}</div>` : ''}
+            </button>
+          </td>
+        `;
+      } else {
+        html += `
+          <td style="padding: 5px 6px; text-align: center; color: #cbd5e1; font-size: 8pt; border-right: 1px solid #f1f5f9;">
+            -
+          </td>
+        `;
+      }
+    });
+
+    html += `</tr>`;
+  });
+
+  tbody.innerHTML = html;
+}
+
+/**
+ * 2차 미니 모달 오픈 (셀 클릭 시)
+ */
+function onSubWhCellClick(itemIndex, warehouseName, availStock) {
+  if (itemIndex < 0 || itemIndex >= subWhFilteredItems.length) return;
+  const item = subWhFilteredItems[itemIndex];
+  currentSubWhTarget = { item: item, warehouse: warehouseName, availStock: availStock };
+
+  // 모달 데이터 채우기
+  document.getElementById('qtyModalWarehouse').textContent = warehouseName;
+  document.getElementById('qtyModalItemName').textContent = `${item.codigo} (${item.color})`;
+  document.getElementById('qtyModalAvailStock').textContent = `${availStock} 상자`;
+  document.getElementById('qtyModalEffectiveStock').textContent = `실재고 ${item.mainStock} + 이동중 ${item.inTransit} = 유효 ${item.effectiveStock}상자`;
+
+  // 기본 수량 세팅 (1상자)
+  const qtyInput = document.getElementById('subWhQtyInput');
+  qtyInput.value = 1;
+  qtyInput.max = availStock;
+  document.getElementById('qtyModalWarning').style.display = 'none';
+
+  // 2차 모달 표시
+  const modal = document.getElementById('subWarehouseQtyModal');
+  if (modal) modal.style.display = 'block';
+}
+
+function closeSubWarehouseQtyModal() {
+  const modal = document.getElementById('subWarehouseQtyModal');
+  if (modal) modal.style.display = 'none';
+  currentSubWhTarget = null;
+}
+
+function adjustQtyInput(delta) {
+  const input = document.getElementById('subWhQtyInput');
+  if (!input || !currentSubWhTarget) return;
+  let val = (parseInt(input.value, 10) || 1) + delta;
+  if (val < 1) val = 1;
+  if (val > currentSubWhTarget.availStock) val = currentSubWhTarget.availStock;
+  input.value = val;
+  validateQtyInput();
+}
+
+function setQuickQty(val) {
+  const input = document.getElementById('subWhQtyInput');
+  if (!input || !currentSubWhTarget) return;
+  if (val === 'max') {
+    input.value = currentSubWhTarget.availStock;
+  } else {
+    let num = parseInt(val, 10) || 1;
+    if (num > currentSubWhTarget.availStock) num = currentSubWhTarget.availStock;
+    input.value = num;
+  }
+  validateQtyInput();
+}
+
+function validateQtyInput() {
+  const input = document.getElementById('subWhQtyInput');
+  const warn = document.getElementById('qtyModalWarning');
+  if (!input || !currentSubWhTarget) return;
+  const val = parseInt(input.value, 10);
+
+  if (isNaN(val) || val <= 0) {
+    warn.textContent = '1 이상의 수량을 입력해주세요.';
+    warn.style.display = 'block';
+    return false;
+  }
+  if (val > currentSubWhTarget.availStock) {
+    warn.textContent = `창고 보유 재고(${currentSubWhTarget.availStock}상자)를 초과할 수 없습니다.`;
+    warn.style.display = 'block';
+    return false;
+  }
+  warn.style.display = 'none';
+  return true;
+}
+
+/**
+ * 2차 모달 [담기] 확정
+ */
+function confirmAddSubWarehouseOrder() {
+  if (!validateQtyInput() || !currentSubWhTarget) return;
+
+  const qty = parseInt(document.getElementById('subWhQtyInput').value, 10);
+  const { item, warehouse, availStock } = currentSubWhTarget;
+
+  const currentDraft = getOrderDraftItems();
+  const draftKey = `${warehouse}___${item.codigo}___${item.color}`.toUpperCase();
+
+  // 이미 동일 창고/품목이 있으면 수량 누적, 없으면 신규 추가
+  const existingIdx = currentDraft.findIndex(d => `${d.warehouse}___${d.itemName}___${d.color}`.toUpperCase() === draftKey);
+  if (existingIdx !== -1) {
+    const newQty = currentDraft[existingIdx].boxQty + qty;
+    if (newQty > availStock) {
+      alert(`⚠️ 이미 담긴 수량(${currentDraft[existingIdx].boxQty}상자)과 합산하면 창고 재고(${availStock}상자)를 초과합니다.`);
+      return;
+    }
+    currentDraft[existingIdx].boxQty = newQty;
+    currentDraft[existingIdx].addedAt = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+  } else {
+    currentDraft.push({
+      warehouse: warehouse,
+      itemName: item.codigo,
+      color: item.color,
+      boxQty: qty,
+      boxContent: 0,
+      addedAt: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+    });
+  }
+
+  saveOrderDraftItems(currentDraft);
+  closeSubWarehouseQtyModal();
+
+  // 게이지 바 및 테이블 셀 실시간 갱신
+  updateTruckGauges();
+  filterSubWarehouseTable();
 }
 
 // ---------------- 키보드 단축키 이벤트 ----------------
@@ -4316,6 +4877,8 @@ function setupHotkeyShortcuts() {
       closeHotkeyConfigModal();
       closeQuickStockModal();
       closeOrderDraftModal();
+      closeSubWarehouseQtyModal();
+      closeSubWarehouseMatrixModal();
       showOcrLoadingModal(false);
     }
     // Ctrl + Enter : 그리드 모달이 열려 있을 때 일괄 담기 실행

@@ -870,6 +870,182 @@ function updatePendingRecords(invoiceNumber, type, newRecords, admin) {
 }
 
 // -------------------------------------------------------------------
+// 🏢 외부(서브)창고 8대 재고 매트릭스 & 유효재고 백엔드 연동
+// -------------------------------------------------------------------
+
+const SUB_WAREHOUSE_CONFIG = {
+  SPREADSHEET_ID: '17_FjWFFbuMvvVhQ7Bn7CKmh59c9hzHDvWv68y11v4CX8',
+  TARGET_WAREHOUSES: ['PANTACO', 'IKEA', 'LERMA', 'PINO', 'YARE', 'ALMINTER', 'TLANE', 'STAR']
+};
+
+function getSubWarehouseStockMatrix(forceRefresh) {
+  const cache = CacheService.getScriptCache();
+  const cacheKey = 'SUB_WH_MATRIX_V1';
+
+  if (!forceRefresh) {
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      try {
+        return JSON.parse(cached);
+      } catch (e) {}
+    }
+  }
+
+  try {
+    const subSS = SpreadsheetApp.openById(SUB_WAREHOUSE_CONFIG.SPREADSHEET_ID);
+    const allSheets = subSS.getSheets();
+
+    // 1. 재고현황 시트 찾기 (gid 543678626 또는 이름 '재고현황' 또는 첫 번째 시트)
+    let stockSheet = subSS.getSheetByName('재고현황');
+    if (!stockSheet) {
+      stockSheet = allSheets.find(s => s.getSheetId() === 543678626) || allSheets[0];
+    }
+
+    // 2. 주문사항 시트 찾기 (gid 1459767519 또는 이름 '주문사항' 또는 '주문내역')
+    let orderSheet = subSS.getSheetByName('주문사항') || subSS.getSheetByName('주문내역');
+    if (!orderSheet) {
+      orderSheet = allSheets.find(s => s.getSheetId() === 1459767519);
+    }
+
+    // A. 서브창고 재고 매트릭스 로드
+    const stockData = stockSheet.getDataRange().getValues();
+    if (stockData.length < 2) {
+      throw new Error('서브창고 재고 데이터가 비어있습니다.');
+    }
+
+    const headerRow = stockData[0];
+    let codigoCol = -1;
+    let colorCol = -1;
+    const warehouseColMap = {};
+
+    headerRow.forEach((colName, idx) => {
+      const cleanName = normalizeText(colName).toUpperCase();
+      if (cleanName === 'CODIGO' || cleanName === '품명' || cleanName === '제품명') {
+        codigoCol = idx;
+      } else if (cleanName === 'COLOR' || cleanName === '색상') {
+        colorCol = idx;
+      } else {
+        SUB_WAREHOUSE_CONFIG.TARGET_WAREHOUSES.forEach(wh => {
+          if (cleanName.indexOf(wh) !== -1 || wh.indexOf(cleanName) !== -1) {
+            warehouseColMap[wh] = idx;
+          }
+        });
+      }
+    });
+
+    if (codigoCol === -1) codigoCol = 1;
+    if (colorCol === -1) colorCol = 2;
+
+    // B. 서브창고 PENDING 이동중(In-Transit) 수량 집계
+    const inTransitMap = {};
+    if (orderSheet) {
+      const orderData = orderSheet.getDataRange().getValues();
+      if (orderData.length >= 2) {
+        const orderHeader = orderData[0];
+        let pNameCol = -1, pColorCol = -1, pQtyCol = -1, pStatusCol = -1;
+
+        orderHeader.forEach((h, idx) => {
+          const ch = normalizeText(h).toUpperCase();
+          if (ch.indexOf('품명') !== -1) pNameCol = idx;
+          else if (ch.indexOf('색상') !== -1) pColorCol = idx;
+          else if (ch.indexOf('개수') !== -1 || ch.indexOf('수량') !== -1) pQtyCol = idx;
+          else if (ch.indexOf('처리상태') !== -1 || ch.indexOf('상태') !== -1) pStatusCol = idx;
+        });
+
+        if (pNameCol === -1) pNameCol = 4;
+        if (pColorCol === -1) pColorCol = 5;
+        if (pQtyCol === -1) pQtyCol = 6;
+        if (pStatusCol === -1) pStatusCol = 9;
+
+        for (let r = 1; r < orderData.length; r++) {
+          const row = orderData[r];
+          const status = normalizeText(row[pStatusCol]).toUpperCase();
+          if (status === 'PENDING') {
+            const item = normalizeText(row[pNameCol]);
+            const color = normalizeText(row[pColorCol]) || DEFAULTS.COLOR;
+            const qty = normalizeNumber(row[pQtyCol]);
+            if (item && qty > 0) {
+              const key = `${item}___${color}`.toUpperCase();
+              inTransitMap[key] = (inTransitMap[key] || 0) + qty;
+            }
+          }
+        }
+      }
+    }
+
+    // C. 메인창고 실재고(Main Stock) 매핑
+    const mainStockMap = {};
+    try {
+      const mainStockSheet = getSheet(SHEETS.STOCK);
+      const mData = mainStockSheet.getDataRange().getValues();
+      for (let m = 1; m < mData.length; m++) {
+        const mRow = mData[m];
+        const mName = normalizeText(mRow[0]);
+        const mColor = normalizeText(mRow[1]) || DEFAULTS.COLOR;
+        const mBox = normalizeNumber(mRow[2]);
+        if (mName) {
+          const mKey = `${mName}___${mColor}`.toUpperCase();
+          mainStockMap[mKey] = (mainStockMap[mKey] || 0) + mBox;
+        }
+      }
+    } catch (e) {
+      console.warn('메인 재고 로드 실패: ' + e.message);
+    }
+
+    // D. 최종 매트릭스 항목 구성
+    const items = [];
+    const whList = SUB_WAREHOUSE_CONFIG.TARGET_WAREHOUSES;
+
+    for (let i = 1; i < stockData.length; i++) {
+      const row = stockData[i];
+      const codigo = normalizeText(row[codigoCol]);
+      if (!codigo) continue;
+      const color = normalizeText(row[colorCol]) || DEFAULTS.COLOR;
+      const key = `${codigo}___${color}`.toUpperCase();
+
+      const stocks = {};
+      let totalSubStock = 0;
+
+      whList.forEach(wh => {
+        const colIdx = warehouseColMap[wh];
+        const qty = colIdx !== undefined ? normalizeNumber(row[colIdx]) : 0;
+        stocks[wh] = qty;
+        totalSubStock += qty;
+      });
+
+      const mainStock = mainStockMap[key] || 0;
+      const inTransit = inTransitMap[key] || 0;
+      const effectiveStock = mainStock + inTransit;
+
+      items.push({
+        codigo: codigo,
+        color: color,
+        mainStock: mainStock,
+        inTransit: inTransit,
+        effectiveStock: effectiveStock,
+        stocks: stocks,
+        totalSubStock: totalSubStock
+      });
+    }
+
+    const result = {
+      warehouses: whList,
+      items: items,
+      updatedAt: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+    };
+
+    try {
+      cache.put(cacheKey, JSON.stringify(result), 600); // 10분 캐시
+    } catch (e) {}
+
+    return result;
+  } catch (err) {
+    console.error('getSubWarehouseStockMatrix error: ' + err.message);
+    throw new Error(`서브창고 재고 데이터 로드 실패: ${err.message}`);
+  }
+}
+
+// -------------------------------------------------------------------
 // 메뉴 및 UI 표시
 // -------------------------------------------------------------------
 
