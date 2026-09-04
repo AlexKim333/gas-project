@@ -1546,8 +1546,8 @@
             <span>서브창고 재고 있는 품목만</span>
           </label>
         </div>
-        <div style="font-size: 8.2pt; color: #64748b;">
-          표시 품목: <strong id="subWhFilteredCount" style="color: #0f172a;">0</strong>개
+        <div style="font-size: 8.2pt; color: #64748b; white-space: nowrap;">
+          표시: <strong id="subWhFilteredCount" style="color: #0f766e; font-size: 9pt;">0</strong> / 전체 <span id="subWhTotalCount" style="font-weight: 600; color: #334155;">0</span>개
         </div>
       </div>
 
@@ -1557,7 +1557,7 @@
           <div class="loading-spinner" style="border-top-color: #0d9488; margin-bottom: 10px;"></div>
           <span>8개 서브창고 실시간 재고 & PENDING 이동수량 로딩 중...</span>
         </div>
-        <table id="subWhTable" style="display: none; width: 100%; border-collapse: separate; border-spacing: 0; font-size: 8.5pt;">
+        <table id="subWhTable" style="display: none; min-width: 1200px; width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0; font-size: 8.5pt;">
           <thead id="subWhThead"></thead>
           <tbody id="subWhTbody"></tbody>
         </table>
@@ -4610,6 +4610,9 @@ function filterSubWarehouseTable() {
   const countEl = document.getElementById('subWhFilteredCount');
   if (countEl) countEl.textContent = subWhFilteredItems.length;
 
+  const totalEl = document.getElementById('subWhTotalCount');
+  if (totalEl) totalEl.textContent = subWhMatrixData.items ? subWhMatrixData.items.length : 0;
+
   renderSubWhTable(subWhFilteredItems, cartKeyMap);
 }
 
@@ -4617,29 +4620,36 @@ function filterSubWarehouseTable() {
  * 8대 창고 매트릭스 테이블 렌더링
  */
 function renderSubWhTable(items, cartKeyMap) {
+  const table = document.getElementById('subWhTable');
   const thead = document.getElementById('subWhThead');
   const tbody = document.getElementById('subWhTbody');
   if (!thead || !tbody || !subWhMatrixData) return;
 
   const warehouses = subWhMatrixData.warehouses || [];
 
-  // 1. 헤더 구성 (Sticky Columns 적용)
+  // 1. 헤더 구성 (정확한 고정 너비와 !important 색상으로 텍스트 가독성 및 겹침 완벽 방지)
   thead.innerHTML = `
-    <tr style="position: sticky; top: 0; z-index: 20; background: #0f172a; color: #ffffff; font-size: 8.2pt; text-align: center;">
-      <th style="padding: 8px 6px; position: sticky; left: 0; z-index: 25; background: #0f172a; width: 140px; text-align: left; border-right: 1px solid #334155;">품명</th>
-      <th style="padding: 8px 6px; position: sticky; left: 140px; z-index: 25; background: #0f172a; width: 90px; border-right: 1.5px solid #475569;">색상</th>
-      <th style="padding: 8px 6px; position: sticky; left: 230px; z-index: 25; background: #1e3a8a; width: 85px; color: #93c5fd; border-right: 1px solid #3b82f6;">🏢 메인실재고</th>
-      <th style="padding: 8px 6px; position: sticky; left: 315px; z-index: 25; background: #1e3a8a; width: 85px; color: #fdba74; border-right: 1px solid #3b82f6;">🚚 이동중</th>
-      <th style="padding: 8px 6px; position: sticky; left: 400px; z-index: 25; background: #1e3a8a; width: 85px; color: #86efac; border-right: 2.5px solid #0d9488;">⭐ 유효재고</th>
-      ${warehouses.map(wh => `<th style="padding: 8px 6px; min-width: 80px; background: #134e4a; color: #ccfbf1; border-right: 1px solid #0f766e;">${wh}</th>`).join('')}
+    <tr style="position: sticky; top: 0; z-index: 20; background: #0f172a; font-size: 8.2pt; text-align: center;">
+      <th style="padding: 8px 6px; position: sticky; left: 0; z-index: 25; background: #0f172a !important; color: #ffffff !important; width: 140px; min-width: 140px; max-width: 140px; text-align: left; border-right: 1px solid #334155; font-weight: 700;">품명</th>
+      <th style="padding: 8px 6px; position: sticky; left: 140px; z-index: 25; background: #0f172a !important; color: #ffffff !important; width: 90px; min-width: 90px; max-width: 90px; border-right: 1.5px solid #475569; font-weight: 700;">색상</th>
+      <th style="padding: 8px 6px; position: sticky; left: 230px; z-index: 25; background: #1e3a8a !important; color: #93c5fd !important; width: 85px; min-width: 85px; max-width: 85px; border-right: 1px solid #3b82f6; font-weight: 700;">🏢 메인실재고</th>
+      <th style="padding: 8px 6px; position: sticky; left: 315px; z-index: 25; background: #1e3a8a !important; color: #fdba74 !important; width: 85px; min-width: 85px; max-width: 85px; border-right: 1px solid #3b82f6; font-weight: 700;">🚚 이동중</th>
+      <th style="padding: 8px 6px; position: sticky; left: 400px; z-index: 25; background: #1e3a8a !important; color: #86efac !important; width: 90px; min-width: 90px; max-width: 90px; border-right: 2.5px solid #0d9488; font-weight: 700;">⭐ 유효재고</th>
+      ${warehouses.map(wh => `<th style="padding: 8px 4px; width: 85px; min-width: 85px; max-width: 85px; background: #134e4a !important; color: #ccfbf1 !important; border-right: 1px solid #0f766e; font-weight: 700; text-align: center; white-space: nowrap;">${wh}</th>`).join('')}
     </tr>
   `;
 
   if (!items.length) {
+    const onlyInStock = document.getElementById('chkOnlyInStock') ? document.getElementById('chkOnlyInStock').checked : false;
+    const totalCount = subWhMatrixData && subWhMatrixData.items ? subWhMatrixData.items.length : 0;
     tbody.innerHTML = `
       <tr>
-        <td colspan="${5 + warehouses.length}" style="padding: 40px; text-align: center; color: #94a3b8; font-size: 9pt;">
-          일치하는 품목이 없습니다.
+        <td colspan="${5 + warehouses.length}" style="padding: 40px 20px; text-align: center; color: #64748b; font-size: 9pt;">
+          <div style="font-size: 22pt; margin-bottom: 8px;">📦</div>
+          <div style="font-weight: bold; color: #334155; font-size: 10pt; margin-bottom: 6px;">일치하는 품목이 없습니다.</div>
+          <div style="font-size: 8.5pt; color: #64748b; line-height: 1.5;">
+            ${totalCount > 0 && onlyInStock ? `현재 전체 ${totalCount}개 품목 중 서브창고 재고가 1개 이상인 품목만 표시하도록 필터링되어 있습니다.<br>상단 <strong>[서브창고 재고 있는 품목만]</strong> 체크를 해제하시면 전체 품목을 확인하실 수 있습니다.` : '검색어를 변경하시거나 우측 상단의 [🔄 새로고침] 버튼을 눌러주세요.'}
+          </div>
         </td>
       </tr>
     `;
@@ -4666,43 +4676,43 @@ function renderSubWhTable(items, cartKeyMap) {
 
     html += `<tr style="background: ${rowBg}; border-bottom: 1px solid #e2e8f0;">`;
 
-    // 1. 품명 (Sticky 0px)
+    // 1. 품명 (Sticky 0px, width 140px)
     html += `
-      <td style="padding: 6px 8px; position: sticky; left: 0; z-index: 10; background: ${stickyBg}; border-right: 1px solid #e2e8f0; font-weight: 700; color: #0f172a; white-space: nowrap;">
+      <td style="padding: 6px 8px; position: sticky; left: 0; z-index: 10; background: ${stickyBg}; width: 140px; min-width: 140px; max-width: 140px; border-right: 1px solid #e2e8f0; font-weight: 700; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
         ${item.codigo}
         ${isNeeded ? `<span style="display: inline-block; margin-left: 4px; font-size: 7.2pt; background: #f59e0b; color: #ffffff; padding: 1px 5px; border-radius: 3px; font-weight: bold;">발주필요:${neededQty}</span>` : ''}
       </td>
     `;
 
-    // 2. 색상 (Sticky 140px)
+    // 2. 색상 (Sticky 140px, width 90px)
     html += `
-      <td style="padding: 6px 8px; position: sticky; left: 140px; z-index: 10; background: ${stickyBg}; border-right: 1.5px solid #cbd5e1; text-align: center; color: #475569; white-space: nowrap;">
+      <td style="padding: 6px 8px; position: sticky; left: 140px; z-index: 10; background: ${stickyBg}; width: 90px; min-width: 90px; max-width: 90px; border-right: 1.5px solid #cbd5e1; text-align: center; color: #475569; white-space: nowrap;">
         ${item.color}
       </td>
     `;
 
-    // 3. 메인 실재고 (Sticky 230px)
+    // 3. 메인 실재고 (Sticky 230px, width 85px)
     html += `
-      <td style="padding: 6px 8px; position: sticky; left: 230px; z-index: 10; background: ${isNeeded ? '#fef3c7' : '#f0f9ff'}; border-right: 1px solid #bfdbfe; text-align: right; font-weight: bold; color: ${item.mainStock > 0 ? '#0284c7' : '#94a3b8'};">
+      <td style="padding: 6px 8px; position: sticky; left: 230px; z-index: 10; background: ${isNeeded ? '#fef3c7' : '#f0f9ff'}; width: 85px; min-width: 85px; max-width: 85px; border-right: 1px solid #bfdbfe; text-align: right; font-weight: bold; color: ${item.mainStock > 0 ? '#0284c7' : '#94a3b8'};">
         ${item.mainStock}
       </td>
     `;
 
-    // 4. 이동중 (PENDING) (Sticky 315px)
+    // 4. 이동중 (PENDING) (Sticky 315px, width 85px)
     html += `
-      <td style="padding: 6px 8px; position: sticky; left: 315px; z-index: 10; background: ${isNeeded ? '#fef3c7' : '#fff7ed'}; border-right: 1px solid #fed7aa; text-align: right; font-weight: bold; color: ${item.inTransit > 0 ? '#ea580c' : '#cbd5e1'};">
+      <td style="padding: 6px 8px; position: sticky; left: 315px; z-index: 10; background: ${isNeeded ? '#fef3c7' : '#fff7ed'}; width: 85px; min-width: 85px; max-width: 85px; border-right: 1px solid #fed7aa; text-align: right; font-weight: bold; color: ${item.inTransit > 0 ? '#ea580c' : '#cbd5e1'};">
         ${item.inTransit > 0 ? `+${item.inTransit}` : '-'}
       </td>
     `;
 
-    // 5. 유효재고 (Sticky 400px)
+    // 5. 유효재고 (Sticky 400px, width 90px)
     html += `
-      <td style="padding: 6px 8px; position: sticky; left: 400px; z-index: 10; background: ${isNeeded ? '#fef3c7' : '#f0fdf4'}; border-right: 2.5px solid #0d9488; text-align: right; font-weight: 800; color: ${item.effectiveStock > 0 ? '#15803d' : '#ef4444'};">
+      <td style="padding: 6px 8px; position: sticky; left: 400px; z-index: 10; background: ${isNeeded ? '#fef3c7' : '#f0fdf4'}; width: 90px; min-width: 90px; max-width: 90px; border-right: 2.5px solid #0d9488; text-align: right; font-weight: 800; color: ${item.effectiveStock > 0 ? '#15803d' : '#ef4444'};">
         ${item.effectiveStock}
       </td>
     `;
 
-    // 6. 8대 서브창고 열들
+    // 6. 8대 서브창고 열들 (width 85px)
     warehouses.forEach(wh => {
       const stock = item.stocks ? (item.stocks[wh] || 0) : 0;
       const cellDraftKey = `${wh}___${item.codigo}___${item.color}`.toUpperCase();
@@ -4710,7 +4720,7 @@ function renderSubWhTable(items, cartKeyMap) {
 
       if (stock > 0) {
         html += `
-          <td style="padding: 5px 6px; text-align: center; border-right: 1px solid #e2e8f0;">
+          <td style="padding: 5px 6px; width: 85px; min-width: 85px; max-width: 85px; text-align: center; border-right: 1px solid #e2e8f0;">
             <button type="button" onclick="onSubWhCellClick(${itemIdx}, '${wh}', ${stock})" style="width: 100%; padding: 4px 2px; background: ${draftedQty > 0 ? '#dbeafe' : '#ccfbf1'}; border: 1px solid ${draftedQty > 0 ? '#93c5fd' : '#5eead4'}; border-radius: 4px; font-weight: bold; color: ${draftedQty > 0 ? '#1d4ed8' : '#0f766e'}; cursor: pointer; font-size: 8.5pt; transition: all 0.15s ease;" title="${wh} 창고: 클릭하여 발주 수량 입력">
               ${stock}
               ${draftedQty > 0 ? `<div style="font-size: 6.8pt; color: #1d4ed8; font-weight: 800;">담김:${draftedQty}</div>` : ''}
@@ -4719,7 +4729,7 @@ function renderSubWhTable(items, cartKeyMap) {
         `;
       } else {
         html += `
-          <td style="padding: 5px 6px; text-align: center; color: #cbd5e1; font-size: 8pt; border-right: 1px solid #f1f5f9;">
+          <td style="padding: 5px 6px; width: 85px; min-width: 85px; max-width: 85px; text-align: center; color: #cbd5e1; font-size: 8pt; border-right: 1px solid #f1f5f9;">
             -
           </td>
         `;

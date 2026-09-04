@@ -880,14 +880,16 @@ const SUB_WAREHOUSE_CONFIG = {
 
 function getSubWarehouseStockMatrix(forceRefresh) {
   const cache = CacheService.getScriptCache();
-  const cacheKey = 'SUB_WH_MATRIX_V1';
+  const cacheKey = 'SUB_WH_MATRIX_V2';
 
   if (!forceRefresh) {
     const cached = cache.get(cacheKey);
     if (cached) {
       try {
         return JSON.parse(cached);
-      } catch (e) {}
+      } catch (e) {
+        cache.remove(cacheKey);
+      }
     }
   }
 
@@ -895,16 +897,19 @@ function getSubWarehouseStockMatrix(forceRefresh) {
     const subSS = SpreadsheetApp.openById(SUB_WAREHOUSE_CONFIG.SPREADSHEET_ID);
     const allSheets = subSS.getSheets();
 
-    // 1. 재고현황 시트 찾기 (gid 543678626 또는 이름 '재고현황' 또는 첫 번째 시트)
+    // 1. 재고현황 시트 찾기 (이름 '재고현황' 또는 gid 543678626 또는 첫 번째 시트)
     let stockSheet = subSS.getSheetByName('재고현황');
     if (!stockSheet) {
-      stockSheet = allSheets.find(s => s.getSheetId() === 543678626) || allSheets[0];
+      stockSheet = allSheets.find(s => s.getName().trim().indexOf('재고현황') !== -1) ||
+                   allSheets.find(s => s.getSheetId() === 543678626) ||
+                   allSheets[0];
     }
 
-    // 2. 주문사항 시트 찾기 (gid 1459767519 또는 이름 '주문사항' 또는 '주문내역')
+    // 2. 주문사항 시트 찾기 (이름 '주문사항' / '주문내역' 또는 gid 1459767519)
     let orderSheet = subSS.getSheetByName('주문사항') || subSS.getSheetByName('주문내역');
     if (!orderSheet) {
-      orderSheet = allSheets.find(s => s.getSheetId() === 1459767519);
+      orderSheet = allSheets.find(s => s.getName().trim().indexOf('주문') !== -1) ||
+                   allSheets.find(s => s.getSheetId() === 1459767519);
     }
 
     // A. 서브창고 재고 매트릭스 로드
@@ -913,20 +918,43 @@ function getSubWarehouseStockMatrix(forceRefresh) {
       throw new Error('서브창고 재고 데이터가 비어있습니다.');
     }
 
-    const headerRow = stockData[0];
+    // 실제 헤더 행(CODIGO / 제품명 / 품명이 있는 행) 자동 검색 (상위 10행 스캔)
+    let headerRowIdx = -1;
     let codigoCol = -1;
     let colorCol = -1;
     const warehouseColMap = {};
 
+    for (let r = 0; r < Math.min(stockData.length, 10); r++) {
+      const row = stockData[r];
+      for (let c = 0; c < row.length; c++) {
+        const cleanVal = normalizeText(row[c]).toUpperCase();
+        if (cleanVal === 'CODIGO' || cleanVal.indexOf('품명') !== -1 || cleanVal.indexOf('제품명') !== -1) {
+          headerRowIdx = r;
+          codigoCol = c;
+          break;
+        }
+      }
+      if (headerRowIdx !== -1) break;
+    }
+
+    if (headerRowIdx === -1) {
+      headerRowIdx = 0;
+      codigoCol = 1;
+    }
+
+    const headerRow = stockData[headerRowIdx];
     headerRow.forEach((colName, idx) => {
       const cleanName = normalizeText(colName).toUpperCase();
-      if (cleanName === 'CODIGO' || cleanName === '품명' || cleanName === '제품명') {
+      if (!cleanName) return; // 빈 셀 무시
+
+      if (cleanName === 'CODIGO' || cleanName.indexOf('품명') !== -1 || cleanName.indexOf('제품명') !== -1) {
         codigoCol = idx;
-      } else if (cleanName === 'COLOR' || cleanName === '색상') {
+      } else if (cleanName === 'COLOR' || cleanName.indexOf('색상') !== -1 || cleanName.indexOf('컬러') !== -1) {
         colorCol = idx;
       } else {
         SUB_WAREHOUSE_CONFIG.TARGET_WAREHOUSES.forEach(wh => {
-          if (cleanName.indexOf(wh) !== -1 || wh.indexOf(cleanName) !== -1) {
+          // 정확한 창고명 일치 또는 포함 검사 (빈 문자열은 제외)
+          if (cleanName === wh || cleanName.indexOf(wh) !== -1) {
             warehouseColMap[wh] = idx;
           }
         });
@@ -934,30 +962,37 @@ function getSubWarehouseStockMatrix(forceRefresh) {
     });
 
     if (codigoCol === -1) codigoCol = 1;
-    if (colorCol === -1) colorCol = 2;
+    if (colorCol === -1) colorCol = codigoCol + 1;
 
     // B. 서브창고 PENDING 이동중(In-Transit) 수량 집계
     const inTransitMap = {};
     if (orderSheet) {
       const orderData = orderSheet.getDataRange().getValues();
       if (orderData.length >= 2) {
-        const orderHeader = orderData[0];
+        let orderHeaderIdx = 0;
         let pNameCol = -1, pColorCol = -1, pQtyCol = -1, pStatusCol = -1;
 
-        orderHeader.forEach((h, idx) => {
-          const ch = normalizeText(h).toUpperCase();
-          if (ch.indexOf('품명') !== -1) pNameCol = idx;
-          else if (ch.indexOf('색상') !== -1) pColorCol = idx;
-          else if (ch.indexOf('개수') !== -1 || ch.indexOf('수량') !== -1) pQtyCol = idx;
-          else if (ch.indexOf('처리상태') !== -1 || ch.indexOf('상태') !== -1) pStatusCol = idx;
-        });
+        for (let r = 0; r < Math.min(orderData.length, 5); r++) {
+          const row = orderData[r];
+          row.forEach((h, idx) => {
+            const ch = normalizeText(h).toUpperCase();
+            if (ch.indexOf('품명') !== -1 || ch.indexOf('제품명') !== -1) pNameCol = idx;
+            else if (ch.indexOf('색상') !== -1 || ch.indexOf('컬러') !== -1) pColorCol = idx;
+            else if (ch.indexOf('개수') !== -1 || ch.indexOf('수량') !== -1) pQtyCol = idx;
+            else if (ch.indexOf('처리상태') !== -1 || ch.indexOf('상태') !== -1) pStatusCol = idx;
+          });
+          if (pNameCol !== -1 && pQtyCol !== -1) {
+            orderHeaderIdx = r;
+            break;
+          }
+        }
 
         if (pNameCol === -1) pNameCol = 4;
         if (pColorCol === -1) pColorCol = 5;
         if (pQtyCol === -1) pQtyCol = 6;
         if (pStatusCol === -1) pStatusCol = 9;
 
-        for (let r = 1; r < orderData.length; r++) {
+        for (let r = orderHeaderIdx + 1; r < orderData.length; r++) {
           const row = orderData[r];
           const status = normalizeText(row[pStatusCol]).toUpperCase();
           if (status === 'PENDING') {
@@ -996,11 +1031,11 @@ function getSubWarehouseStockMatrix(forceRefresh) {
     const items = [];
     const whList = SUB_WAREHOUSE_CONFIG.TARGET_WAREHOUSES;
 
-    for (let i = 1; i < stockData.length; i++) {
+    for (let i = headerRowIdx + 1; i < stockData.length; i++) {
       const row = stockData[i];
       const codigo = normalizeText(row[codigoCol]);
       if (!codigo) continue;
-      const color = normalizeText(row[colorCol]) || DEFAULTS.COLOR;
+      const color = colorCol !== -1 && row[colorCol] !== undefined ? (normalizeText(row[colorCol]) || DEFAULTS.COLOR) : DEFAULTS.COLOR;
       const key = `${codigo}___${color}`.toUpperCase();
 
       const stocks = {};
@@ -1031,12 +1066,21 @@ function getSubWarehouseStockMatrix(forceRefresh) {
     const result = {
       warehouses: whList,
       items: items,
+      totalLoadedCount: items.length,
       updatedAt: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
     };
 
+    // CacheService 100KB 제한 안전 가드 (크기가 작을 때만 캐싱)
     try {
-      cache.put(cacheKey, JSON.stringify(result), 600); // 10분 캐시
-    } catch (e) {}
+      const jsonStr = JSON.stringify(result);
+      if (jsonStr.length < 95000) {
+        cache.put(cacheKey, jsonStr, 300);
+      } else {
+        cache.remove(cacheKey);
+      }
+    } catch (e) {
+      cache.remove(cacheKey);
+    }
 
     return result;
   } catch (err) {
