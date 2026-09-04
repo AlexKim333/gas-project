@@ -4018,6 +4018,33 @@ function onHandwrittenExtracted(data) {
     }
   }
 
+  // 1-1. 주문요청자(관리자) 자동 선택 (밑줄 친 텍스트 또는 헤더 요청자)
+  let matchedAdminName = '';
+  if (data.requester) {
+    const rawReq = String(data.requester).trim().toLowerCase();
+    const adminSelect = document.getElementById('adminSelect');
+    if (adminSelect && adminSelect.options.length > 0) {
+      let bestAdmin = '';
+      let bestAdminScore = 0;
+      let bestAdminIndex = -1;
+      for (let i = 0; i < adminSelect.options.length; i++) {
+        const optVal = adminSelect.options[i].value;
+        const optText = (adminSelect.options[i].text || optVal).toLowerCase();
+        const score = sequenceMatcher(rawReq, optText);
+        if (score > bestAdminScore) {
+          bestAdminScore = score;
+          bestAdminIndex = i;
+          bestAdmin = optVal;
+        }
+      }
+      if (bestAdminScore >= 0.50 && bestAdminIndex >= 0) {
+        adminSelect.selectedIndex = bestAdminIndex;
+        matchedAdminName = bestAdmin;
+        saveMetadata();
+      }
+    }
+  }
+
   const currentLocation = document.getElementById('location') ? document.getElementById('location').value : '';
 
   // 2. Forward-Fill 및 색상 정규화 파이프라인
@@ -4028,6 +4055,17 @@ function onHandwrittenExtracted(data) {
   data.results.forEach(r => {
     let rawModel = String(r.modelo || '').trim();
     let rawColor = String(r.color || '').trim();
+
+    // [2중 안전망] 단독 색상 감별: 만약 rawColor가 비어있고 rawModel이 알려진 색상 단독인 경우
+    if (!rawColor && rawModel) {
+      const normM = normalizeColor(rawModel);
+      const upM = normM.toUpperCase().replace(/[,.-/]/g, '').trim();
+      if (KNOWN_COLORS.includes(upM) || COLOR_SYNONYMS[rawModel.toLowerCase().trim()]) {
+        rawColor = rawModel;
+        rawModel = '';
+      }
+    }
+
     let { base, color } = extractColorAndBase(rawModel);
 
     if (rawColor) {
@@ -4077,6 +4115,9 @@ function onHandwrittenExtracted(data) {
     let msg = `🎉 손글씨 주문서 인식 성공!\n\n총 ${addedCount}개 품목이 장바구니에 자동 입력되었습니다.`;
     if (matchedLocationName) {
       msg += `\n출고처: [${matchedLocationName}] 자동 선택됨`;
+    }
+    if (matchedAdminName) {
+      msg += `\n요청자(관리자): [${matchedAdminName}] 자동 선택됨`;
     }
     alert(msg);
   } else {

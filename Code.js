@@ -901,27 +901,40 @@ function analyzeHandwrittenOrder(imageBase64) {
   }
 
   const apiKey = getGeminiApiKey();
-  const promptText = `Extract all handwritten table rows by strictly following the horizontal grid lines (rows).
+  const promptText = `Extract all handwritten order rows from the image. Support BOTH Form A (Printed grid table with columns) AND Form B (Free-form handwritten text with comma or dot delimiters).
 
 Rules:
-1. "branch": Branch/customer name written at the top header (e.g. "Aztecas", "CARMEN", "TIENDA", "CHINCONCUAC").
-2. "results": Each horizontal grid line that contains a quantity number is a SEPARATE row:
-   - "modelo": Text written in the 'modelo' column. If empty on that row line, return "".
-   - "color": Text written in the 'color' column. If empty on that row line, return "".
-   - "no_de_bultos": The integer quantity in the 'cant oder' column for that row line.
-   - "contenedor": Remarks if written, else "".
+1. Header Information:
+   - "branch": Branch/customer name written at the top header (e.g. "Aztecas", "CARMEN", "TIENDA", "CHINCONCUAC", "지점명"). If not found, return "".
+   - "requester": Order requester/admin name written at the top right, especially text that is UNDERLINED (e.g. text with an underline '___' like 'Sr. Kim', '요청자이름', or in parentheses). If not found, return "".
 
-IMPORTANT: Do NOT merge different horizontal lines!
-For example:
-- Line 1 has model 'L-AL165' and qty 5 -> {"modelo": "L-AL165", "color": "", "no_de_bultos": 5}
-- Line 2 has color 'Negro' and qty 2 -> {"modelo": "", "color": "Negro", "no_de_bultos": 2}
-- Line 3 has color 'Blanco' and qty 1 -> {"modelo": "", "color": "Blanco", "no_de_bultos": 1}
+2. Delimiters (for Form B free-form):
+   - ONLY commas (',') and dots ('.') are delimiters between fields.
+   - Spaces/whitespace are NEVER delimiters (preserve spaces in multi-word colors like "Palo Rosa", "Azul Marino" or models).
+
+3. Row Parsing Rules:
+   - Each row line containing a quantity is a separate entry:
+     - 3 fields format: [modelo] ,/. [color] ,/. [quantity]
+     - Color empty/blank (e.g. [modelo] , , [qty] OR [modelo] .. [qty]): return {"modelo": "...", "color": "", "no_de_bultos": qty}
+     - Model empty/blank (Option 1: [empty] , [color] , [qty] OR Option 2: [color] , [qty]):
+       If the row starts with empty delimiter or only has a color word and quantity, return {"modelo": "", "color": "color_name", "no_de_bultos": qty}
+   - Form A (Grid table rows):
+     - "modelo": Text written in the 'modelo' column. If empty on that row line, return "".
+     - "color": Text written in the 'color' column. If empty on that row line, return "".
+     - "no_de_bultos": The integer quantity in the 'cant oder' column for that row line.
+     - "contenedor": Remarks if written, else "".
+
+4. IMPORTANT:
+   - Do NOT merge different rows!
+   - For quantities, extract only the positive integer number (e.g. "./ 1" or ". 1" is 1).
 
 Return ONLY valid JSON:
 {
   "branch": "...",
+  "requester": "...",
   "results": [
-    {"modelo": "...", "color": "...", "no_de_bultos": 1}
+    {"modelo": "P-D60", "color": "Blanco", "no_de_bultos": 2},
+    {"modelo": "", "color": "Beige", "no_de_bultos": 1}
   ]
 }`;
 
