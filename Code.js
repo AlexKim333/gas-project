@@ -65,6 +65,57 @@ function formatDate(date) {
   return Utilities.formatDate(date, tz, 'yyyy/MM/dd');
 }
 
+/**
+ * 시트의 남은 행 수를 검사하여, 데이터가 넘치기 전(여유 50행 미만)에 자동으로 1,000행씩 확장
+ * @param {GoogleAppsScript.Spreadsheet.Sheet} sheet 대상 시트
+ * @param {number} neededRow 새로 기록할 마지막 행 번호 (1-based)
+ */
+function ensureSheetCapacity(sheet, neededRow) {
+  if (!sheet) return;
+  const maxRows = sheet.getMaxRows();
+  if (neededRow > maxRows - 50) {
+    const rowsToAdd = Math.max(1000, (neededRow - maxRows) + 500);
+    sheet.insertRowsAfter(maxRows, rowsToAdd);
+    console.log(`[용량자동확장] ${sheet.getName()} 시트에 행이 부족하여 ${rowsToAdd}개 행을 자동 추가했습니다. (총 ${sheet.getMaxRows()}행)`);
+  }
+}
+
+/**
+ * 스프레드시트 내 모든 시트의 여유 행을 점검하고 100행 미만이면 1,000행씩 선제 확장
+ */
+function ensureAllSheetsCapacity() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheets = ss.getSheets();
+  let expandedCount = 0;
+
+  sheets.forEach(sheet => {
+    try {
+      const lastRow = sheet.getLastRow();
+      const maxRows = sheet.getMaxRows();
+      if (maxRows - lastRow < 100) {
+        sheet.insertRowsAfter(maxRows, 1000);
+        expandedCount++;
+        console.log(`[전체점검] ${sheet.getName()} 시트에 1,000행을 선제 추가했습니다 (총 ${sheet.getMaxRows()}행).`);
+      }
+    } catch (e) {
+      console.warn(`[전체점검] ${sheet.getName()} 점검 중 오류: ${e.message}`);
+    }
+  });
+
+  return expandedCount;
+}
+
+function promptEnsureAllSheetsCapacity() {
+  const ui = SpreadsheetApp.getUi();
+  const count = ensureAllSheetsCapacity();
+  if (count > 0) {
+    ui.alert('용량 확보 완료', `${count}개 시트에 1,000행씩 여유 공간을 자동으로 확보했습니다.`, ui.ButtonSet.OK);
+  } else {
+    ui.alert('용량 점검 완료', '모든 시트에 충분한 여유 공간(100행 이상)이 이미 확보되어 있습니다.', ui.ButtonSet.OK);
+  }
+}
+
+
 function getDropdownData(sheetName, column) {
   const sheet = getSheet(sheetName);
   const lastRow = sheet.getLastRow();
@@ -296,6 +347,7 @@ function registerProduct(tableData) {
     // 신규 행만 시트 끝에 일괄 추가 (sheet.clear() 호출 절대 안 함)
     if (newRows.length > 0) {
       const targetStartRow = Math.max(lastRow + 1, 2);
+      ensureSheetCapacity(sheet, targetStartRow + newRows.length - 1);
       sheet.getRange(targetStartRow, 1, newRows.length, 8).setValues(newRows);
     }
 
@@ -455,6 +507,7 @@ function processForm(tableData, mode, admin) {
     ]);
 
     if (updatedStockRows.length > 0) {
+      ensureSheetCapacity(stockSheet, 2 + updatedStockRows.length - 1);
       stockSheet.getRange(2, 1, updatedStockRows.length, 8).setValues(updatedStockRows);
       if (stockLastRow - 1 > updatedStockRows.length) {
         stockSheet.getRange(2 + updatedStockRows.length, 1, (stockLastRow - 1) - updatedStockRows.length, 8).clearContent();
@@ -463,6 +516,7 @@ function processForm(tableData, mode, admin) {
 
     // 6. PendingSheet 일괄 쓰기
     const pendingLastRow = pendingSheet.getLastRow();
+    ensureSheetCapacity(pendingSheet, pendingLastRow + pendingRows.length);
     pendingSheet.getRange(pendingLastRow + 1, 1, pendingRows.length, 11).setValues(pendingRows);
 
     console.log(`processForm 완료: ${invoiceNumber} (${typeKorean} ${pendingRows.length}건)`);
@@ -566,6 +620,7 @@ function updateStockSheet(tableData, mode) {
     ]);
 
     if (updatedData.length > 0) {
+      ensureSheetCapacity(sheet, 2 + updatedData.length - 1);
       sheet.getRange(2, 1, updatedData.length, 8).setValues(updatedData);
       if (lastRow - 1 > updatedData.length) {
         sheet.getRange(2 + updatedData.length, 1, (lastRow - 1) - updatedData.length, 8).clearContent();
@@ -788,6 +843,7 @@ function updatePendingRecords(invoiceNumber, type, newRecords, admin) {
     ]);
 
     if (updatedStockRows.length > 0) {
+      ensureSheetCapacity(stockSheet, 2 + updatedStockRows.length - 1);
       stockSheet.getRange(2, 1, updatedStockRows.length, 8).setValues(updatedStockRows);
       if (stockLastRow - 1 > updatedStockRows.length) {
         stockSheet.getRange(2 + updatedStockRows.length, 1, (stockLastRow - 1) - updatedStockRows.length, 8).clearContent();
@@ -797,6 +853,7 @@ function updatePendingRecords(invoiceNumber, type, newRecords, admin) {
     // B. PendingSheet 일괄 갱신 (deleteRow 루프 완전 배제)
     const finalPendingRows = keptPendingRows.concat(createdPendingRows);
     if (finalPendingRows.length > 0) {
+      ensureSheetCapacity(pendingSheet, 2 + finalPendingRows.length - 1);
       pendingSheet.getRange(2, 1, finalPendingRows.length, 11).setValues(finalPendingRows);
     }
     if (pendingLastRow - 1 > finalPendingRows.length) {
@@ -823,8 +880,16 @@ function onOpen() {
     .addItem('상품등록', 'showAppProduct')
     .addItem('검색수정', 'showSearchModify')
     .addSeparator()
+    .addItem('📦 모든 시트 용량 점검 (1,000행 자동확보)', 'promptEnsureAllSheetsCapacity')
     .addItem('🔑 Gemini API 키 설정', 'promptSetGeminiApiKey')
     .addToUi();
+
+  // 스프레드시트 열릴 때 모든 시트 용량을 선제 점검하여 100행 미만이면 자동 1,000행 확장
+  try {
+    ensureAllSheetsCapacity();
+  } catch (e) {
+    console.warn(`onOpen 자동 용량 점검 중 예외: ${e.message}`);
+  }
 }
 
 function promptSetGeminiApiKey() {
@@ -1111,12 +1176,14 @@ function processQuickStockAdjustment(adjustments, admin) {
     ]);
 
     if (updatedStockRows.length > 0) {
+      ensureSheetCapacity(stockSheet, 2 + updatedStockRows.length - 1);
       stockSheet.getRange(2, 1, updatedStockRows.length, 8).setValues(updatedStockRows);
     }
 
     // 4. PendingSheet 에 '재고조정' 행 일괄 추가
     if (pendingRows.length > 0) {
       const pLastRow = Math.max(pendingSheet.getLastRow() + 1, 2);
+      ensureSheetCapacity(pendingSheet, pLastRow + pendingRows.length - 1);
       pendingSheet.getRange(pLastRow, 1, pendingRows.length, 11).setValues(pendingRows);
     }
 
