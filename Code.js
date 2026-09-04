@@ -822,7 +822,32 @@ function onOpen() {
     .addItem('출고입력', 'showAppOut')
     .addItem('상품등록', 'showAppProduct')
     .addItem('검색수정', 'showSearchModify')
+    .addSeparator()
+    .addItem('🔑 Gemini API 키 설정', 'promptSetGeminiApiKey')
     .addToUi();
+}
+
+function promptSetGeminiApiKey() {
+  const ui = SpreadsheetApp.getUi();
+  const props = PropertiesService.getScriptProperties();
+  const currentKey = props.getProperty('GEMINI_API_KEY') || '';
+  const maskedKey = currentKey ? (currentKey.slice(0, 8) + '...' + currentKey.slice(-4)) : '미등록';
+
+  const response = ui.prompt(
+    'Gemini API 키 설정',
+    '현재 등록 상태: ' + maskedKey + '\n\n새로운 Gemini API 키를 입력하세요:',
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (response.getSelectedButton() === ui.Button.OK) {
+    const newKey = response.getResponseText().trim();
+    if (newKey) {
+      props.setProperty('GEMINI_API_KEY', newKey);
+      ui.alert('설정 완료', 'GEMINI_API_KEY가 안전하게 스크립트 속성에 저장되었습니다.', ui.ButtonSet.OK);
+    } else {
+      ui.alert('안내', '입력된 키가 없어 변경되지 않았습니다.', ui.ButtonSet.OK);
+    }
+  }
 }
 
 function showSearchModify() {
@@ -858,13 +883,9 @@ function showApp(type, pendingData = null) {
 
 function getGeminiApiKey() {
   const props = PropertiesService.getScriptProperties();
-  let key = props.getProperty('GEMINI_API_KEY');
+  const key = props.getProperty('GEMINI_API_KEY');
   if (!key) {
-    try {
-      key = Utilities.newBlob(Utilities.base64Decode('QVEuQWI4Uk42S1NMRHBWcXJfTVlPVjhyNDV6R2gyRTBpbFJVTldJN1hFMVZ1b3AzbnlBZ0E=')).getDataAsString();
-    } catch (e) {
-      key = '';
-    }
+    throw new Error('GEMINI_API_KEY 스크립트 속성이 설정되지 않았습니다. Apps Script 프로젝트 설정(스크립트 속성)에 GEMINI_API_KEY를 등록해주세요.');
   }
   return key;
 }

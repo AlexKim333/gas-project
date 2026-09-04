@@ -1,5 +1,10 @@
-﻿# Clasp credentials (DO NOT COMMIT)
+# Clasp credentials (DO NOT COMMIT)
 .clasprc.json
+
+# Environment variables
+.env
+.env.*
+*.env
 
 # OS / Editor files
 Thumbs.db
