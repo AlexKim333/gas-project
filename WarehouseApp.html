@@ -4441,6 +4441,16 @@ function openSubWarehouseMatrixModal() {
   modal.style.display = 'flex';
   if (overlay) overlay.style.display = 'block';
 
+  // 구글 시트 다이얼로그 자체를 모니터 크기 최대치로 동적 확장
+  if (window.google && google.script && google.script.host) {
+    try {
+      const sw = Math.min((window.screen && window.screen.availWidth ? window.screen.availWidth - 20 : 1850), 1880);
+      const sh = Math.min((window.screen && window.screen.availHeight ? window.screen.availHeight - 40 : 980), 1020);
+      google.script.host.setWidth(sw);
+      google.script.host.setHeight(sh);
+    } catch (e) {}
+  }
+
   // 캐시된 데이터가 있으면 먼저 즉시 렌더링하고 백그라운드 갱신
   if (subWhMatrixData) {
     updateTruckGauges();
