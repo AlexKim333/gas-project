@@ -1559,7 +1559,7 @@
           <div class="loading-spinner" style="border-top-color: #0d9488; margin-bottom: 10px;"></div>
           <span>8개 서브창고 실시간 재고 & PENDING 이동수량 로딩 중...</span>
         </div>
-        <table id="subWhTable" style="display: none; min-width: 1200px; width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0; font-size: 8.5pt;">
+        <table id="subWhTable" style="display: none; width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0; font-size: 8.5pt;">
           <thead id="subWhThead"></thead>
           <tbody id="subWhTbody"></tbody>
         </table>
@@ -4639,15 +4639,16 @@ function renderSubWhTable(items, cartKeyMap) {
 
   const warehouses = subWhMatrixData.warehouses || [];
 
-  // 1. colgroup 및 헤더 구성 (풀스크린 최적화: 고정 5열 + 8대 서브창고 균등 확장)
+  // 1. colgroup 및 헤더 구성 (풀스크린 최적화: 고정 5열 + 8대 서브창고 균등 분배)
+  // 고정폭: 품명(125) + 색상(75) + 메인(70) + 이동(65) + 유효(75) = 410px
   let colgroupHtml = `
     <colgroup>
-      <col style="width: 150px;">
-      <col style="width: 95px;">
-      <col style="width: 90px;">
-      <col style="width: 90px;">
-      <col style="width: 95px;">
-      ${warehouses.map(() => '<col style="min-width: 85px;">').join('')}
+      <col style="width: 125px;">
+      <col style="width: 75px;">
+      <col style="width: 70px;">
+      <col style="width: 65px;">
+      <col style="width: 75px;">
+      ${warehouses.map(() => '<col style="width: auto;">').join('')}
     </colgroup>
   `;
 
@@ -4657,13 +4658,13 @@ function renderSubWhTable(items, cartKeyMap) {
   table.insertAdjacentHTML('afterbegin', colgroupHtml);
 
   thead.innerHTML = `
-    <tr style="position: sticky; top: 0; z-index: 20; background: #0f172a; font-size: 8.5pt; text-align: center;">
-      <th style="padding: 8px 6px; position: sticky; left: 0; z-index: 25; background: #0f172a !important; color: #ffffff !important; width: 150px; min-width: 150px; max-width: 150px; text-align: left; border-right: 1px solid #334155; font-weight: 700;">품명</th>
-      <th style="padding: 8px 6px; position: sticky; left: 150px; z-index: 25; background: #0f172a !important; color: #ffffff !important; width: 95px; min-width: 95px; max-width: 95px; border-right: 1.5px solid #475569; font-weight: 700;">색상</th>
-      <th style="padding: 8px 6px; position: sticky; left: 245px; z-index: 25; background: #1e3a8a !important; color: #93c5fd !important; width: 90px; min-width: 90px; max-width: 90px; border-right: 1px solid #3b82f6; font-weight: 700;">🏢 메인실재고</th>
-      <th style="padding: 8px 6px; position: sticky; left: 335px; z-index: 25; background: #1e3a8a !important; color: #fdba74 !important; width: 90px; min-width: 90px; max-width: 90px; border-right: 1px solid #3b82f6; font-weight: 700;">🚚 이동중</th>
-      <th style="padding: 8px 6px; position: sticky; left: 425px; z-index: 25; background: #1e3a8a !important; color: #86efac !important; width: 95px; min-width: 95px; max-width: 95px; border-right: 2.5px solid #0d9488; font-weight: 700;">⭐ 유효재고</th>
-      ${warehouses.map(wh => `<th style="padding: 8px 4px; background: #134e4a !important; color: #ccfbf1 !important; border-right: 1px solid #0f766e; font-weight: 700; text-align: center; white-space: nowrap; font-size: 8.8pt;">${wh}</th>`).join('')}
+    <tr style="position: sticky; top: 0; z-index: 20; background: #0f172a; font-size: 8.3pt; text-align: center;">
+      <th style="padding: 7px 4px; position: sticky; left: 0; z-index: 25; background: #0f172a !important; color: #ffffff !important; width: 125px; min-width: 125px; max-width: 125px; text-align: left; border-right: 1px solid #334155; font-weight: 700;">품명</th>
+      <th style="padding: 7px 4px; position: sticky; left: 125px; z-index: 25; background: #0f172a !important; color: #ffffff !important; width: 75px; min-width: 75px; max-width: 75px; border-right: 1.5px solid #475569; font-weight: 700;">색상</th>
+      <th style="padding: 7px 2px; position: sticky; left: 200px; z-index: 25; background: #1e3a8a !important; color: #93c5fd !important; width: 70px; min-width: 70px; max-width: 70px; border-right: 1px solid #3b82f6; font-weight: 700; font-size: 7.8pt;">🏢메인실재고</th>
+      <th style="padding: 7px 2px; position: sticky; left: 270px; z-index: 25; background: #1e3a8a !important; color: #fdba74 !important; width: 65px; min-width: 65px; max-width: 65px; border-right: 1px solid #3b82f6; font-weight: 700; font-size: 7.8pt;">🚚이동중</th>
+      <th style="padding: 7px 2px; position: sticky; left: 335px; z-index: 25; background: #1e3a8a !important; color: #86efac !important; width: 75px; min-width: 75px; max-width: 75px; border-right: 2px solid #0d9488; font-weight: 700; font-size: 7.8pt;">⭐유효재고</th>
+      ${warehouses.map(wh => `<th style="padding: 7px 2px; background: #134e4a !important; color: #ccfbf1 !important; border-right: 1px solid #0f766e; font-weight: 700; text-align: center; white-space: nowrap; font-size: 8.2pt;">${wh}</th>`).join('')}
     </tr>
   `;
 
@@ -4704,38 +4705,38 @@ function renderSubWhTable(items, cartKeyMap) {
 
     html += `<tr style="background: ${rowBg}; border-bottom: 1px solid #e2e8f0;">`;
 
-    // 1. 품명 (Sticky 0px, width 150px)
+    // 1. 품명 (Sticky 0px, width 125px)
     html += `
-      <td style="padding: 6px 8px; position: sticky; left: 0; z-index: 10; background: ${stickyBg}; width: 150px; min-width: 150px; max-width: 150px; border-right: 1px solid #e2e8f0; font-weight: 700; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+      <td style="padding: 5px 6px; position: sticky; left: 0; z-index: 10; background: ${stickyBg}; width: 125px; min-width: 125px; max-width: 125px; border-right: 1px solid #e2e8f0; font-weight: 700; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 8.2pt;">
         ${item.codigo}
-        ${isNeeded ? `<span style="display: inline-block; margin-left: 4px; font-size: 7.2pt; background: #f59e0b; color: #ffffff; padding: 1px 5px; border-radius: 3px; font-weight: bold;">발주필요:${neededQty}</span>` : ''}
+        ${isNeeded ? `<span style="display: inline-block; margin-left: 3px; font-size: 6.8pt; background: #f59e0b; color: #ffffff; padding: 1px 4px; border-radius: 3px; font-weight: bold;">필요:${neededQty}</span>` : ''}
       </td>
     `;
 
-    // 2. 색상 (Sticky 150px, width 95px)
+    // 2. 색상 (Sticky 125px, width 75px)
     html += `
-      <td style="padding: 6px 8px; position: sticky; left: 150px; z-index: 10; background: ${stickyBg}; width: 95px; min-width: 95px; max-width: 95px; border-right: 1.5px solid #cbd5e1; text-align: center; color: #475569; white-space: nowrap;">
+      <td style="padding: 5px 4px; position: sticky; left: 125px; z-index: 10; background: ${stickyBg}; width: 75px; min-width: 75px; max-width: 75px; border-right: 1.5px solid #cbd5e1; text-align: center; color: #475569; white-space: nowrap; font-size: 8pt; overflow: hidden; text-overflow: ellipsis;">
         ${item.color}
       </td>
     `;
 
-    // 3. 메인 실재고 (Sticky 245px, width 90px)
+    // 3. 메인 실재고 (Sticky 200px, width 70px)
     html += `
-      <td style="padding: 6px 8px; position: sticky; left: 245px; z-index: 10; background: ${isNeeded ? '#fef3c7' : '#f0f9ff'}; width: 90px; min-width: 90px; max-width: 90px; border-right: 1px solid #bfdbfe; text-align: right; font-weight: bold; color: ${item.mainStock > 0 ? '#0284c7' : '#94a3b8'};">
+      <td style="padding: 5px 6px; position: sticky; left: 200px; z-index: 10; background: ${isNeeded ? '#fef3c7' : '#f0f9ff'}; width: 70px; min-width: 70px; max-width: 70px; border-right: 1px solid #bfdbfe; text-align: right; font-weight: bold; color: ${item.mainStock > 0 ? '#0284c7' : '#94a3b8'}; font-size: 8.2pt;">
         ${item.mainStock}
       </td>
     `;
 
-    // 4. 이동중 (PENDING) (Sticky 335px, width 90px)
+    // 4. 이동중 (PENDING) (Sticky 270px, width 65px)
     html += `
-      <td style="padding: 6px 8px; position: sticky; left: 335px; z-index: 10; background: ${isNeeded ? '#fef3c7' : '#fff7ed'}; width: 90px; min-width: 90px; max-width: 90px; border-right: 1px solid #fed7aa; text-align: right; font-weight: bold; color: ${item.inTransit > 0 ? '#ea580c' : '#cbd5e1'};">
+      <td style="padding: 5px 6px; position: sticky; left: 270px; z-index: 10; background: ${isNeeded ? '#fef3c7' : '#fff7ed'}; width: 65px; min-width: 65px; max-width: 65px; border-right: 1px solid #fed7aa; text-align: right; font-weight: bold; color: ${item.inTransit > 0 ? '#ea580c' : '#cbd5e1'}; font-size: 8.2pt;">
         ${item.inTransit > 0 ? `+${item.inTransit}` : '-'}
       </td>
     `;
 
-    // 5. 유효재고 (Sticky 425px, width 95px)
+    // 5. 유효재고 (Sticky 335px, width 75px)
     html += `
-      <td style="padding: 6px 8px; position: sticky; left: 425px; z-index: 10; background: ${isNeeded ? '#fef3c7' : '#f0fdf4'}; width: 95px; min-width: 95px; max-width: 95px; border-right: 2.5px solid #0d9488; text-align: right; font-weight: 800; color: ${item.effectiveStock > 0 ? '#15803d' : '#ef4444'};">
+      <td style="padding: 5px 6px; position: sticky; left: 335px; z-index: 10; background: ${isNeeded ? '#fef3c7' : '#f0fdf4'}; width: 75px; min-width: 75px; max-width: 75px; border-right: 2px solid #0d9488; text-align: right; font-weight: 800; color: ${item.effectiveStock > 0 ? '#15803d' : '#ef4444'}; font-size: 8.2pt;">
         ${item.effectiveStock}
       </td>
     `;
@@ -4748,16 +4749,16 @@ function renderSubWhTable(items, cartKeyMap) {
 
       if (stock > 0) {
         html += `
-          <td style="padding: 4px 6px; text-align: center; border-right: 1px solid #e2e8f0;">
-            <button type="button" onclick="onSubWhCellClick(${itemIdx}, '${wh}', ${stock})" style="width: 100%; min-height: 28px; padding: 4px 2px; background: ${draftedQty > 0 ? '#dbeafe' : '#ccfbf1'}; border: 1.5px solid ${draftedQty > 0 ? '#3b82f6' : '#2dd4bf'}; border-radius: 5px; font-weight: 800; color: ${draftedQty > 0 ? '#1d4ed8' : '#0f766e'}; cursor: pointer; font-size: 8.8pt; transition: all 0.15s ease;" title="${wh} 창고: 클릭하여 발주 수량 입력">
+          <td style="padding: 3px 4px; text-align: center; border-right: 1px solid #e2e8f0;">
+            <button type="button" onclick="onSubWhCellClick(${itemIdx}, '${wh}', ${stock})" style="width: 100%; min-height: 26px; padding: 3px 2px; background: ${draftedQty > 0 ? '#dbeafe' : '#ccfbf1'}; border: 1.5px solid ${draftedQty > 0 ? '#3b82f6' : '#2dd4bf'}; border-radius: 4px; font-weight: 800; color: ${draftedQty > 0 ? '#1d4ed8' : '#0f766e'}; cursor: pointer; font-size: 8.3pt; transition: all 0.15s ease;" title="${wh} 창고: 클릭하여 발주 수량 입력">
               ${stock}
-              ${draftedQty > 0 ? `<div style="font-size: 7.2pt; color: #1e40af; font-weight: 900; margin-top: 1px;">담김: ${draftedQty}</div>` : ''}
+              ${draftedQty > 0 ? `<div style="font-size: 7pt; color: #1e40af; font-weight: 900; margin-top: 1px;">담김:${draftedQty}</div>` : ''}
             </button>
           </td>
         `;
       } else {
         html += `
-          <td style="padding: 4px 6px; text-align: center; color: #cbd5e1; font-size: 8.5pt; border-right: 1px solid #f1f5f9;">
+          <td style="padding: 3px 4px; text-align: center; color: #cbd5e1; font-size: 8.2pt; border-right: 1px solid #f1f5f9;">
             -
           </td>
         `;
