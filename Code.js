@@ -880,7 +880,7 @@ const SUB_WAREHOUSE_CONFIG = {
 
 function getSubWarehouseStockMatrix(forceRefresh) {
   const cache = CacheService.getScriptCache();
-  const cacheKey = 'SUB_WH_MATRIX_V2';
+  const cacheKey = 'SUB_WH_MATRIX_V3';
 
   if (!forceRefresh) {
     const cached = cache.get(cacheKey);
@@ -1008,7 +1008,7 @@ function getSubWarehouseStockMatrix(forceRefresh) {
       }
     }
 
-    // C. 메인창고 실재고(Main Stock) 매핑
+    // C. 메인창고 실재고(Main Stock) 및 안전재고(Safe Stock) 매핑
     const mainStockMap = {};
     try {
       const mainStockSheet = getSheet(SHEETS.STOCK);
@@ -1018,9 +1018,14 @@ function getSubWarehouseStockMatrix(forceRefresh) {
         const mName = normalizeText(mRow[0]);
         const mColor = normalizeText(mRow[1]) || DEFAULTS.COLOR;
         const mBox = normalizeNumber(mRow[2]);
+        const mSafe = normalizeNumber(mRow[4]);
         if (mName) {
           const mKey = `${mName}___${mColor}`.toUpperCase();
-          mainStockMap[mKey] = (mainStockMap[mKey] || 0) + mBox;
+          if (!mainStockMap[mKey]) {
+            mainStockMap[mKey] = { stock: 0, safeStock: 0 };
+          }
+          mainStockMap[mKey].stock += mBox;
+          mainStockMap[mKey].safeStock = Math.max(mainStockMap[mKey].safeStock, mSafe);
         }
       }
     } catch (e) {
@@ -1048,7 +1053,9 @@ function getSubWarehouseStockMatrix(forceRefresh) {
         totalSubStock += qty;
       });
 
-      const mainStock = mainStockMap[key] || 0;
+      const mainInfo = mainStockMap[key] || { stock: 0, safeStock: 0 };
+      const mainStock = mainInfo.stock;
+      const safeStock = mainInfo.safeStock;
       const inTransit = inTransitMap[key] || 0;
       const effectiveStock = mainStock + inTransit;
 
@@ -1056,6 +1063,7 @@ function getSubWarehouseStockMatrix(forceRefresh) {
         codigo: codigo,
         color: color,
         mainStock: mainStock,
+        safeStock: safeStock,
         inTransit: inTransit,
         effectiveStock: effectiveStock,
         stocks: stocks,
