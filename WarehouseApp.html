@@ -4006,8 +4006,8 @@ function extractColorAndBase(text) {
  * 3) 품명이 완전 빈칸인 경우: 앞 품명 전체를 그대로 계승
  */
 function resolveDerivedModelName(rawModel, lastModel) {
-  const cur = (rawModel || '').trim();
-  const prev = (lastModel || '').trim();
+  const cur = (rawModel || '').replace(/[.,;:]+$/, '').trim();
+  const prev = (lastModel || '').replace(/[.,;:]+$/, '').trim();
 
   if (!cur) return prev;
   if (!prev) return cur;
@@ -4016,7 +4016,7 @@ function resolveDerivedModelName(rawModel, lastModel) {
   // 또는 앞선 품명이 숫자로 끝나는데 알파벳 1글자가 온 경우 (예: prev = "CK928", cur = "B" -> "CK928B")
   if (/^[A-Za-z]$/.test(cur)) {
     const curUpper = cur.toUpperCase();
-    // Case A: 앞 품명이 알파벳으로 끝나는 경우 (예: CECIK999C, CK928A) -> 마지막 글자 치환
+    // Case A: 앞 품명이 알파벳으로 끝나는 경우 (예: CECIK999C, CK928A) -> 마지막 알파벳 치환
     if (/[A-Za-z]$/.test(prev) && prev.length > 1) {
       const stem = prev.slice(0, -1);
       return stem + curUpper;
@@ -4110,16 +4110,25 @@ function findBestCatalogMatch(query, catalog, threshold = 0.55) {
   let best = null;
   let maxScore = 0;
 
-  // 1단계: 품명(name) 완전 일치 우선 검사 (예: query = "CECIK999D", item.name = "CECIK999D")
+  // 1단계: 품명(name) 완전 일치 또는 접두사 일치 최우선 검사 (색상이 붙어있는 복합 쿼리 지원)
   const qClean = q.replace(/[\s_\-]/g, '').toLowerCase();
+  let bestPrefixMatch = null;
+  let maxPrefixLen = 0;
+
   for (let i = 0; i < catalog.length; i++) {
     const item = catalog[i];
     const nameClean = (item.name || '').replace(/[\s_\-]/g, '').toLowerCase();
-    if (nameClean === qClean || qClean.startsWith(nameClean) || nameClean.startsWith(qClean)) {
-      if (nameClean === qClean) {
-        return { item: item, score: 1.0 };
-      }
+    if (nameClean === qClean) {
+      return { item: item, score: 1.0 };
     }
+    if (qClean.startsWith(nameClean) && nameClean.length > maxPrefixLen) {
+      maxPrefixLen = nameClean.length;
+      bestPrefixMatch = item;
+    }
+  }
+
+  if (bestPrefixMatch && maxPrefixLen >= 3) {
+    return { item: bestPrefixMatch, score: 1.0 };
   }
 
   // 2단계: Gestalt SequenceMatcher 유사도 검사
@@ -4277,8 +4286,9 @@ function onHandwrittenExtracted(data) {
 
   const activeLocation = currentLocEl ? currentLocEl.value : '';
 
-  // 2. Forward-Fill 및 색상 정규화 파이프라인
+  // 2. Forward-Fill 및 색상 정규화 파이프라인 (전자동 델타 매칭 엔진)
   let lastBaseModel = '';
+  let lastItemInfo = null;
   let addedCount = 0;
   const newRecords = [];
 
@@ -4286,7 +4296,13 @@ function onHandwrittenExtracted(data) {
     let rawModel = String(r.modelo || '').trim();
     let rawColor = String(r.color || '').trim();
 
-    // [2중 안전망] 단독 색상 감별: 만약 rawColor가 비어있고 rawModel이 알려진 색상 단독인 경우
+    // 1. 단독 알파벳(D, E, G, H...) 또는 2~4자리 숫자(960...)가 color 필드로 잘못 들어온 경우 모델명으로 자동 복구
+    if (!rawModel && (/^[A-Za-z]$/.test(rawColor) || /^\d{2,4}$/.test(rawColor))) {
+      rawModel = rawColor;
+      rawColor = '';
+    }
+
+    // 2. [2중 안전망] 단독 색상 감별: 만약 rawColor가 비어있고 rawModel이 알려진 색상 단독인 경우
     if (!rawColor && rawModel) {
       const normM = normalizeColor(rawModel);
       const upM = normM.toUpperCase().replace(/[,.-/]/g, '').trim();
@@ -4296,39 +4312,81 @@ function onHandwrittenExtracted(data) {
       }
     }
 
-    let { base, color } = extractColorAndBase(rawModel);
-
-    if (rawColor) {
-      let ext = extractColorAndBase(rawColor);
-      color = ext.color || normalizeColor(rawColor);
-    }
-
-    // 🏭 [접미사 치환 및 Forward-fill 알고리즘 적용]
-    // 만약 base가 단일 알파벳(D, E, G, H...)이거나 숫자(960, 961...)이면 앞 모델명(lastBaseModel)의 접미사를 치환
-    if (base) {
-      base = resolveDerivedModelName(base, lastBaseModel);
-    } else {
-      base = lastBaseModel;
-    }
-
-    if (!color) color = 'SURTIDO';
-
     let qty = parseInt(r.no_de_bultos || r.cant_oder || r.cantidad || 0, 10);
     if (isNaN(qty) || qty <= 0) return;
 
-    // 파이썬 MasterMatcher와 100% 동일: f"{base_model} {color}" 조합 쿼리 생성
-    const combinedQuery = base ? `${base} ${color}`.trim() : color;
+    let finalItemName = '';
+    let finalColor = '';
+    let finalBoxContent = 0;
 
-    // 전체 마스터 테이블(stockDataCache)을 대상으로 SequenceMatcher 대조 수행
-    const matchRes = findBestCatalogMatch(combinedQuery, stockDataCache, 0.55);
+    const isSingleAlpha = /^[A-Za-z]$/.test(rawModel);
+    const isNumericSuffix = /^\d{2,4}$/.test(rawModel);
+    const isDeltaSuffix = isSingleAlpha || isNumericSuffix;
 
-    const finalItemName = matchRes ? matchRes.item.name : base;
-    const finalColor = matchRes ? matchRes.item.color : color;
-    const finalBoxContent = matchRes ? matchRes.item.boxContent : 0;
+    if (lastBaseModel && isDeltaSuffix) {
+      // 🏭 [전자동 델타 매칭 엔진]
+      // 앞 모델명(lastBaseModel)에서 접미사를 치환하여 새 파생 모델명 생성 (예: CECIK999C -> CECIK999D)
+      const derivedModel = resolveDerivedModelName(rawModel, lastBaseModel);
+      const cleanDerived = derivedModel.replace(/[\s_\-]/g, '').toUpperCase();
 
-    // 다음 행의 접미사 치환 기준이 되도록 베이스 모델명 업데이트
-    if (finalItemName) {
+      // 마스터 카탈로그에서 derivedModel과 100% 품명 일치하는 품목 탐색
+      const exactMaster = (stockDataCache || []).find(it => 
+        (it.name || '').replace(/[\s_\-]/g, '').toUpperCase() === cleanDerived
+      );
+
+      if (exactMaster) {
+        finalItemName = exactMaster.name;
+        finalColor = (rawColor && rawColor !== 'SURTIDO') ? normalizeColor(rawColor) : (exactMaster.color || 'SURTIDO');
+        finalBoxContent = exactMaster.boxContent;
+        lastItemInfo = exactMaster;
+      } else {
+        // 마스터에 아직 미등록된 파생 품목인 경우:
+        // ⚠️ 절대 다른 형제 품목(CECIK999C 등)으로 퍼지 매칭하지 않고 파생 모델명을 그대로 보존!
+        finalItemName = derivedModel;
+        finalColor = rawColor ? normalizeColor(rawColor) : 'SURTIDO';
+        finalBoxContent = lastItemInfo ? lastItemInfo.boxContent : 0;
+      }
       lastBaseModel = finalItemName;
+    } else if (lastBaseModel && !rawModel) {
+      // 🏭 품명이 비어있는 경우: 앞선 품명 계승 (Forward-fill)
+      const targetColor = rawColor ? normalizeColor(rawColor) : (lastItemInfo ? lastItemInfo.color : 'SURTIDO');
+      const cleanPrev = lastBaseModel.replace(/[\s_\-]/g, '').toUpperCase();
+
+      const exactMaster = (stockDataCache || []).find(it => 
+        (it.name || '').replace(/[\s_\-]/g, '').toUpperCase() === cleanPrev &&
+        (it.color || 'SURTIDO').toUpperCase() === targetColor.toUpperCase()
+      );
+
+      if (exactMaster) {
+        finalItemName = exactMaster.name;
+        finalColor = exactMaster.color || targetColor;
+        finalBoxContent = exactMaster.boxContent;
+        lastItemInfo = exactMaster;
+      } else {
+        finalItemName = lastBaseModel;
+        finalColor = targetColor;
+        finalBoxContent = lastItemInfo ? lastItemInfo.boxContent : 0;
+      }
+    } else {
+      // 🏭 새로운 독립 모델인 경우: 일반 추출 및 마스터 유사도 매칭
+      let { base, color } = extractColorAndBase(rawModel);
+      if (rawColor) {
+        let ext = extractColorAndBase(rawColor);
+        color = ext.color || normalizeColor(rawColor);
+      }
+      if (!color) color = 'SURTIDO';
+
+      const combinedQuery = base ? `${base} ${color}`.trim() : color;
+      const matchRes = findBestCatalogMatch(combinedQuery, stockDataCache, 0.55);
+
+      finalItemName = matchRes ? matchRes.item.name : (base || rawModel);
+      finalColor = matchRes ? matchRes.item.color : color;
+      finalBoxContent = matchRes ? matchRes.item.boxContent : 0;
+
+      if (finalItemName) {
+        lastBaseModel = finalItemName;
+        lastItemInfo = matchRes ? matchRes.item : null;
+      }
     }
 
     newRecords.push({

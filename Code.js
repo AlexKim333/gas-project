@@ -81,6 +81,18 @@ function ensureSheetCapacity(sheet, neededRow) {
 }
 
 /**
+ * 시트의 열(Column) 개수를 검사하여 필요한 최소 열 수를 확보
+ */
+function ensureSheetColumns(sheet, neededCols = 9) {
+  if (!sheet) return;
+  const maxCols = sheet.getMaxColumns();
+  if (maxCols < neededCols) {
+    sheet.insertColumnsAfter(maxCols, neededCols - maxCols);
+    console.log(`[열자동확장] ${sheet.getName()} 시트에 열이 부족하여 ${neededCols - maxCols}개 열을 자동 추가했습니다. (총 ${sheet.getMaxColumns()}열)`);
+  }
+}
+
+/**
  * 스프레드시트 내 모든 시트의 여유 행을 점검하고 100행 미만이면 1,000행씩 선제 확장
  */
 function ensureAllSheetsCapacity() {
@@ -158,14 +170,16 @@ function getStockData() {
   try {
     lock.waitLock(15000);
     const sheet = getSheet(SHEETS.STOCK);
+    ensureSheetColumns(sheet, 9);
     const lastRow = sheet.getLastRow();
     if (lastRow < 2) return [];
 
-    const data = sheet.getRange(2, 1, lastRow - 1, 8).getValues();
+    const data = sheet.getRange(2, 1, lastRow - 1, 9).getValues();
     const items = data.map(row => {
       const name = normalizeText(row[0]);
       const color = normalizeText(row[1]) || DEFAULTS.COLOR;
       const boxContent = normalizeNumber(row[5]);
+      const deltaVal = normalizeText(row[8]).toUpperCase();
       return {
         name: name,
         color: color,
@@ -175,6 +189,7 @@ function getStockData() {
         boxContent: boxContent,
         initialStock: normalizeNumber(row[6]),
         manufacturer: normalizeText(row[7]),
+        isDelta: row[8] === true || deltaVal === 'Y' || deltaVal === 'TRUE',
         key: makeKey(name, color, boxContent)
       };
     }).filter(item => item.name);
@@ -202,6 +217,7 @@ function getFilteredItemNames(searchText = '') {
     boxContent: 0,
     initialStock: 0,
     manufacturer: '',
+    isDelta: false,
     key: `기본품목_${DEFAULTS.COLOR}_0`
   }];
 }
@@ -303,12 +319,13 @@ function registerProduct(tableData) {
   try {
     lock.waitLock(20000);
     const sheet = getSheet(SHEETS.STOCK);
+    ensureSheetColumns(sheet, 9);
     const lastRow = sheet.getLastRow();
     
     // 기존 상품 맵 로드
     const stockMap = Object.create(null);
     if (lastRow >= 2) {
-      const data = sheet.getRange(2, 1, lastRow - 1, 8).getValues();
+      const data = sheet.getRange(2, 1, lastRow - 1, 9).getValues();
       data.forEach(row => {
         const name = normalizeText(row[0]);
         const color = normalizeText(row[1]) || DEFAULTS.COLOR;
@@ -331,6 +348,7 @@ function registerProduct(tableData) {
 
       const initialStock = Math.abs(normalizeNumber(record.initialStock));
       stockMap[key] = true;
+      const isDeltaVal = (record.isDelta === true || normalizeText(record.isDelta).toUpperCase() === 'Y' || normalizeText(record.isDelta).toUpperCase() === 'TRUE') ? 'Y' : '';
       newRows.push([
         name,
         color,
@@ -339,7 +357,8 @@ function registerProduct(tableData) {
         normalizeNumber(record.safeStock),
         boxContent,
         initialStock,
-        normalizeText(record.manufacturer)
+        normalizeText(record.manufacturer),
+        isDeltaVal
       ]);
       return { success: true, record };
     });
@@ -348,7 +367,7 @@ function registerProduct(tableData) {
     if (newRows.length > 0) {
       const targetStartRow = Math.max(lastRow + 1, 2);
       ensureSheetCapacity(sheet, targetStartRow + newRows.length - 1);
-      sheet.getRange(targetStartRow, 1, newRows.length, 8).setValues(newRows);
+      sheet.getRange(targetStartRow, 1, newRows.length, 9).setValues(newRows);
     }
 
     return results;
@@ -387,16 +406,18 @@ function processForm(tableData, mode, admin) {
     const todayStr = formatDate(new Date());
 
     // 1. 재고 데이터 맵 로드
+    ensureSheetColumns(stockSheet, 9);
     const stockLastRow = stockSheet.getLastRow();
     const stockMap = Object.create(null);
 
     if (stockLastRow >= 2) {
-      const stockData = stockSheet.getRange(2, 1, stockLastRow - 1, 8).getValues();
+      const stockData = stockSheet.getRange(2, 1, stockLastRow - 1, 9).getValues();
       stockData.forEach(row => {
         const name = normalizeText(row[0]);
         const color = normalizeText(row[1]) || DEFAULTS.COLOR;
         const boxContent = normalizeNumber(row[5]);
         const key = makeKey(name, color, boxContent);
+        const deltaVal = normalizeText(row[8]).toUpperCase();
         stockMap[key] = {
           name: name,
           color: color,
@@ -405,7 +426,8 @@ function processForm(tableData, mode, admin) {
           safeStock: normalizeNumber(row[4]),
           boxContent: boxContent,
           initialStock: normalizeNumber(row[6]),
-          manufacturer: normalizeText(row[7])
+          manufacturer: normalizeText(row[7]),
+          isDelta: row[8] === true || deltaVal === 'Y' || deltaVal === 'TRUE'
         };
       });
     }
@@ -503,14 +525,15 @@ function processForm(tableData, mode, admin) {
       v.safeStock,
       v.boxContent,
       v.initialStock,
-      v.manufacturer
+      v.manufacturer,
+      v.isDelta ? 'Y' : ''
     ]);
 
     if (updatedStockRows.length > 0) {
       ensureSheetCapacity(stockSheet, 2 + updatedStockRows.length - 1);
-      stockSheet.getRange(2, 1, updatedStockRows.length, 8).setValues(updatedStockRows);
+      stockSheet.getRange(2, 1, updatedStockRows.length, 9).setValues(updatedStockRows);
       if (stockLastRow - 1 > updatedStockRows.length) {
-        stockSheet.getRange(2 + updatedStockRows.length, 1, (stockLastRow - 1) - updatedStockRows.length, 8).clearContent();
+        stockSheet.getRange(2 + updatedStockRows.length, 1, (stockLastRow - 1) - updatedStockRows.length, 9).clearContent();
       }
     }
 
@@ -540,16 +563,18 @@ function updateStockSheet(tableData, mode) {
   try {
     lock.waitLock(20000);
     const sheet = getSheet(SHEETS.STOCK);
+    ensureSheetColumns(sheet, 9);
     const lastRow = sheet.getLastRow();
     const stockMap = Object.create(null);
 
     if (lastRow >= 2) {
-      const data = sheet.getRange(2, 1, lastRow - 1, 8).getValues();
+      const data = sheet.getRange(2, 1, lastRow - 1, 9).getValues();
       data.forEach(row => {
         const name = normalizeText(row[0]);
         const color = normalizeText(row[1]) || DEFAULTS.COLOR;
         const boxContent = normalizeNumber(row[5]);
         const key = makeKey(name, color, boxContent);
+        const deltaVal = normalizeText(row[8]).toUpperCase();
         stockMap[key] = {
           name: name,
           color: color,
@@ -558,7 +583,8 @@ function updateStockSheet(tableData, mode) {
           safeStock: normalizeNumber(row[4]),
           boxContent: boxContent,
           initialStock: normalizeNumber(row[6]),
-          manufacturer: normalizeText(row[7])
+          manufacturer: normalizeText(row[7]),
+          isDelta: row[8] === true || deltaVal === 'Y' || deltaVal === 'TRUE'
         };
       });
     }
@@ -579,7 +605,8 @@ function updateStockSheet(tableData, mode) {
           safeStock: normalizeNumber(record.safeStock),
           boxContent: boxContent,
           initialStock: 0,
-          manufacturer: normalizeText(record.manufacturer)
+          manufacturer: normalizeText(record.manufacturer),
+          isDelta: record.isDelta === true || normalizeText(record.isDelta).toUpperCase() === 'Y'
         };
         stockMap[key] = current;
       }
@@ -616,14 +643,15 @@ function updateStockSheet(tableData, mode) {
       v.safeStock,
       v.boxContent,
       v.initialStock,
-      v.manufacturer
+      v.manufacturer,
+      v.isDelta ? 'Y' : ''
     ]);
 
     if (updatedData.length > 0) {
       ensureSheetCapacity(sheet, 2 + updatedData.length - 1);
-      sheet.getRange(2, 1, updatedData.length, 8).setValues(updatedData);
+      sheet.getRange(2, 1, updatedData.length, 9).setValues(updatedData);
       if (lastRow - 1 > updatedData.length) {
-        sheet.getRange(2 + updatedData.length, 1, (lastRow - 1) - updatedData.length, 8).clearContent();
+        sheet.getRange(2 + updatedData.length, 1, (lastRow - 1) - updatedData.length, 9).clearContent();
       }
     }
   } catch (e) {
@@ -676,15 +704,17 @@ function updatePendingRecords(invoiceNumber, type, newRecords, admin) {
     const targetType = normalizeText(type);
 
     // 1. 재고 맵 로드
+    ensureSheetColumns(stockSheet, 9);
     const stockLastRow = stockSheet.getLastRow();
     const stockMap = Object.create(null);
     if (stockLastRow >= 2) {
-      const sData = stockSheet.getRange(2, 1, stockLastRow - 1, 8).getValues();
+      const sData = stockSheet.getRange(2, 1, stockLastRow - 1, 9).getValues();
       sData.forEach(row => {
         const name = normalizeText(row[0]);
         const color = normalizeText(row[1]) || DEFAULTS.COLOR;
         const boxContent = normalizeNumber(row[5]);
         const key = makeKey(name, color, boxContent);
+        const deltaVal = normalizeText(row[8]).toUpperCase();
         stockMap[key] = {
           name: name,
           color: color,
@@ -693,7 +723,8 @@ function updatePendingRecords(invoiceNumber, type, newRecords, admin) {
           safeStock: normalizeNumber(row[4]),
           boxContent: boxContent,
           initialStock: normalizeNumber(row[6]),
-          manufacturer: normalizeText(row[7])
+          manufacturer: normalizeText(row[7]),
+          isDelta: row[8] === true || deltaVal === 'Y' || deltaVal === 'TRUE'
         };
       });
     }
@@ -839,14 +870,15 @@ function updatePendingRecords(invoiceNumber, type, newRecords, admin) {
       v.safeStock,
       v.boxContent,
       v.initialStock,
-      v.manufacturer
+      v.manufacturer,
+      v.isDelta ? 'Y' : ''
     ]);
 
     if (updatedStockRows.length > 0) {
       ensureSheetCapacity(stockSheet, 2 + updatedStockRows.length - 1);
-      stockSheet.getRange(2, 1, updatedStockRows.length, 8).setValues(updatedStockRows);
+      stockSheet.getRange(2, 1, updatedStockRows.length, 9).setValues(updatedStockRows);
       if (stockLastRow - 1 > updatedStockRows.length) {
-        stockSheet.getRange(2 + updatedStockRows.length, 1, (stockLastRow - 1) - updatedStockRows.length, 8).clearContent();
+        stockSheet.getRange(2 + updatedStockRows.length, 1, (stockLastRow - 1) - updatedStockRows.length, 9).clearContent();
       }
     }
 
@@ -1108,6 +1140,7 @@ function onOpen() {
     .addItem('상품등록', 'showAppProduct')
     .addItem('검색수정', 'showSearchModify')
     .addSeparator()
+    .addItem('⚡ 델타 품목 필드 자동 설정', 'setupDeltaItemFields')
     .addItem('📦 모든 시트 용량 점검 (1,000행 자동확보)', 'promptEnsureAllSheetsCapacity')
     .addItem('🔑 Gemini API 키 설정', 'promptSetGeminiApiKey')
     .addToUi();
@@ -1117,6 +1150,91 @@ function onOpen() {
     ensureAllSheetsCapacity();
   } catch (e) {
     console.warn(`onOpen 자동 용량 점검 중 예외: ${e.message}`);
+  }
+}
+
+/**
+ * ⚡ [전자동 마이그레이션] 재고시트 I열(9열)에 '델타품목' 헤더 및 접미사/패밀리 변형 품목 자동 분석/마킹
+ */
+function setupDeltaItemFields() {
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(30000);
+    const sheet = getSheet(SHEETS.STOCK);
+    ensureSheetColumns(sheet, 9);
+
+    // 1행 9열(I1) 헤더 설정
+    const headerCell = sheet.getRange(1, 9);
+    headerCell.setValue('델타품목');
+    headerCell.setFontWeight('bold');
+
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) {
+      SpreadsheetApp.getUi().alert('재고시트에 등록된 데이터가 없습니다.');
+      return;
+    }
+
+    const data = sheet.getRange(2, 1, lastRow - 1, 9).getValues();
+
+    // 접두사 그룹 카운트 수집 (동일 stem을 가진 형제 품목 탐색)
+    const stemCounts = {};
+    data.forEach(row => {
+      const name = normalizeText(row[0]);
+      if (!name) return;
+      // 영문+숫자 뒤에 1자리 알파벳 (예: CECIK999C -> stem: CECIK999)
+      const m1 = name.match(/^(.*?\d+)[A-Za-z]$/i);
+      if (m1) {
+        const stem = m1[1].toUpperCase();
+        stemCounts[stem] = (stemCounts[stem] || 0) + 1;
+      }
+      // 영문 접두사 뒤에 숫자 (예: PH959 -> stem: PH)
+      const m2 = name.match(/^([A-Za-z\s_-]+)\d+$/i);
+      if (m2) {
+        const stem = m2[1].toUpperCase().trim();
+        stemCounts[stem] = (stemCounts[stem] || 0) + 1;
+      }
+    });
+
+    let updatedCount = 0;
+    const deltaValues = [];
+
+    data.forEach(row => {
+      const name = normalizeText(row[0]);
+      const existingDelta = normalizeText(row[8]).toUpperCase();
+      let isDelta = existingDelta === 'Y' || existingDelta === 'TRUE';
+
+      if (!isDelta && name) {
+        // 규칙 1: 영문+숫자+알파벳 접미사 (CECIK999C, CK928A, B, C...)
+        const m1 = name.match(/^(.*?\d+)[A-Za-z]$/i);
+        if (m1) {
+          isDelta = true;
+        } else {
+          // 규칙 2: 공통 접두사를 가진 숫자 품목이 2개 이상 존재하는 경우 (PH959, PH960...)
+          const m2 = name.match(/^([A-Za-z\s_-]+)\d+$/i);
+          if (m2) {
+            const stem = m2[1].toUpperCase().trim();
+            if (stemCounts[stem] && stemCounts[stem] >= 2) {
+              isDelta = true;
+            }
+          }
+        }
+      }
+
+      if (isDelta) {
+        deltaValues.push(['Y']);
+        updatedCount++;
+      } else {
+        deltaValues.push([existingDelta ? existingDelta : '']);
+      }
+    });
+
+    sheet.getRange(2, 9, deltaValues.length, 1).setValues(deltaValues);
+    SpreadsheetApp.getUi().alert(`🎉 델타 품목 전자동 설정 완료!\n총 ${data.length}개 품목 중 ${updatedCount}개 품목이 델타(패밀리 변형) 품목으로 자동 감지되어 'Y'로 등록되었습니다.`);
+  } catch (e) {
+    SpreadsheetApp.getUi().alert(`델타 품목 필드 설정 오류: ${e.message}`);
+    throw e;
+  } finally {
+    lock.releaseLock();
   }
 }
 
@@ -1311,16 +1429,18 @@ function processQuickStockAdjustment(adjustments, admin) {
     const adminName = normalizeText(admin) || 'ADMIN';
 
     // 1. 재고 데이터 로드
+    ensureSheetColumns(stockSheet, 9);
     const stockLastRow = stockSheet.getLastRow();
     const stockMap = Object.create(null);
 
     if (stockLastRow >= 2) {
-      const stockData = stockSheet.getRange(2, 1, stockLastRow - 1, 8).getValues();
+      const stockData = stockSheet.getRange(2, 1, stockLastRow - 1, 9).getValues();
       stockData.forEach(row => {
         const name = normalizeText(row[0]);
         const color = normalizeText(row[1]) || DEFAULTS.COLOR;
         const boxContent = normalizeNumber(row[5]);
         const key = makeKey(name, color, boxContent);
+        const deltaVal = normalizeText(row[8]).toUpperCase();
         stockMap[key] = {
           name: name,
           color: color,
@@ -1329,7 +1449,8 @@ function processQuickStockAdjustment(adjustments, admin) {
           safeStock: normalizeNumber(row[4]),
           boxContent: boxContent,
           initialStock: normalizeNumber(row[6]),
-          manufacturer: normalizeText(row[7])
+          manufacturer: normalizeText(row[7]),
+          isDelta: row[8] === true || deltaVal === 'Y' || deltaVal === 'TRUE'
         };
       });
     }
@@ -1358,7 +1479,8 @@ function processQuickStockAdjustment(adjustments, admin) {
           safeStock: normalizeNumber(item.safeStock),
           boxContent: boxContent,
           initialStock: 0,
-          manufacturer: normalizeText(item.manufacturer)
+          manufacturer: normalizeText(item.manufacturer),
+          isDelta: /^(.*?\d+)[A-Za-z]$/i.test(name) || /^([A-Za-z\s_-]+)\d+$/i.test(name)
         };
         stockMap[key] = current;
       } else {
@@ -1400,12 +1522,13 @@ function processQuickStockAdjustment(adjustments, admin) {
       v.safeStock,
       v.boxContent,
       v.initialStock,
-      v.manufacturer
+      v.manufacturer,
+      v.isDelta ? 'Y' : ''
     ]);
 
     if (updatedStockRows.length > 0) {
       ensureSheetCapacity(stockSheet, 2 + updatedStockRows.length - 1);
-      stockSheet.getRange(2, 1, updatedStockRows.length, 8).setValues(updatedStockRows);
+      stockSheet.getRange(2, 1, updatedStockRows.length, 9).setValues(updatedStockRows);
     }
 
     // 4. PendingSheet 에 '재고조정' 행 일괄 추가
