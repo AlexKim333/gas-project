@@ -1718,7 +1718,7 @@ const typeConfig = {
       </div>
       <div class="input-row"><label for="itemName">품명:</label><input type="text" id="itemName" name="itemName" autocomplete="off" oninput="filterItems(this.value)" onchange="autoFillColor()" tabindex="2"><div id="customDropdown" class="dropdown-container" style="display: none;"><ul id="itemSuggestionsList"></ul></div></div>
       <div class="input-row"><label for="color">색상:</label><input type="text" id="color" name="color" value="SURTIDO" tabindex="3"></div>
-      <div class="input-row"><label id="qtyLabel"></label><input type="number" id="qty" name="qty" tabindex="4"></div>
+      <div class="input-row"><label id="qtyLabel"></label><input type="text" id="qty" name="qty" tabindex="4" placeholder="수량 (예: 1 또는 10P)" oninput="handleQtyInput(this)"></div>
       <div class="input-row"><label for="boxContent">박스당수량:</label><input type="number" id="boxContent" name="boxContent" tabindex="5"></div>
     `
   },
@@ -1740,7 +1740,7 @@ const typeConfig = {
       </div>
       <div class="input-row"><label for="itemName">품명:</label><input type="text" id="itemName" name="itemName" autocomplete="off" oninput="filterItems(this.value)" onchange="autoFillColor()" tabindex="2"><div id="customDropdown" class="dropdown-container" style="display: none;"><ul id="itemSuggestionsList"></ul></div></div>
       <div class="input-row"><label for="color">색상:</label><input type="text" id="color" name="color" value="SURTIDO" tabindex="3"></div>
-      <div class="input-row"><label id="qtyLabel"></label><input type="number" id="qty" name="qty" tabindex="4"></div>
+      <div class="input-row"><label id="qtyLabel"></label><input type="text" id="qty" name="qty" tabindex="4" placeholder="수량 (예: 1 또는 10P)" oninput="handleQtyInput(this)"></div>
       <div class="input-row"><label for="boxContent">박스당수량:</label><input type="number" id="boxContent" name="boxContent" tabindex="5"></div>
     `
   },
@@ -2165,6 +2165,18 @@ function updateUnitType() {
   if (checkedRadio) unitType = checkedRadio.value;
 }
 
+function handleQtyInput(el) {
+  if (!el) return;
+  const val = (el.value || '').trim();
+  if (/[pP]$/i.test(val) || /pz$/i.test(val)) {
+    const indivRadio = document.querySelector('input[name="unitType"][value="individual"]');
+    if (indivRadio && !indivRadio.checked) {
+      indivRadio.checked = true;
+      updateUnitType();
+    }
+  }
+}
+
 function checkItemAndStock(itemName, color, boxContent, qty, unitType) {
   const normColor = color || 'SURTIDO';
   const normBoxContent = Number(boxContent) || 0;
@@ -2246,8 +2258,16 @@ function addRecord() {
     alert('입출고 폼의 일부 요소를 찾을 수 없습니다.');
     return;
   }
-  const unitType = unitTypeRadio.value;
-  const qty = parseInt(qtyInput.value) || 0;
+  const rawQtyStr = (qtyInput.value || '').trim();
+  const isP = /[pP]$/i.test(rawQtyStr) || /pz$/i.test(rawQtyStr);
+  const qty = parseInt(rawQtyStr.replace(/[^\d]/g, ''), 10) || 0;
+  const unitType = isP ? 'individual' : unitTypeRadio.value;
+
+  if (isP) {
+    const indivRadio = document.querySelector('input[name="unitType"][value="individual"]');
+    if (indivRadio) indivRadio.checked = true;
+  }
+
   const itemName = itemNameInput.value.trim();
   const color = colorInput.value;
   const boxContent = parseInt(boxContentInput.value) || 0;
@@ -2388,14 +2408,24 @@ function updateTable() {
 
 function updateRecord(index, field, value) {
   if (index < 0 || index >= records.length) return;
-  if (field === 'boxContent' || field === 'boxQty' || field === 'individualQty' || field === 'safeStock' || field === 'initialStock') {
-    value = parseInt(value) || 0;
-    if (field === 'boxQty' || field === 'individualQty') {
-      records[index][field] = currentType === 'in' ? value : -Math.abs(value);
-      if (field === 'boxQty' && value !== 0) records[index].individualQty = 0;
-      if (field === 'individualQty' && value !== 0) records[index].boxQty = 0;
+  if (field === 'isDelta') {
+    records[index].isDelta = !!value;
+  } else if (field === 'boxContent' || field === 'safeStock' || field === 'initialStock') {
+    records[index][field] = parseInt(value) || 0;
+  } else if (field === 'boxQty' || field === 'individualQty') {
+    const valStr = String(value || '').trim();
+    const isP = /[pP]$/i.test(valStr) || /pz$/i.test(valStr);
+    const parsedNum = parseInt(valStr.replace(/[^\d]/g, ''), 10) || 0;
+    const targetVal = currentType === 'in' ? parsedNum : -Math.abs(parsedNum);
+
+    if (isP || field === 'individualQty') {
+      records[index].individualQty = targetVal;
+      records[index].boxQty = 0;
+      records[index].unitType = 'individual';
     } else {
-      records[index][field] = value;
+      records[index].boxQty = targetVal;
+      records[index].individualQty = 0;
+      records[index].unitType = 'box';
     }
   } else {
     records[index][field] = value.trim();
@@ -2422,6 +2452,11 @@ function clearForm() {
     if (manufacturerInput) manufacturerInput.value = '';
   } else {
     if (qtyInput) qtyInput.value = currentType === 'out' ? '1' : '0';
+    const boxRadio = document.querySelector('input[name="unitType"][value="box"]');
+    if (boxRadio) {
+      boxRadio.checked = true;
+      updateUnitType();
+    }
   }
   hideCustomDropdown();
 }
@@ -4312,7 +4347,9 @@ function onHandwrittenExtracted(data) {
       }
     }
 
-    let qty = parseInt(r.no_de_bultos || r.cant_oder || r.cantidad || 0, 10);
+    let rawQtyStr = String(r.no_de_bultos || r.cant_oder || r.cantidad || '').trim();
+    let isIndividualUnit = /[pP]$/i.test(rawQtyStr) || /pz/i.test(rawQtyStr) || String(r.unidad || '').toUpperCase().includes('P');
+    let qty = parseInt(rawQtyStr.replace(/[^\d]/g, ''), 10) || 0;
     if (isNaN(qty) || qty <= 0) return;
 
     let finalItemName = '';
@@ -4392,11 +4429,11 @@ function onHandwrittenExtracted(data) {
     newRecords.push({
       itemName: finalItemName,
       color: finalColor,
-      boxQty: currentType === 'out' ? -Math.abs(qty) : Math.abs(qty),
-      individualQty: 0,
+      boxQty: isIndividualUnit ? 0 : (currentType === 'out' ? -Math.abs(qty) : Math.abs(qty)),
+      individualQty: isIndividualUnit ? (currentType === 'out' ? -Math.abs(qty) : Math.abs(qty)) : 0,
       boxContent: finalBoxContent,
       location: activeLocation || '',
-      unitType: 'box'
+      unitType: isIndividualUnit ? 'individual' : 'box'
     });
     addedCount++;
   });

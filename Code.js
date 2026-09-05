@@ -1337,7 +1337,7 @@ Rules:
 
 4. IMPORTANT:
    - Do NOT merge different rows!
-   - For quantities, extract only the positive integer number (e.g. "./ 1" or ". 1" is 1).
+   - For quantities: If 'P' or 'pz' (meaning piezas/낱개, e.g. "10P", "5p", "12 pz") is written after or with the number, preserve 'P' with the number (e.g. "10P"). Otherwise extract the positive integer number (e.g. "./ 1" or ". 1" is 1).
 
 Return ONLY valid JSON:
 {
