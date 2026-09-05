@@ -4414,6 +4414,16 @@ function onHandwrittenExtracted(data) {
     } else {
       msg += `\n(기존 [${currentLocValue}] 주문서에 이어서 누적 추가됨)`;
     }
+
+    if (data.usageMetadata) {
+      const meta = data.usageMetadata;
+      const totalTokens = (meta.totalTokenCount || 0).toLocaleString();
+      const promptTokens = (meta.promptTokenCount || 0).toLocaleString();
+      const outputTokens = (meta.candidatesTokenCount || 0).toLocaleString();
+      const modelName = data.usedModel || 'Gemini 3 Flash';
+      msg += `\n\n⚡ [AI 소비 토큰]: 총 ${totalTokens} 토큰\n(입력: ${promptTokens} / 출력: ${outputTokens} · ${modelName})`;
+    }
+
     alert(msg);
   } else {
     alert('⚠️ 유효한 품목 또는 수량을 추출하지 못했습니다.');

@@ -1352,6 +1352,8 @@ Return ONLY valid JSON:
   const models = ['gemini-3.7-flash', 'gemini-3.8-flash', 'gemini-3.6-flash'];
   let rawResponse = '';
   let lastError = '';
+  let usageMetadata = null;
+  let usedModel = '';
 
   for (let i = 0; i < models.length; i++) {
     const model = models[i];
@@ -1385,6 +1387,8 @@ Return ONLY valid JSON:
         if (candidates.length > 0) {
           const parts = candidates[0].content ? candidates[0].content.parts || [] : [];
           rawResponse = parts.map(p => p.text || '').join('');
+          usageMetadata = json.usageMetadata || null;
+          usedModel = model;
           break;
         }
       } else {
@@ -1404,7 +1408,10 @@ Return ONLY valid JSON:
     if (cleanJson.startsWith('```json')) cleanJson = cleanJson.slice(7);
     if (cleanJson.startsWith('```')) cleanJson = cleanJson.slice(3);
     if (cleanJson.endsWith('```')) cleanJson = cleanJson.slice(0, -3);
-    return JSON.parse(cleanJson.trim());
+    const parsed = JSON.parse(cleanJson.trim());
+    parsed.usageMetadata = usageMetadata;
+    parsed.usedModel = usedModel;
+    return parsed;
   } catch (err) {
     throw new Error(`분석 결과 JSON 파싱 오류: ${err.message}\n응답: ${rawResponse.slice(0, 300)}`);
   }
