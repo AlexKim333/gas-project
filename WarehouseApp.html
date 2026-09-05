@@ -3997,6 +3997,49 @@ function extractColorAndBase(text) {
   return { base: baseWords.join(' ').trim(), color: foundColor };
 }
 
+/**
+ * 🏭 [사장님 실무 규칙] 품명 파생 및 접미사 치환 알고리즘
+ * 1) 접미사 알파벳 1자리 치환: 앞선 품명이 영문+숫자+알파벳(예: CECIK999C, CK928A)인데 현재 입력이 알파벳 1글자(D, E, G, H, B...)인 경우
+ *    -> 앞 품명의 마지막 글자를 새 알파벳으로 교체 (CECIK999C -> CECIK999D)
+ * 2) 접미사 숫자 치환: 앞선 품명이 영문+숫자(예: PH959)인데 현재 입력이 숫자(960, 961)인 경우
+ *    -> 앞 품명의 영문 접두사는 유지하고 숫자 부분을 교체 (PH959 -> PH960)
+ * 3) 품명이 완전 빈칸인 경우: 앞 품명 전체를 그대로 계승
+ */
+function resolveDerivedModelName(rawModel, lastModel) {
+  const cur = (rawModel || '').trim();
+  const prev = (lastModel || '').trim();
+
+  if (!cur) return prev;
+  if (!prev) return cur;
+
+  // 1. 단일 알파벳 접미사 치환 (예: cur = "D", prev = "CECIK999C" -> "CECIK999D", prev = "CK928A" -> "CK928D")
+  // 또는 앞선 품명이 숫자로 끝나는데 알파벳 1글자가 온 경우 (예: prev = "CK928", cur = "B" -> "CK928B")
+  if (/^[A-Za-z]$/.test(cur)) {
+    const curUpper = cur.toUpperCase();
+    // Case A: 앞 품명이 알파벳으로 끝나는 경우 (예: CECIK999C, CK928A) -> 마지막 글자 치환
+    if (/[A-Za-z]$/.test(prev) && prev.length > 1) {
+      const stem = prev.slice(0, -1);
+      return stem + curUpper;
+    }
+    // Case B: 앞 품명이 숫자로 끝나는 경우 (예: CECIK999, CK928) -> 접미사로 덧붙임
+    if (/\d$/.test(prev)) {
+      return prev + curUpper;
+    }
+  }
+
+  // 2. 숫자 접미사 치환 (예: cur = "960", prev = "PH959" -> "PH960")
+  if (/^\d{2,4}$/.test(cur)) {
+    // 앞 품명에서 마지막 연속 숫자 부분을 추출
+    const match = prev.match(/^(.*?)(\d+)$/);
+    if (match) {
+      const prefix = match[1]; // 예: "PH"
+      return prefix + cur;
+    }
+  }
+
+  return cur;
+}
+
 // -------------------------------------------------------------------
 // Python difflib.SequenceMatcher (Gestalt Pattern Matching) 100% 포팅
 // 마스터 테이블(1,472개 전 품목) 대상 수학적 유사도 기반 자동 매칭
@@ -4067,6 +4110,19 @@ function findBestCatalogMatch(query, catalog, threshold = 0.55) {
   let best = null;
   let maxScore = 0;
 
+  // 1단계: 품명(name) 완전 일치 우선 검사 (예: query = "CECIK999D", item.name = "CECIK999D")
+  const qClean = q.replace(/[\s_\-]/g, '').toLowerCase();
+  for (let i = 0; i < catalog.length; i++) {
+    const item = catalog[i];
+    const nameClean = (item.name || '').replace(/[\s_\-]/g, '').toLowerCase();
+    if (nameClean === qClean || qClean.startsWith(nameClean) || nameClean.startsWith(qClean)) {
+      if (nameClean === qClean) {
+        return { item: item, score: 1.0 };
+      }
+    }
+  }
+
+  // 2단계: Gestalt SequenceMatcher 유사도 검사
   for (let i = 0; i < catalog.length; i++) {
     const item = catalog[i];
     const candidate = `${item.name} ${item.color || 'SURTIDO'}`.toLowerCase().trim();
@@ -4247,8 +4303,10 @@ function onHandwrittenExtracted(data) {
       color = ext.color || normalizeColor(rawColor);
     }
 
+    // 🏭 [접미사 치환 및 Forward-fill 알고리즘 적용]
+    // 만약 base가 단일 알파벳(D, E, G, H...)이거나 숫자(960, 961...)이면 앞 모델명(lastBaseModel)의 접미사를 치환
     if (base) {
-      lastBaseModel = base;
+      base = resolveDerivedModelName(base, lastBaseModel);
     } else {
       base = lastBaseModel;
     }
@@ -4267,6 +4325,11 @@ function onHandwrittenExtracted(data) {
     const finalItemName = matchRes ? matchRes.item.name : base;
     const finalColor = matchRes ? matchRes.item.color : color;
     const finalBoxContent = matchRes ? matchRes.item.boxContent : 0;
+
+    // 다음 행의 접미사 치환 기준이 되도록 베이스 모델명 업데이트
+    if (finalItemName) {
+      lastBaseModel = finalItemName;
+    }
 
     newRecords.push({
       itemName: finalItemName,
