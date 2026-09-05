@@ -4192,21 +4192,43 @@ function findBestCatalogMatch(query, catalog, threshold = 0.55) {
   const q = (query || '').toLowerCase().trim();
   let best = null;
   let maxScore = 0;
-
-  // 1단계: 품명(name) 완전 일치 또는 접두사 일치 최우선 검사 (색상이 붙어있는 복합 쿼리 지원)
   const qClean = q.replace(/[\s_\-]/g, '').toLowerCase();
-  let bestPrefixMatch = null;
-  let maxPrefixLen = 0;
 
+  // 0단계: 품명 + 색상 동시 완전 일치 최우선 (예: "pd60blanco" === "pd60blanco")
+  for (let i = 0; i < catalog.length; i++) {
+    const item = catalog[i];
+    const fullClean = ((item.name || '') + (item.color || 'SURTIDO')).replace(/[\s_\-]/g, '').toLowerCase();
+    if (fullClean === qClean) {
+      return { item: item, score: 1.0 };
+    }
+  }
+
+  // 1단계: 품명(name) 완전 일치 최우선 검사
   for (let i = 0; i < catalog.length; i++) {
     const item = catalog[i];
     const nameClean = (item.name || '').replace(/[\s_\-]/g, '').toLowerCase();
     if (nameClean === qClean) {
       return { item: item, score: 1.0 };
     }
-    if (qClean.startsWith(nameClean) && nameClean.length > maxPrefixLen) {
-      maxPrefixLen = nameClean.length;
-      bestPrefixMatch = item;
+  }
+
+  // 1-1단계: 접두사 일치 (query가 [품명 + 색상] 복합 쿼리인 경우)
+  let bestPrefixMatch = null;
+  let maxPrefixLen = 0;
+  for (let i = 0; i < catalog.length; i++) {
+    const item = catalog[i];
+    const nameClean = (item.name || '').replace(/[\s_\-]/g, '').toLowerCase();
+    if (qClean.startsWith(nameClean) && nameClean.length >= 3) {
+      const remainder = qClean.slice(nameClean.length);
+      const colorClean = (item.color || 'SURTIDO').replace(/[\s_\-]/g, '').toLowerCase();
+      // 색상까지 일치하는 접두사 항목이 있으면 최우선 반환
+      if (remainder && (colorClean === remainder || remainder.includes(colorClean))) {
+        return { item: item, score: 1.0 };
+      }
+      if (nameClean.length > maxPrefixLen) {
+        maxPrefixLen = nameClean.length;
+        bestPrefixMatch = item;
+      }
     }
   }
 
@@ -4455,22 +4477,49 @@ function onHandwrittenExtracted(data) {
     } else {
       // 🏭 새로운 독립 모델인 경우: 일반 추출 및 마스터 유사도 매칭
       let { base, color } = extractColorAndBase(rawModel);
+      let isExplicitColor = false;
+
       if (rawColor) {
         let ext = extractColorAndBase(rawColor);
         color = ext.color || normalizeColor(rawColor);
+        isExplicitColor = true;
+      } else if (color) {
+        isExplicitColor = true;
       }
       if (!color) color = 'SURTIDO';
 
-      const combinedQuery = base ? `${base} ${color}`.trim() : color;
+      const queryBase = base || rawModel;
+      const combinedQuery = queryBase ? `${queryBase} ${color}`.trim() : color;
       const matchRes = findBestCatalogMatch(combinedQuery, stockDataCache, 0.55);
 
-      finalItemName = matchRes ? matchRes.item.name : (base || rawModel);
-      finalColor = matchRes ? matchRes.item.color : color;
-      finalBoxContent = matchRes ? matchRes.item.boxContent : 0;
+      finalItemName = matchRes ? matchRes.item.name : queryBase;
+      const cleanMatchedName = finalItemName.replace(/[\s_\-]/g, '').toUpperCase();
+      const normTargetColor = (color || 'SURTIDO').toUpperCase();
+
+      // 1) 마스터 카탈로그에서 매칭된 품명 + 사용자가 지정한 색상에 일치하는 특정 변형(Variant) 탐색
+      const exactVariant = (stockDataCache || []).find(it => 
+        (it.name || '').replace(/[\s_\-]/g, '').toUpperCase() === cleanMatchedName &&
+        (it.color || 'SURTIDO').toUpperCase() === normTargetColor
+      );
+
+      if (exactVariant) {
+        finalColor = exactVariant.color || normTargetColor;
+        finalBoxContent = exactVariant.boxContent;
+        lastItemInfo = exactVariant;
+      } else if (isExplicitColor) {
+        // 2) 마스터에 해당 색상이 아직 등록 안 되어 있더라도, 사용자가 명시한 색상(예: BLANCO)을 절대 SURTIDO로 덮어쓰지 않고 100% 보존!
+        finalColor = normTargetColor;
+        finalBoxContent = matchRes ? matchRes.item.boxContent : 0;
+        lastItemInfo = matchRes ? matchRes.item : null;
+      } else {
+        // 3) 사용자가 색상을 기재하지 않은 경우: 매칭된 마스터의 기본 색상 사용
+        finalColor = matchRes ? matchRes.item.color : 'SURTIDO';
+        finalBoxContent = matchRes ? matchRes.item.boxContent : 0;
+        lastItemInfo = matchRes ? matchRes.item : null;
+      }
 
       if (finalItemName) {
         lastBaseModel = finalItemName;
-        lastItemInfo = matchRes ? matchRes.item : null;
       }
     }
 
