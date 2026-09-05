@@ -4137,44 +4137,47 @@ function onHandwrittenExtracted(data) {
     return;
   }
 
-  // 1. 지점명(출고처) 자동 선택 (파이썬 match_branch와 동일하게 SequenceMatcher 0.50 적용)
-  let matchedLocationName = '';
+  // 1. 기존 장바구니(records)가 있는지 확인
+  const hasExistingRecords = records && records.length > 0;
+  const currentLocEl = document.getElementById('location');
+  const currentAdminEl = document.getElementById('adminSelect');
+  const currentLocValue = currentLocEl ? currentLocEl.value.trim() : '';
+  const currentAdminValue = currentAdminEl ? currentAdminEl.value.trim() : '';
+
+  // 1-1. 지점명(출고처) 매칭
+  let detectedLoc = '';
   if (data.branch && currentType === 'out') {
     const rawBranch = String(data.branch).trim().toLowerCase();
-    const locSelect = document.getElementById('location');
-    if (locSelect) {
+    if (currentLocEl) {
       let bestLoc = '';
       let bestLocScore = 0;
       let bestLocIndex = -1;
-      for (let i = 0; i < locSelect.options.length; i++) {
-        const optText = locSelect.options[i].text.toLowerCase();
+      for (let i = 0; i < currentLocEl.options.length; i++) {
+        const optText = currentLocEl.options[i].text.toLowerCase();
         const score = sequenceMatcher(rawBranch, optText);
         if (score > bestLocScore) {
           bestLocScore = score;
           bestLocIndex = i;
-          bestLoc = locSelect.options[i].value;
+          bestLoc = currentLocEl.options[i].value;
         }
       }
       if (bestLocScore >= 0.50 && bestLocIndex >= 0) {
-        locSelect.selectedIndex = bestLocIndex;
-        matchedLocationName = bestLoc;
-        saveMetadata();
+        detectedLoc = bestLoc;
       }
     }
   }
 
-  // 1-1. 주문요청자(관리자) 자동 선택 (밑줄 친 텍스트 또는 헤더 요청자)
-  let matchedAdminName = '';
+  // 1-2. 주문요청자(관리자) 매칭
+  let detectedAdmin = '';
   if (data.requester) {
     const rawReq = String(data.requester).trim().toLowerCase();
-    const adminSelect = document.getElementById('adminSelect');
-    if (adminSelect && adminSelect.options.length > 0) {
+    if (currentAdminEl && currentAdminEl.options.length > 0) {
       let bestAdmin = '';
       let bestAdminScore = 0;
       let bestAdminIndex = -1;
-      for (let i = 0; i < adminSelect.options.length; i++) {
-        const optVal = adminSelect.options[i].value;
-        const optText = (adminSelect.options[i].text || optVal).toLowerCase();
+      for (let i = 0; i < currentAdminEl.options.length; i++) {
+        const optVal = currentAdminEl.options[i].value;
+        const optText = (currentAdminEl.options[i].text || optVal).toLowerCase();
         const score = sequenceMatcher(rawReq, optText);
         if (score > bestAdminScore) {
           bestAdminScore = score;
@@ -4183,14 +4186,40 @@ function onHandwrittenExtracted(data) {
         }
       }
       if (bestAdminScore >= 0.50 && bestAdminIndex >= 0) {
-        adminSelect.selectedIndex = bestAdminIndex;
-        matchedAdminName = bestAdmin;
-        saveMetadata();
+        detectedAdmin = bestAdmin;
       }
     }
   }
 
-  const currentLocation = document.getElementById('location') ? document.getElementById('location').value : '';
+  // 🚨 [사장님 업무 규칙] 기존 장바구니에 품목이 이미 있는 경우 (두 번째 장 이상):
+  // 제출 전까지는 첫 번째 장의 헤더(출고처/관리자)를 반드시 유지해야 함.
+  // 두 번째 장에서 다른 출고처나 관리자가 감지되면 에러 경고를 띄우고 입력을 즉시 차단!
+  if (hasExistingRecords) {
+    const mismatchErrors = [];
+    if (detectedLoc && currentLocValue && detectedLoc.toUpperCase() !== currentLocValue.toUpperCase()) {
+      mismatchErrors.push(`• 출고처 불일치: 현재 장바구니 [${currentLocValue}] vs 이번 주문서 [${detectedLoc}]`);
+    }
+    if (detectedAdmin && currentAdminValue && detectedAdmin.toUpperCase() !== currentAdminValue.toUpperCase()) {
+      mismatchErrors.push(`• 관리자(요청자) 불일치: 현재 장바구니 [${currentAdminValue}] vs 이번 주문서 [${detectedAdmin}]`);
+    }
+
+    if (mismatchErrors.length > 0) {
+      alert(`❌ [주문서 헤더 불일치 오류]\n\n현재 장바구니에 이미 담긴 품목들과 다른 주문서입니다!\n제출(전송) 전까지는 동일한 출고처/관리자 주문서만 추가할 수 있습니다.\n\n${mismatchErrors.join('\n')}\n\n⚠️ 기존 품목을 먼저 [제출] 처리하시거나, 올바른 주문서 이미지를 다시 확인해 주세요.`);
+      return;
+    }
+  } else {
+    // 첫 번째 장인 경우: 감지된 출고처 및 관리자 자동 선택
+    if (detectedLoc && currentLocEl) {
+      currentLocEl.value = detectedLoc;
+      saveMetadata();
+    }
+    if (detectedAdmin && currentAdminEl) {
+      currentAdminEl.value = detectedAdmin;
+      saveMetadata();
+    }
+  }
+
+  const activeLocation = currentLocEl ? currentLocEl.value : '';
 
   // 2. Forward-Fill 및 색상 정규화 파이프라인
   let lastBaseModel = '';
@@ -4245,7 +4274,7 @@ function onHandwrittenExtracted(data) {
       boxQty: currentType === 'out' ? -Math.abs(qty) : Math.abs(qty),
       individualQty: 0,
       boxContent: finalBoxContent,
-      location: currentLocation || matchedLocationName || '',
+      location: activeLocation || '',
       unitType: 'box'
     });
     addedCount++;
@@ -4257,12 +4286,12 @@ function onHandwrittenExtracted(data) {
     updateTable();
     updateTotals();
     
-    let msg = `🎉 손글씨 주문서 인식 성공!\n\n총 ${addedCount}개 품목이 장바구니에 자동 입력되었습니다.`;
-    if (matchedLocationName) {
-      msg += `\n출고처: [${matchedLocationName}] 자동 선택됨`;
-    }
-    if (matchedAdminName) {
-      msg += `\n요청자(관리자): [${matchedAdminName}] 자동 선택됨`;
+    let msg = `🎉 손글씨 주문서 인식 성공!\n\n총 ${addedCount}개 품목이 장바구니에 추가되었습니다.`;
+    if (!hasExistingRecords) {
+      if (detectedLoc) msg += `\n출고처: [${detectedLoc}] 자동 선택됨`;
+      if (detectedAdmin) msg += `\n요청자(관리자): [${detectedAdmin}] 자동 선택됨`;
+    } else {
+      msg += `\n(기존 [${currentLocValue}] 주문서에 이어서 누적 추가됨)`;
     }
     alert(msg);
   } else {
