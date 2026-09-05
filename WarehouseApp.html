@@ -1699,6 +1699,42 @@ let locationCache = [];
 let debounceTimeout;
 let isLoadingStockData = false;
 
+// 크로스 윈도우/탭 실시간 재고 동기화 리스너 (검색수정 등 타 창에서 변경 시 즉각 반영)
+window.addEventListener('storage', function(e) {
+  if (e.key === 'cached_stock_data' || e.key === 'stock_data_updated') {
+    try {
+      const cachedStock = localStorage.getItem('cached_stock_data');
+      if (cachedStock) {
+        stockDataCache = JSON.parse(cachedStock);
+        if (typeof initProductHotkeys === 'function') initProductHotkeys();
+        if (typeof updateTable === 'function') updateTable();
+        if (typeof updateTotals === 'function') updateTotals();
+        if (typeof updateUnitType === 'function') updateUnitType();
+        console.log('🔄 [WarehouseApp] 실시간 재고 캐시 자동 동기화 (Storage Event)');
+      }
+    } catch (err) {
+      console.warn('Storage sync error:', err);
+    }
+  }
+});
+
+// 창 포커스 복귀 시 실시간 동기화 (검색수정 팝업 닫고 복귀 시)
+window.addEventListener('focus', function() {
+  try {
+    const cachedStock = localStorage.getItem('cached_stock_data');
+    if (cachedStock) {
+      const parsed = JSON.parse(cachedStock);
+      if (parsed && parsed.length > 0) {
+        stockDataCache = parsed;
+        if (typeof initProductHotkeys === 'function') initProductHotkeys();
+        if (typeof updateTable === 'function') updateTable();
+        if (typeof updateTotals === 'function') updateTotals();
+        if (typeof updateUnitType === 'function') updateUnitType();
+      }
+    }
+  } catch (err) {}
+});
+
 const typeConfig = {
   'in': {
     title: '입고입력', bannerColor: 'var(--banner-in)', processFunction: 'processInForm',
@@ -1759,14 +1795,17 @@ const typeConfig = {
   }
 };
 
-function loadStockData() {
+function loadStockData(silent = false) {
   if (isLoadingStockData) return;
   isLoadingStockData = true;
-  const loadingIndicator = document.createElement('div');
-  loadingIndicator.id = 'loadingIndicator';
-  loadingIndicator.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 10px; border: 1px solid #ccc; z-index: 1000;';
-  loadingIndicator.textContent = '재고 데이터 로드 중...';
-  document.body.appendChild(loadingIndicator);
+  let loadingIndicator = null;
+  if (!silent) {
+    loadingIndicator = document.createElement('div');
+    loadingIndicator.id = 'loadingIndicator';
+    loadingIndicator.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 10px; border: 1px solid #ccc; z-index: 1000;';
+    loadingIndicator.textContent = '재고 데이터 로드 중...';
+    document.body.appendChild(loadingIndicator);
+  }
 
   const timeoutPromise = new Promise((_, reject) => {
     setTimeout(() => reject(new Error('재고 데이터 로드 타임아웃')), 30000);
@@ -1783,18 +1822,26 @@ function loadStockData() {
     .then(data => {
       stockDataCache = data;
       isLoadingStockData = false;
-      document.body.removeChild(loadingIndicator);
+      if (loadingIndicator && document.body.contains(loadingIndicator)) {
+        document.body.removeChild(loadingIndicator);
+      }
       try {
         localStorage.setItem('cached_stock_data', JSON.stringify(data));
+        localStorage.setItem('stock_data_updated', Date.now().toString());
       } catch (e) {}
       initProductHotkeys();
       updateTable();
       updateTotals();
+      if (typeof updateUnitType === 'function') updateUnitType();
     })
     .catch(err => {
       isLoadingStockData = false;
-      alert('재고 데이터를 불러오는 데 실패했습니다: ' + err.message);
-      document.body.removeChild(loadingIndicator);
+      if (!silent) {
+        alert('재고 데이터를 불러오는 데 실패했습니다: ' + err.message);
+      }
+      if (loadingIndicator && document.body.contains(loadingIndicator)) {
+        document.body.removeChild(loadingIndicator);
+      }
       stockDataCache = stockDataCache || [];
     });
 }
@@ -2557,9 +2604,10 @@ function confirmSubmit() {
         if (buttonContainer.contains(processingButton)) {
           buttonContainer.removeChild(processingButton);
         }
-        loadStockData();
+        loadStockData(true);
       } else {
         alert('입출고가 성공적으로 처리되었습니다.');
+        loadStockData(true); // ★ 핵심: 인쇄 대기 없이 백그라운드에서 즉시 재고 갱신 시작!
         printReceipt(recordsToPrint, type, new Date().toLocaleDateString(), adminValue, result, () => {
           records = [];
           updateTable();
@@ -2582,7 +2630,7 @@ function confirmSubmit() {
           if (buttonContainer.contains(processingButton)) {
             buttonContainer.removeChild(processingButton);
           }
-          loadStockData();
+          loadStockData(true);
         });
       }
     })

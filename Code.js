@@ -368,6 +368,7 @@ function registerProduct(tableData) {
       const targetStartRow = Math.max(lastRow + 1, 2);
       ensureSheetCapacity(sheet, targetStartRow + newRows.length - 1);
       sheet.getRange(targetStartRow, 1, newRows.length, 9).setValues(newRows);
+      SpreadsheetApp.flush();
     }
 
     return results;
@@ -541,6 +542,7 @@ function processForm(tableData, mode, admin) {
     const pendingLastRow = pendingSheet.getLastRow();
     ensureSheetCapacity(pendingSheet, pendingLastRow + pendingRows.length);
     pendingSheet.getRange(pendingLastRow + 1, 1, pendingRows.length, 11).setValues(pendingRows);
+    SpreadsheetApp.flush();
 
     console.log(`processForm 완료: ${invoiceNumber} (${typeKorean} ${pendingRows.length}건)`);
     return seq;
@@ -891,6 +893,7 @@ function updatePendingRecords(invoiceNumber, type, newRecords, admin) {
     if (pendingLastRow - 1 > finalPendingRows.length) {
       pendingSheet.getRange(2 + finalPendingRows.length, 1, (pendingLastRow - 1) - finalPendingRows.length, 11).clearContent();
     }
+    SpreadsheetApp.flush();
 
     console.log(`updatePendingRecords 완료: ${invoiceNumber} (${targetType})`);
   } catch (e) {
@@ -1544,6 +1547,7 @@ function processQuickStockAdjustment(adjustments, admin) {
       ensureSheetCapacity(pendingSheet, pLastRow + pendingRows.length - 1);
       pendingSheet.getRange(pLastRow, 1, pendingRows.length, 11).setValues(pendingRows);
     }
+    SpreadsheetApp.flush();
 
     return {
       success: true,

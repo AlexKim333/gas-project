@@ -333,6 +333,10 @@ let originalRecords = [];
 let currentType;
 let selectedDate;
 let stockDataCache = [];
+try {
+  const cachedStock = localStorage.getItem('cached_stock_data') || sessionStorage.getItem('cached_stock_data');
+  if (cachedStock) stockDataCache = JSON.parse(cachedStock);
+} catch (e) {}
 let locationCache = [];
 let debounceTimeout;
 let isLoadingStockData = false;
@@ -347,14 +351,39 @@ document.addEventListener('DOMContentLoaded', function() {
   loadDropdowns();
 });
 
-function loadStockData() {
+// 크로스 윈도우/탭 실시간 재고 동기화 리스너
+window.addEventListener('storage', function(e) {
+  if (e.key === 'cached_stock_data' || e.key === 'stock_data_updated') {
+    try {
+      const cachedStock = localStorage.getItem('cached_stock_data');
+      if (cachedStock) {
+        stockDataCache = JSON.parse(cachedStock);
+        console.log('🔄 [SearchModify] 실시간 재고 캐시 자동 동기화 (Storage Event)');
+      }
+    } catch (err) {}
+  }
+});
+
+window.addEventListener('focus', function() {
+  try {
+    const cachedStock = localStorage.getItem('cached_stock_data');
+    if (cachedStock) {
+      stockDataCache = JSON.parse(cachedStock);
+    }
+  } catch (err) {}
+});
+
+function loadStockData(silent = false) {
   if (isLoadingStockData) return; // 중복 호출 방지
   isLoadingStockData = true;
-  const loadingIndicator = document.createElement('div');
-  loadingIndicator.id = 'loadingIndicator';
-  loadingIndicator.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 10px; border: 1px solid #ccc; z-index: 1000;';
-  loadingIndicator.textContent = '재고 데이터 로드 중...';
-  document.body.appendChild(loadingIndicator);
+  let loadingIndicator = null;
+  if (!silent) {
+    loadingIndicator = document.createElement('div');
+    loadingIndicator.id = 'loadingIndicator';
+    loadingIndicator.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 10px; border: 1px solid #ccc; z-index: 1000;';
+    loadingIndicator.textContent = '재고 데이터 로드 중...';
+    document.body.appendChild(loadingIndicator);
+  }
 
   // 타임아웃 설정
   const timeoutPromise = new Promise((_, reject) => {
@@ -373,13 +402,23 @@ function loadStockData() {
       stockDataCache = data;
       isLoadingStockData = false;
       console.log('Stock data loaded:', stockDataCache.length, 'items');
-      document.body.removeChild(loadingIndicator);
+      if (loadingIndicator && document.body.contains(loadingIndicator)) {
+        document.body.removeChild(loadingIndicator);
+      }
+      try {
+        localStorage.setItem('cached_stock_data', JSON.stringify(data));
+        localStorage.setItem('stock_data_updated', Date.now().toString());
+      } catch (e) {}
     })
     .catch(err => {
       isLoadingStockData = false;
       console.error('Failed to load stock data:', err);
-      alert('재고 데이터를 불러오는 데 실패했습니다: ' + err.message);
-      document.body.removeChild(loadingIndicator);
+      if (!silent) {
+        alert('재고 데이터를 불러오는 데 실패했습니다: ' + err.message);
+      }
+      if (loadingIndicator && document.body.contains(loadingIndicator)) {
+        document.body.removeChild(loadingIndicator);
+      }
       stockDataCache = stockDataCache || [];
     });
 }
@@ -695,13 +734,13 @@ if (invoiceNumber.padStart(3, '0') !== loadedInvoiceNumber) {
       google.script.run
         .withSuccessHandler(() => {
           alert('레코드가 성공적으로 삭제되었습니다.');
+          loadStockData(true); // 즉시 백그라운드 재고 갱신
           records = [];
           updateTable();
           updateTotals();
           toggleScroll();
           originalButton.style.visibility = 'visible';
           buttonContainer.removeChild(processingButton);
-          loadStockData(); // 재고 데이터 갱신
         })
         .withFailureHandler(err => {
           alert('삭제 실패: ' + err.message);
@@ -778,6 +817,7 @@ if (invoiceNumber.padStart(3, '0') !== loadedInvoiceNumber) {
   google.script.run
     .withSuccessHandler(() => {
       alert('레코드가 성공적으로 업데이트되었습니다.');
+      loadStockData(true); // ★ 핵심: 인쇄 대기 없이 백그라운드에서 즉시 재고 갱신 시작!
       printReceipt(recordsToPrint, typeValue, date, adminValue, fullInvoiceNumber, () => {
         records = [];
         updateTable();
@@ -785,7 +825,7 @@ if (invoiceNumber.padStart(3, '0') !== loadedInvoiceNumber) {
         toggleScroll();
         originalButton.style.visibility = 'visible';
         buttonContainer.removeChild(processingButton);
-        loadStockData(); // 재고 데이터 갱신
+        loadStockData(true); // 인쇄 콜백 완료 후 재확인
       });
     })
     .withFailureHandler(err => {
