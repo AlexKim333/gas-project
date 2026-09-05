@@ -4398,8 +4398,8 @@ function onHandwrittenExtracted(data) {
   const newRecords = [];
 
   data.results.forEach(r => {
-    let rawModel = String(r.modelo || '').trim();
-    let rawColor = String(r.color || '').trim();
+    let rawModel = String(r.modelo || '').trim().replace(/[.,;:_\-\s]+$/, '');
+    let rawColor = String(r.color || '').trim().replace(/^[.,;:_\-\s]+/, '').replace(/[.,;:_\-\s]+$/, '');
 
     // 1. 단독 알파벳(D, E, G, H...) 또는 2~4자리 숫자(960...)가 color 필드로 잘못 들어온 경우 모델명으로 자동 복구
     if (!rawModel && (/^[A-Za-z]$/.test(rawColor) || /^\d{2,4}$/.test(rawColor))) {
@@ -4414,6 +4414,15 @@ function onHandwrittenExtracted(data) {
       if (KNOWN_COLORS.includes(upM) || COLOR_SYNONYMS[rawModel.toLowerCase().trim()]) {
         rawColor = rawModel;
         rawModel = '';
+      }
+    }
+
+    // 3. [추가 안전망] rawColor가 비어있는데 rawModel 뒤에 색상 단어가 붙어있는 경우 (예: "P-D60 blanco" 또는 "P-D60 . blanco")
+    if (!rawColor && rawModel) {
+      const ext = extractColorAndBase(rawModel);
+      if (ext.color) {
+        rawModel = ext.base;
+        rawColor = ext.color;
       }
     }
 
@@ -4548,6 +4557,10 @@ function onHandwrittenExtracted(data) {
     } else {
       msg += `\n(기존 [${currentLocValue}] 주문서에 이어서 누적 추가됨)`;
     }
+
+    msg += '\n\n📋 [인식된 품목 상세]:\n' + newRecords.map((rec, i) => 
+      ` ${i + 1}. ${rec.itemName} | 컬러: ${rec.color} | ${rec.unitType === 'individual' ? Math.abs(rec.individualQty) + '개' : Math.abs(rec.boxQty) + '상자'}`
+    ).join('\n');
 
     if (data.usageMetadata) {
       const meta = data.usageMetadata;

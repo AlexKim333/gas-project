@@ -1323,8 +1323,11 @@ Rules:
    - "requester": Order requester/admin name written at the top right, especially text that is UNDERLINED (e.g. text with an underline '___' like 'Sr. Kim', '요청자이름', or in parentheses). If not found, return "".
 
 2. Delimiters (for Form B free-form):
-   - ONLY commas (',') and dots ('.') are delimiters between fields.
+   - Field delimiters are commas (',') and dots ('.').
    - Spaces/whitespace are NEVER delimiters (preserve spaces in multi-word colors like "Palo Rosa", "Azul Marino" or models).
+   - If consecutive punctuation marks appear together (e.g. ". ,", ".,", ",.", "..", ",,"), treat them as a SINGLE delimiter between fields!
+     For example: "P-D60 . , blanco , 1" -> modelo: "P-D60", color: "blanco", no_de_bultos: 1.
+   - A field is blank/empty ONLY when there is NO text word between delimiters before the next delimiter or quantity (e.g. "Cecik 24, , 1" -> color is empty; "25, , 1" -> color is empty). But if a color word like "blanco" or "negro" is present, ALWAYS capture it as "color"!
 
 3. Row Parsing Rules:
    - Each row line containing a quantity is a separate entry:
