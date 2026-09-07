@@ -4416,15 +4416,46 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;');
 }
 
-function parseLocationEntry(loc) {
+function parseLocationEntry(loc, query) {
   const trimmed = String(loc || '').trim();
+  
+  // 1. 괄호 형식: "고객명 (배송지)" 또는 "고객명(배송지)"
   const parenMatch = trimmed.match(/^([^(]+?)(?:\s*\((.*?)\))?$/);
-  const base = parenMatch && parenMatch[1] ? parenMatch[1].trim() : trimmed;
-  const detail = parenMatch && parenMatch[2] ? parenMatch[2].trim() : '';
+  if (parenMatch && parenMatch[2]) {
+    return {
+      fullLoc: trimmed,
+      baseName: parenMatch[1].trim(),
+      subDest: parenMatch[2].trim()
+    };
+  }
+
+  // 2. 구분자 형식: "고객명 - 배송지" 또는 "고객명 / 배송지"
+  const dashMatch = trimmed.match(/^([^-/]+?)\s*[-/]\s*(.+)$/);
+  if (dashMatch && dashMatch[2]) {
+    return {
+      fullLoc: trimmed,
+      baseName: dashMatch[1].trim(),
+      subDest: dashMatch[2].trim()
+    };
+  }
+
+  // 3. 띄어쓰기 형식 (검색어가 접두사인 경우): 예 "WILLIAM TIENDA 1"
+  if (query) {
+    const cleanQ = query.toLowerCase().trim();
+    const cleanL = trimmed.toLowerCase();
+    if (cleanL.startsWith(cleanQ + ' ')) {
+      return {
+        fullLoc: trimmed,
+        baseName: trimmed.slice(0, query.length).trim(),
+        subDest: trimmed.slice(query.length).trim()
+      };
+    }
+  }
+
   return {
     fullLoc: trimmed,
-    baseName: base,
-    subDest: detail
+    baseName: trimmed,
+    subDest: ''
   };
 }
 
@@ -4438,14 +4469,14 @@ function findMatchingLocations(rawBranch, locationList) {
     .trim();
   if (!cleanBranch) return [];
 
+  const normBranch = cleanBranch.toLowerCase();
   const parsedLocs = locationList
-    .map(loc => parseLocationEntry(loc))
+    .map(loc => parseLocationEntry(loc, normBranch))
     .filter(p => p.fullLoc && p.fullLoc !== '선택');
 
-  const normBranch = cleanBranch.toLowerCase();
   const normBranchNoParen = normBranch.replace(/[()]/g, ' ').replace(/\s+/g, ' ').trim();
 
-  // 1. 주문서에 배송지까지 구체적으로 적힌 경우 (예: "william tienda 1" or "william (tienda 1)")
+  // 1. 전체 배송지 명칭과 완전 일치 (예: "william tienda 1" or "william (tienda 1)")
   const exactFullMatches = [];
   for (const p of parsedLocs) {
     const normFull = p.fullLoc.toLowerCase();
@@ -4458,19 +4489,23 @@ function findMatchingLocations(rawBranch, locationList) {
     return exactFullMatches;
   }
 
-  // 2. 고객 기본명(괄호 앞부분) 기준 매칭
+  // 2. 고객 기본명(괄호/구분자 앞) 기준 매칭 및 부분일치
   const matches = [];
   for (const p of parsedLocs) {
     const normBase = p.baseName.toLowerCase();
+    const normFull = p.fullLoc.toLowerCase();
     let isMatch = false;
     let score = 0;
 
     if (normBase === normBranch) {
       isMatch = true;
       score = 1.0;
-    } else if (normBranch.length >= 3 && normBase.length >= 3 && (normBase === normBranch || normBase.startsWith(normBranch) || normBranch.startsWith(normBase))) {
+    } else if (normBranch.length >= 3 && (normBase.startsWith(normBranch) || normBranch.startsWith(normBase))) {
       isMatch = true;
       score = 0.9;
+    } else if (normBranch.length >= 3 && normFull.includes(normBranch)) {
+      isMatch = true;
+      score = 0.85;
     } else {
       const sim = sequenceMatcher(normBranch, normBase);
       if (sim >= 0.70) {
@@ -4638,16 +4673,31 @@ function onHandwrittenExtracted(data) {
   // 1-1. 지점명(출고처) 다중 후보 매칭 분석
   let detectedLoc = '';
   let candidateLocations = [];
-  if (data.branch && currentType === 'out') {
-    const allLocations = (locationCache && locationCache.length > 0)
-      ? locationCache
-      : (currentLocEl ? Array.from(currentLocEl.options).map(o => o.value).filter(Boolean) : []);
-    candidateLocations = findMatchingLocations(data.branch, allLocations);
+  const rawBranchCandidate = String(data.branch || data.requester || '').trim();
+
+  if (rawBranchCandidate && currentType === 'out') {
+    // 1순위: 서버에서 '출고처목록' 시트와 직접 매칭해준 결과 활용
+    if (data.matchedLocations && data.matchedLocations.length > 0) {
+      candidateLocations = data.matchedLocations;
+    } else {
+      // 2순위: 클라이언트 locationCache 및 select 옵션 활용
+      const allLocations = (locationCache && locationCache.length > 0)
+        ? locationCache
+        : (data.serverOutLocations && data.serverOutLocations.length > 0)
+          ? data.serverOutLocations
+          : (currentLocEl ? Array.from(currentLocEl.options).map(o => o.value).filter(Boolean) : []);
+      candidateLocations = findMatchingLocations(rawBranchCandidate, allLocations);
+    }
   }
 
-  // 1-2. 주문요청자(관리자) 매칭
+  // 만약 candidateLocations가 매칭되었고 data.branch가 비어있었다면 rawBranchCandidate로 동기화
+  if (candidateLocations.length > 0 && !data.branch) {
+    data.branch = rawBranchCandidate;
+  }
+
+  // 1-2. 주문요청자(관리자) 매칭 (고객/출고처로 사용되지 않은 경우에만)
   let detectedAdmin = '';
-  if (data.requester) {
+  if (data.requester && data.requester !== data.branch) {
     const rawReq = String(data.requester).trim().toLowerCase();
     if (currentAdminEl && currentAdminEl.options.length > 0) {
       let bestAdmin = '';
@@ -4874,9 +4924,9 @@ function onHandwrittenExtracted(data) {
       detectedAdmin: detectedAdmin,
       usageMetadata: data.usageMetadata,
       usedModel: data.usedModel,
-      customerName: candidateLocations[0].baseName || data.branch
+      customerName: candidateLocations[0].baseName || rawBranchCandidate
     };
-    openMultiLocationSelectModal(candidateLocations, candidateLocations[0].baseName || data.branch);
+    openMultiLocationSelectModal(candidateLocations, candidateLocations[0].baseName || rawBranchCandidate);
     return;
   }
 
@@ -4890,8 +4940,8 @@ function onHandwrittenExtracted(data) {
   if (!hasExistingRecords) {
     if (detectedLoc) {
       msg += `\n출고처: [${detectedLoc}] 자동 선택됨`;
-    } else if (data.branch) {
-      msg += `\n⚠️ 주문서 지점명 [${data.branch}]이(가) 출고처 목록에 없어 미지정되었습니다. 상단 [출고처]에서 선택해 주세요.`;
+    } else if (rawBranchCandidate) {
+      msg += `\n⚠️ 주문서 지점명 [${rawBranchCandidate}]이(가) 출고처 목록에 없어 미지정되었습니다. 상단 [출고처]에서 선택해 주세요.`;
     }
     if (detectedAdmin) msg += `\n요청자(관리자): [${detectedAdmin}] 자동 선택됨`;
   } else {

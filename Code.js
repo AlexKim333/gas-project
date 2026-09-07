@@ -1304,6 +1304,111 @@ function getGeminiApiKey() {
   return key;
 }
 
+// -------------------------------------------------------------------
+// 🏢 서버 사이드 출고처/배송지 매칭 엔진
+// -------------------------------------------------------------------
+
+function parseLocationEntryServer(loc, query) {
+  const trimmed = String(loc || '').trim();
+  
+  // 1. 괄호 형식: "고객명 (배송지)" 또는 "고객명(배송지)"
+  const parenMatch = trimmed.match(/^([^(]+?)(?:\s*\((.*?)\))?$/);
+  if (parenMatch && parenMatch[2]) {
+    return {
+      fullLoc: trimmed,
+      baseName: parenMatch[1].trim(),
+      subDest: parenMatch[2].trim()
+    };
+  }
+
+  // 2. 구분자 형식: "고객명 - 배송지" 또는 "고객명 / 배송지"
+  const dashMatch = trimmed.match(/^([^-/]+?)\s*[-/]\s*(.+)$/);
+  if (dashMatch && dashMatch[2]) {
+    return {
+      fullLoc: trimmed,
+      baseName: dashMatch[1].trim(),
+      subDest: dashMatch[2].trim()
+    };
+  }
+
+  // 3. 띄어쓰기 형식 (검색어가 접두사인 경우): 예 "WILLIAM TIENDA 1"
+  if (query) {
+    const cleanQ = query.toLowerCase().trim();
+    const cleanL = trimmed.toLowerCase();
+    if (cleanL.startsWith(cleanQ + ' ')) {
+      return {
+        fullLoc: trimmed,
+        baseName: trimmed.slice(0, query.length).trim(),
+        subDest: trimmed.slice(query.length).trim()
+      };
+    }
+  }
+
+  return {
+    fullLoc: trimmed,
+    baseName: trimmed,
+    subDest: ''
+  };
+}
+
+function findMatchingLocationsServer(rawBranch, locationList) {
+  if (!rawBranch || !locationList || locationList.length === 0) return [];
+  
+  const cleanBranch = String(rawBranch)
+    .trim()
+    .replace(/^[.,;:_\-\s]+/, '')
+    .replace(/[.,;:_\-\s]+$/, '')
+    .trim();
+  if (!cleanBranch) return [];
+
+  const normBranch = cleanBranch.toLowerCase();
+  const parsedLocs = locationList
+    .map(loc => parseLocationEntryServer(loc, normBranch))
+    .filter(p => p.fullLoc && p.fullLoc !== '선택');
+
+  const normBranchNoParen = normBranch.replace(/[()]/g, ' ').replace(/\s+/g, ' ').trim();
+
+  // 1. 전체 배송지 명칭과 완전 일치
+  const exactFullMatches = [];
+  for (const p of parsedLocs) {
+    const normFull = p.fullLoc.toLowerCase();
+    const normFullNoParen = normFull.replace(/[()]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (normFull === normBranch || normFullNoParen === normBranchNoParen) {
+      exactFullMatches.push({ ...p, score: 1.0 });
+    }
+  }
+  if (exactFullMatches.length === 1) {
+    return exactFullMatches;
+  }
+
+  // 2. 고객 기본명(괄호/구분자 앞) 기준 매칭 및 부분일치
+  const matches = [];
+  for (const p of parsedLocs) {
+    const normBase = p.baseName.toLowerCase();
+    const normFull = p.fullLoc.toLowerCase();
+    let isMatch = false;
+    let score = 0;
+
+    if (normBase === normBranch) {
+      isMatch = true;
+      score = 1.0;
+    } else if (normBranch.length >= 3 && (normBase.startsWith(normBranch) || normBranch.startsWith(normBase))) {
+      isMatch = true;
+      score = 0.9;
+    } else if (normBranch.length >= 3 && normFull.includes(normBranch)) {
+      isMatch = true;
+      score = 0.85;
+    }
+
+    if (isMatch) {
+      matches.push({ ...p, score });
+    }
+  }
+
+  matches.sort((a, b) => b.score - a.score);
+  return matches;
+}
+
 function analyzeHandwrittenOrder(imageBase64) {
   if (!imageBase64) {
     throw new Error('전달된 이미지 데이터가 없습니다.');
@@ -1319,8 +1424,8 @@ function analyzeHandwrittenOrder(imageBase64) {
 
 Rules:
 1. Header Information:
-   - "branch": Branch/customer name written at the top header (e.g. "Aztecas", "CARMEN", "TIENDA", "CHINCONCUAC", "지점명"). If not found, return "".
-   - "requester": Order requester/admin name written at the top right, especially text that is UNDERLINED (e.g. text with an underline '___' like 'Sr. Kim', '요청자이름', or in parentheses). If not found, return "".
+   - "branch": Customer, client, or branch/store name written at the top header (e.g. "william", "Fernando", "Aztecas", "CARMEN", "TIENDA", "CHINCONCUAC", "Abelardo", customer name, store name). Any standalone name or store written at the top header (like 'william.', 'carmen', 'sr. kim') is the primary customer/branch! ALWAYS return this in "branch"! If not found, return "".
+   - "requester": Order requester/admin name ONLY if explicitly underlined (e.g. text with an underline '___' like 'Sr. Kim___') or clearly labeled as the internal salesperson/admin. If not explicitly an admin/salesperson, put any name written at the top into "branch"! If not found, return "".
 
 2. Delimiters (for Form B free-form):
    - Field delimiters are commas (',') and dots ('.').
@@ -1417,6 +1522,24 @@ Return ONLY valid JSON:
     const parsed = JSON.parse(cleanJson.trim());
     parsed.usageMetadata = usageMetadata;
     parsed.usedModel = usedModel;
+
+    // 1. Fallback: branch가 비어있고 requester에 고객명이 추출된 경우 branch로 자동 승격
+    if (!parsed.branch && parsed.requester) {
+      parsed.branch = parsed.requester;
+    }
+
+    // 2. 서버 사이드 실시간 '출고처목록' 매칭
+    try {
+      const outLocations = getOutLocations();
+      parsed.serverOutLocations = outLocations;
+      const targetQuery = (parsed.branch || parsed.requester || '').trim();
+      parsed.matchedLocations = findMatchingLocationsServer(targetQuery, outLocations);
+      console.log(`[OCR 지점 매칭] 추출지점: "${targetQuery}" -> 매칭 ${parsed.matchedLocations.length}건: ` + JSON.stringify(parsed.matchedLocations));
+    } catch (locErr) {
+      console.warn('출고처 매칭 중 서버 오류:', locErr.message);
+      parsed.matchedLocations = [];
+    }
+
     return parsed;
   } catch (err) {
     throw new Error(`분석 결과 JSON 파싱 오류: ${err.message}\n응답: ${rawResponse.slice(0, 300)}`);
