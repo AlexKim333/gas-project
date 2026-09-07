@@ -1777,9 +1777,61 @@ let unitType = 'box';
 let pendingRecord = <?!= pendingRecord ?>;
 let selectedPendingIndex = -1;
 let stockDataCache = [];
+let recentQuickAdjustments = {};
+try {
+  const savedAdj = localStorage.getItem('recent_quick_adjustments');
+  if (savedAdj) recentQuickAdjustments = JSON.parse(savedAdj);
+} catch (e) {}
+
+function applyRecentAdjustments(dataList) {
+  if (!dataList || dataList.length === 0) return dataList;
+  const now = Date.now();
+  const validThreshold = 10 * 60 * 1000; // 10분간 보호
+  let hasValid = false;
+
+  Object.keys(recentQuickAdjustments).forEach(k => {
+    const adj = recentQuickAdjustments[k];
+    if (now - adj.timestamp < validThreshold) {
+      hasValid = true;
+      const targetClean = (adj.itemName || '').replace(/[\s_\-]/g, '').toLowerCase();
+      const targetColor = (adj.color || 'SURTIDO').trim().toLowerCase();
+      let found = false;
+      dataList.forEach(s => {
+        const sClean = (s.name || '').replace(/[\s_\-]/g, '').toLowerCase();
+        const sColor = (s.color || 'SURTIDO').trim().toLowerCase();
+        if (sClean === targetClean && sColor === targetColor) {
+          s.stockBox = adj.targetBox;
+          s.stockIndividual = adj.targetIndividual;
+          found = true;
+        }
+      });
+      if (!found) {
+        dataList.push({
+          name: adj.itemName,
+          color: adj.color || 'SURTIDO',
+          stockBox: adj.targetBox,
+          stockIndividual: adj.targetIndividual,
+          boxContent: adj.boxContent || 0,
+          safeStock: 0
+        });
+      }
+    } else {
+      delete recentQuickAdjustments[k];
+    }
+  });
+
+  try {
+    localStorage.setItem('recent_quick_adjustments', JSON.stringify(recentQuickAdjustments));
+  } catch (e) {}
+
+  return dataList;
+}
+
 try {
   const cachedStock = localStorage.getItem('cached_stock_data') || sessionStorage.getItem('cached_stock_data');
-  if (cachedStock) stockDataCache = JSON.parse(cachedStock);
+  if (cachedStock) {
+    stockDataCache = applyRecentAdjustments(JSON.parse(cachedStock));
+  }
 } catch (e) {}
 let locationCache = [];
 let debounceTimeout;
@@ -1906,13 +1958,13 @@ function loadStockData(silent = false) {
 
   Promise.race([loadPromise, timeoutPromise])
     .then(data => {
-      stockDataCache = data;
+      stockDataCache = applyRecentAdjustments(data || []);
       isLoadingStockData = false;
       if (loadingIndicator && document.body.contains(loadingIndicator)) {
         document.body.removeChild(loadingIndicator);
       }
       try {
-        localStorage.setItem('cached_stock_data', JSON.stringify(data));
+        localStorage.setItem('cached_stock_data', JSON.stringify(stockDataCache));
         localStorage.setItem('stock_data_updated', Date.now().toString());
       } catch (e) {}
       initProductHotkeys();
@@ -2327,13 +2379,17 @@ function handleQtyInput(el) {
 }
 
 function checkItemAndStock(itemName, color, boxContent, qty, unitType) {
-  const normColor = color || 'SURTIDO';
+  const normColor = (color || 'SURTIDO').trim().toLowerCase();
   const normBoxContent = Number(boxContent) || 0;
-  const item = stockDataCache.find(item => 
-    item.key === `${itemName}_${normColor}_${normBoxContent}` ||
-    (item.name === itemName && item.color === normColor && Number(item.boxContent) === normBoxContent) ||
-    (item.name === itemName && item.color === normColor)
-  );
+  const targetClean = (itemName || '').replace(/[\s_\-]/g, '').toLowerCase();
+
+  const item = stockDataCache.find(it => {
+    const itClean = (it.name || '').replace(/[\s_\-]/g, '').toLowerCase();
+    const itColor = (it.color || 'SURTIDO').trim().toLowerCase();
+    const itBoxContent = Number(it.boxContent) || 0;
+    return (itClean === targetClean && itColor === normColor && (normBoxContent <= 0 || itBoxContent === normBoxContent)) ||
+           (itClean === targetClean && itColor === normColor);
+  });
 
   if (!item) {
     return { isRegistered: false };
@@ -2507,10 +2563,13 @@ function updateTable() {
       let stockDisplay = '';
 
       if (stockDataCache && stockDataCache.length > 0) {
-        const sInfo = stockDataCache.find(s => 
-          s.name.toLowerCase() === rec.itemName.toLowerCase() && 
-          (s.color || 'SURTIDO').toLowerCase() === (rec.color || 'SURTIDO').toLowerCase()
-        );
+        const recCleanName = (rec.itemName || '').replace(/[\s_\-]/g, '').toLowerCase();
+        const recCleanColor = (rec.color || 'SURTIDO').trim().toLowerCase();
+        const sInfo = stockDataCache.find(s => {
+          const sCleanName = (s.name || '').replace(/[\s_\-]/g, '').toLowerCase();
+          const sCleanColor = (s.color || 'SURTIDO').trim().toLowerCase();
+          return sCleanName === recCleanName && sCleanColor === recCleanColor;
+        });
         const curBox = sInfo ? (sInfo.stockBox || 0) : 0;
         const curIndiv = sInfo ? (sInfo.stockIndividual || 0) : 0;
 
@@ -4091,49 +4150,41 @@ function submitQuickStockAdjustment() {
       if (btn) { btn.disabled = false; btn.textContent = '💾 재고조정 실행'; }
       closeQuickStockModal();
 
-      // In-memory stockDataCache 즉시 갱신 (공백/대소문자 무시 정밀 매칭)
+      // 1. 최근 조정 목록에 등록 (향후 10분간 구글 시트 복제 지연으로 인한 이전 수량 덮어쓰기 완벽 방지)
       const targetCleanName = (payload[0].itemName || '').replace(/[\s_\-]/g, '').toLowerCase();
       const targetCleanColor = (payload[0].color || 'SURTIDO').trim().toLowerCase();
-      let cacheUpdated = false;
+      const adjKey = `${targetCleanName}__${targetCleanColor}`;
 
-      if (stockDataCache && stockDataCache.length > 0) {
-        stockDataCache.forEach(s => {
-          const sCleanName = (s.name || '').replace(/[\s_\-]/g, '').toLowerCase();
-          const sCleanColor = (s.color || 'SURTIDO').trim().toLowerCase();
-          if (sCleanName === targetCleanName && sCleanColor === targetCleanColor) {
-            s.stockBox = targetBox;
-            s.stockIndividual = targetIndiv;
-            cacheUpdated = true;
-          }
-        });
-      }
+      recentQuickAdjustments[adjKey] = {
+        itemName: payload[0].itemName,
+        color: payload[0].color || 'SURTIDO',
+        boxContent: payload[0].boxContent || 0,
+        targetBox: targetBox,
+        targetIndividual: targetIndiv,
+        timestamp: Date.now()
+      };
 
-      if (!cacheUpdated) {
-        stockDataCache.push({
-          name: payload[0].itemName,
-          color: payload[0].color || 'SURTIDO',
-          stockBox: targetBox,
-          stockIndividual: targetIndiv,
-          boxContent: payload[0].boxContent || 0,
-          safeStock: 0
-        });
-      }
+      // 2. In-memory stockDataCache 즉시 갱신
+      applyRecentAdjustments(stockDataCache);
 
-      // 로컬 스토리지 캐시 및 창간 동기화 즉시 갱신
+      // 3. 로컬 스토리지 캐시 및 다른 창/탭 실시간 동기화 브로드캐스트
       try {
+        localStorage.setItem('recent_quick_adjustments', JSON.stringify(recentQuickAdjustments));
         localStorage.setItem('cached_stock_data', JSON.stringify(stockDataCache));
         localStorage.setItem('stock_data_updated', Date.now().toString());
         localStorage.setItem('wms_cross_window_stock_sync', Date.now().toString());
       } catch (e) {}
 
-      // 즉각 화면 렌더링 (재고부족 빨간색 경고 및 퀵재고 버튼 즉시 해제)
+      // 4. 즉각 화면 렌더링 (재고부족 빨간색 경고 및 퀵재고 버튼 즉시 해제 & 가용재고 즉시 표시)
       updateTable();
       updateTotals();
 
-      // 백그라운드에서 구글 시트 실제 재고와 2중 자동 무음 동기화
-      loadStockData(true);
-
-      alert(`✅ [${payload[0].itemName} (${payload[0].color})] 재고가 ${targetBox}상자로 즉시 조정되었습니다.\n\n테이블 가용재고가 (${targetBox}+${targetIndiv})로 즉각 반영되었습니다.`);
+      // 5. 브라우저 DOM 렌더링 완료 후 완료 알림 표시
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          alert(`✅ [${payload[0].itemName} (${payload[0].color || 'SURTIDO'})] 재고가 ${targetBox}상자로 즉시 조정되었습니다.\n\n테이블 가용재고가 (${targetBox}+${targetIndiv})로 즉각 반영되었습니다.`);
+        }, 50);
+      });
     })
     .withFailureHandler(function(err) {
       if (btn) { btn.disabled = false; btn.textContent = '💾 재고조정 실행'; }
