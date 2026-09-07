@@ -4292,6 +4292,84 @@ function resolveDerivedModelName(rawModel, lastModel) {
 }
 
 // -------------------------------------------------------------------
+// 🔍 스마트 숫자 역검색 엔진 (유령 품목 생성 방지 및 자동 품목 매칭)
+// 접두사 없는 숫자('5007' 등) 입력 시 창고 카탈로그 전체에서 끝자리 일치/유사 품목 자동 탐색
+// -------------------------------------------------------------------
+function findCatalogByNumericSuffix(numStr, catalog) {
+  if (!numStr || !catalog || catalog.length === 0) return null;
+  const targetNum = String(numStr).replace(/[^\d]/g, '');
+  if (!targetNum || targetNum.length < 2) return null;
+
+  const exactSuffixMatches = [];
+  const exactNumberMatches = [];
+  const seenNames = new Set();
+
+  catalog.forEach(item => {
+    if (!item.name) return;
+    const cleanName = item.name.replace(/[\s_\-]/g, '').toUpperCase();
+    if (seenNames.has(cleanName)) return;
+    seenNames.add(cleanName);
+
+    const numMatch = cleanName.match(/(\d+)$/);
+    if (numMatch) {
+      if (numMatch[1] === targetNum) {
+        exactSuffixMatches.push(item);
+      }
+    } else {
+      const allNums = cleanName.match(/\d+/g);
+      if (allNums && allNums.includes(targetNum)) {
+        exactNumberMatches.push(item);
+      }
+    }
+  });
+
+  if (exactSuffixMatches.length === 1) {
+    return exactSuffixMatches[0];
+  } else if (exactSuffixMatches.length > 1) {
+    const withStock = exactSuffixMatches.find(it => (it.stockBox || 0) > 0);
+    return withStock || exactSuffixMatches[0];
+  }
+
+  if (exactNumberMatches.length === 1) {
+    return exactNumberMatches[0];
+  }
+
+  // 2단계: 4자리 이상 숫자인 경우 1자리 오타(필기/타이핑 오차) 유사도 역검색
+  // 예: 손글씨 '5007' vs 마스터 'YE5077' (거리 1)
+  if (targetNum.length >= 4) {
+    const typoCandidates = [];
+    seenNames.clear();
+    catalog.forEach(item => {
+      if (!item.name) return;
+      const cleanName = item.name.replace(/[\s_\-]/g, '').toUpperCase();
+      if (seenNames.has(cleanName)) return;
+      seenNames.add(cleanName);
+
+      const numMatch = cleanName.match(/(\d{3,5})$/);
+      if (numMatch && numMatch[1].length === targetNum.length) {
+        const candNum = numMatch[1];
+        let diff = 0;
+        for (let i = 0; i < targetNum.length; i++) {
+          if (targetNum[i] !== candNum[i]) diff++;
+        }
+        if (diff === 1) {
+          typoCandidates.push(item);
+        }
+      }
+    });
+
+    if (typoCandidates.length === 1) {
+      return typoCandidates[0];
+    } else if (typoCandidates.length > 1) {
+      const withStock = typoCandidates.find(it => (it.stockBox || 0) > 0);
+      return withStock || typoCandidates[0];
+    }
+  }
+
+  return null;
+}
+
+// -------------------------------------------------------------------
 // Python difflib.SequenceMatcher (Gestalt Pattern Matching) 100% 포팅
 // 마스터 테이블(1,472개 전 품목) 대상 수학적 유사도 기반 자동 매칭
 // -------------------------------------------------------------------
@@ -4889,12 +4967,27 @@ function onHandwrittenExtracted(data) {
         finalColor = (rawColor && rawColor !== 'SURTIDO') ? normalizeColor(rawColor) : (exactMaster.color || 'SURTIDO');
         finalBoxContent = exactMaster.boxContent;
         lastItemInfo = exactMaster;
-      } else {
-        // 마스터에 아직 미등록된 파생 품목인 경우:
-        // ⚠️ 절대 다른 형제 품목(CECIK999C 등)으로 퍼지 매칭하지 않고 파생 모델명을 그대로 보존!
+      } else if (isSingleAlpha) {
+        // 단일 알파벳 접미사(D, E, G...)는 신규 미등록 파생 모델로 인정하여 품명 보존
         finalItemName = derivedModel;
         finalColor = rawColor ? normalizeColor(rawColor) : 'SURTIDO';
         finalBoxContent = lastItemInfo ? lastItemInfo.boxContent : 0;
+      } else {
+        // 🚨 [핵심 개선] 숫자 접미사(5007 등)를 앞 접두사(AD)와 합성했으나 마스터에 없는 경우:
+        // 유령 품목(AD5007)을 임의 생성하지 않고, 마스터 카탈로그 전체에서 스마트 숫자 역검색 실행!
+        const smartMatch = findCatalogByNumericSuffix(rawModel, stockDataCache);
+        if (smartMatch) {
+          finalItemName = smartMatch.name;
+          finalColor = (rawColor && rawColor !== 'SURTIDO') ? normalizeColor(rawColor) : (smartMatch.color || 'SURTIDO');
+          finalBoxContent = smartMatch.boxContent;
+          lastItemInfo = smartMatch;
+        } else {
+          // 스마트 역검색에도 전혀 없으면: 엉뚱한 접두사(AD)를 붙이지 않고, 사용자가 쓴 원문 숫자 그대로 독립 품목으로 보존!
+          finalItemName = rawModel;
+          finalColor = rawColor ? normalizeColor(rawColor) : 'SURTIDO';
+          finalBoxContent = 0;
+          lastItemInfo = null;
+        }
       }
       lastBaseModel = finalItemName;
     } else if (lastBaseModel && !rawModel) {
@@ -4933,7 +5026,15 @@ function onHandwrittenExtracted(data) {
 
       const queryBase = base || rawModel;
       const combinedQuery = queryBase ? `${queryBase} ${color}`.trim() : color;
-      const matchRes = findBestCatalogMatch(combinedQuery, stockDataCache, 0.55);
+      let matchRes = findBestCatalogMatch(combinedQuery, stockDataCache, 0.55);
+
+      // 스마트 숫자 역검색 보강 (독립 행에 접두사 없는 숫자만 들어온 경우 자동 보정)
+      if (!matchRes && /^\d{2,4}$/.test(queryBase)) {
+        const numMatch = findCatalogByNumericSuffix(queryBase, stockDataCache);
+        if (numMatch) {
+          matchRes = { item: numMatch, score: 0.9 };
+        }
+      }
 
       finalItemName = matchRes ? matchRes.item.name : queryBase;
       const cleanMatchedName = finalItemName.replace(/[\s_\-]/g, '').toUpperCase();
