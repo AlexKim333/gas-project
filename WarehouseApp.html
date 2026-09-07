@@ -1214,6 +1214,63 @@
     .btn-cancel-slots:hover {
       background: #475569;
     }
+
+    /* 🏢 다중 배송지(출고처) 선택 모달 스타일 */
+    .multi-loc-card {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      padding: 10px 14px;
+      background: #ffffff;
+      border: 1.5px solid #cbd5e1;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.15s ease-in-out;
+      text-align: left;
+      box-sizing: border-box;
+      outline: none;
+    }
+    .multi-loc-card:hover, .multi-loc-card:focus {
+      background: #eff6ff;
+      border-color: #3b82f6;
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+      transform: translateY(-1px);
+    }
+    .multi-loc-key {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      background: #f1f5f9;
+      color: #334155;
+      border: 1px solid #94a3b8;
+      border-radius: 4px;
+      font-size: 8.5pt;
+      font-weight: 700;
+      margin-right: 10px;
+      flex-shrink: 0;
+    }
+    .multi-loc-name {
+      font-size: 9.8pt;
+      font-weight: 600;
+      color: #1e293b;
+      flex: 1;
+    }
+    .multi-loc-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 10px;
+      background: #e0f2fe;
+      color: #0369a1;
+      border: 1px solid #bae6fd;
+      border-radius: 6px;
+      font-size: 8.8pt;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
   </style>
 </head>
 <body>
@@ -1679,6 +1736,35 @@
       </div>
     </div>
 
+    <!-- 🏢 다중 배송지(출고처) 선택 모달 -->
+    <div id="multiLocationSelectModal" class="modal" style="display: none; width: 480px; max-width: 95%; padding: 20px; box-shadow: 0 20px 50px rgba(0,0,0,0.3); border-radius: 12px; z-index: 1080; border: 1.5px solid #cbd5e1;">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 12px;">
+        <h3 style="margin: 0; color: #b45309; font-size: 12pt; font-weight: bold; display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 16pt;">🏢</span> <span>배송지(출고처) 선택 필요</span>
+        </h3>
+        <button type="button" onclick="cancelMultiLocationSelect()" style="border: none; background: none; font-size: 18pt; cursor: pointer; color: #94a3b8; line-height: 1;">&times;</button>
+      </div>
+
+      <div style="background: #fffbeb; border: 1.5px solid #fde68a; border-radius: 8px; padding: 10px 14px; margin-bottom: 14px;">
+        <div style="color: #92400e; font-size: 9.5pt; font-weight: bold; margin-bottom: 4px;">
+          ⚠️ 고객 <span id="multiLocCustomerName" style="color: #b45309; text-decoration: underline;">고객명</span>에 등록된 배달지가 여러 개 있습니다.
+        </div>
+        <div style="color: #78350f; font-size: 8.5pt; line-height: 1.4;">
+          주문서의 배달지 괄호 <code>( )</code> 내용을 확인하시고, 아래 목록에서 해당 배송지를 선택해 주세요.
+        </div>
+      </div>
+
+      <!-- 배송지 선택 목록 -->
+      <div id="multiLocationList" style="display: flex; flex-direction: column; gap: 8px; max-height: 300px; overflow-y: auto; margin-bottom: 14px; padding: 2px;">
+        <!-- 동적 생성: multi-loc-card 버튼 목록 -->
+      </div>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #e2e8f0; padding-top: 12px;">
+        <button type="button" onclick="cancelMultiLocationSelect()" style="padding: 7px 14px; background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 8.5pt;">나중에 직접 선택</button>
+        <span style="font-size: 8pt; color: #64748b;">키보드 숫자키 (1, 2, 3...) 또는 마우스 클릭</span>
+      </div>
+    </div>
+
     <iframe id="printFrame" style="display: none;"></iframe>
   </div>
 
@@ -1889,6 +1975,22 @@ function saveMetadata() {
     };
     localStorage.setItem(storageKey, JSON.stringify(metadata));
     if (typeof highlightActiveLocationButton === 'function') highlightActiveLocationButton();
+
+    // 출고처 선택/변경 시 현재 장바구니 품목들의 출고처 동기화
+    if (locationSelect && locationSelect.value && records && records.length > 0) {
+      let changed = false;
+      records.forEach(r => {
+        if (r.location !== locationSelect.value) {
+          r.location = locationSelect.value;
+          changed = true;
+        }
+      });
+      if (changed) {
+        const sessionKey = typeConfig[currentType].sessionStorageKey;
+        localStorage.setItem(sessionKey, JSON.stringify(records));
+        updateTable();
+      }
+    }
   } catch (e) {
   }
 }
@@ -4300,6 +4402,225 @@ function onHandwrittenError(err) {
   alert('❌ 손글씨 분석 중 오류가 발생했습니다:\n' + (err.message || err));
 }
 
+// -------------------------------------------------------------------
+// 🏢 다중 배송지(출고처) 감지 및 괄호 () 배송지 파싱 엔진
+// -------------------------------------------------------------------
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function parseLocationEntry(loc) {
+  const trimmed = String(loc || '').trim();
+  const parenMatch = trimmed.match(/^([^(]+?)(?:\s*\((.*?)\))?$/);
+  const base = parenMatch && parenMatch[1] ? parenMatch[1].trim() : trimmed;
+  const detail = parenMatch && parenMatch[2] ? parenMatch[2].trim() : '';
+  return {
+    fullLoc: trimmed,
+    baseName: base,
+    subDest: detail
+  };
+}
+
+function findMatchingLocations(rawBranch, locationList) {
+  if (!rawBranch || !locationList || locationList.length === 0) return [];
+  
+  const cleanBranch = String(rawBranch)
+    .trim()
+    .replace(/^[.,;:_\-\s]+/, '')
+    .replace(/[.,;:_\-\s]+$/, '')
+    .trim();
+  if (!cleanBranch) return [];
+
+  const parsedLocs = locationList
+    .map(loc => parseLocationEntry(loc))
+    .filter(p => p.fullLoc && p.fullLoc !== '선택');
+
+  const normBranch = cleanBranch.toLowerCase();
+  const normBranchNoParen = normBranch.replace(/[()]/g, ' ').replace(/\s+/g, ' ').trim();
+
+  // 1. 주문서에 배송지까지 구체적으로 적힌 경우 (예: "william tienda 1" or "william (tienda 1)")
+  const exactFullMatches = [];
+  for (const p of parsedLocs) {
+    const normFull = p.fullLoc.toLowerCase();
+    const normFullNoParen = normFull.replace(/[()]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (normFull === normBranch || normFullNoParen === normBranchNoParen) {
+      exactFullMatches.push({ ...p, score: 1.0 });
+    }
+  }
+  if (exactFullMatches.length === 1) {
+    return exactFullMatches;
+  }
+
+  // 2. 고객 기본명(괄호 앞부분) 기준 매칭
+  const matches = [];
+  for (const p of parsedLocs) {
+    const normBase = p.baseName.toLowerCase();
+    let isMatch = false;
+    let score = 0;
+
+    if (normBase === normBranch) {
+      isMatch = true;
+      score = 1.0;
+    } else if (normBranch.length >= 3 && normBase.length >= 3 && (normBase === normBranch || normBase.startsWith(normBranch) || normBranch.startsWith(normBase))) {
+      isMatch = true;
+      score = 0.9;
+    } else {
+      const sim = sequenceMatcher(normBranch, normBase);
+      if (sim >= 0.70) {
+        isMatch = true;
+        score = sim;
+      }
+    }
+
+    if (isMatch) {
+      matches.push({ ...p, score });
+    }
+  }
+
+  matches.sort((a, b) => b.score - a.score);
+  return matches;
+}
+
+let currentMultiLocMatches = [];
+let pendingMultiLocState = null;
+
+function openMultiLocationSelectModal(matches, customerName) {
+  currentMultiLocMatches = matches || [];
+  const modal = document.getElementById('multiLocationSelectModal');
+  const overlay = document.getElementById('modalOverlay');
+  const nameEl = document.getElementById('multiLocCustomerName');
+  const listEl = document.getElementById('multiLocationList');
+  if (!modal || !listEl) return;
+
+  if (nameEl) nameEl.textContent = customerName || '고객';
+
+  let html = '';
+  currentMultiLocMatches.forEach((m, idx) => {
+    const keyNum = idx + 1;
+    const destTag = m.subDest
+      ? `<span class="multi-loc-badge">📍 ${escapeHtml(m.subDest)}</span>`
+      : '<span class="multi-loc-badge" style="background: #f1f5f9; color: #475569; border-color: #cbd5e1;">기본</span>';
+    const escapedLoc = m.fullLoc.replace(/'/g, "\\'");
+
+    html += `
+      <button type="button" class="multi-loc-card" onclick="selectDisambiguatedLocation('${escapedLoc}')">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span class="multi-loc-key">${keyNum <= 9 ? keyNum : '•'}</span>
+          <span class="multi-loc-name">${escapeHtml(m.baseName)}</span>
+        </div>
+        ${destTag}
+      </button>
+    `;
+  });
+  listEl.innerHTML = html;
+
+  modal.style.display = 'block';
+  if (overlay) overlay.style.display = 'block';
+}
+
+function closeMultiLocationSelectModal() {
+  const modal = document.getElementById('multiLocationSelectModal');
+  const overlay = document.getElementById('modalOverlay');
+  if (modal) modal.style.display = 'none';
+  if (overlay && (!document.getElementById('orderDraftModal') || document.getElementById('orderDraftModal').style.display === 'none')) {
+    overlay.style.display = 'none';
+  }
+  currentMultiLocMatches = [];
+}
+
+function selectDisambiguatedLocation(selectedLoc) {
+  if (!pendingMultiLocState) {
+    closeMultiLocationSelectModal();
+    return;
+  }
+
+  const { records: pendingRecs, detectedAdmin, usageMetadata, usedModel } = pendingMultiLocState;
+  const currentLocEl = document.getElementById('location');
+  const currentAdminEl = document.getElementById('adminSelect');
+
+  // 1. 상단 드롭다운 및 메타데이터 업데이트
+  if (currentLocEl) {
+    currentLocEl.value = selectedLoc;
+  }
+  if (detectedAdmin && currentAdminEl) {
+    currentAdminEl.value = detectedAdmin;
+  }
+  saveMetadata();
+
+  // 2. 대기 품목들에 선택된 출고처 일괄 지정
+  pendingRecs.forEach(r => {
+    r.location = selectedLoc;
+  });
+
+  // 3. 장바구니에 품목 추가
+  records.push(...pendingRecs);
+  saveTableData();
+  updateTable();
+  updateTotals();
+
+  // 4. 완료 알림 팝업
+  const addedCount = pendingRecs.length;
+  let msg = `🎉 손글씨 주문서 인식 성공!\n\n총 ${addedCount}개 품목이 장바구니에 추가되었습니다.`;
+  msg += `\n출고처: [${selectedLoc}] 선택됨`;
+  if (detectedAdmin) {
+    msg += `\n요청자(관리자): [${detectedAdmin}] 자동 선택됨`;
+  }
+
+  msg += '\n\n📋 [인식된 품목 상세]:\n' + pendingRecs.map((rec, i) => 
+    ` ${i + 1}. ${rec.itemName} | 컬러: ${rec.color} | ${rec.unitType === 'individual' ? Math.abs(rec.individualQty) + '개' : Math.abs(rec.boxQty) + '상자'}`
+  ).join('\n');
+
+  if (usageMetadata) {
+    const meta = usageMetadata;
+    const totalTokens = (meta.totalTokenCount || 0).toLocaleString();
+    const promptTokens = (meta.promptTokenCount || 0).toLocaleString();
+    const outputTokens = (meta.candidatesTokenCount || 0).toLocaleString();
+    const modelName = usedModel || 'Gemini 3 Flash';
+    msg += `\n\n⚡ [AI 소비 토큰]: 총 ${totalTokens} 토큰\n(입력: ${promptTokens} / 출력: ${outputTokens} · ${modelName})`;
+  }
+
+  closeMultiLocationSelectModal();
+  pendingMultiLocState = null;
+
+  alert(msg);
+}
+
+function cancelMultiLocationSelect() {
+  if (!pendingMultiLocState) {
+    closeMultiLocationSelectModal();
+    return;
+  }
+
+  const { records: pendingRecs, detectedAdmin } = pendingMultiLocState;
+  const currentAdminEl = document.getElementById('adminSelect');
+  if (detectedAdmin && currentAdminEl) {
+    currentAdminEl.value = detectedAdmin;
+    saveMetadata();
+  }
+
+  // 출고처 미지정 상태로 장바구니에 담아 데이터 유실 방지
+  pendingRecs.forEach(r => {
+    r.location = '';
+  });
+  records.push(...pendingRecs);
+  saveTableData();
+  updateTable();
+  updateTotals();
+
+  const count = pendingRecs.length;
+  closeMultiLocationSelectModal();
+  pendingMultiLocState = null;
+
+  alert(`ℹ️ 총 ${count}개 품목이 장바구니에 추가되었습니다.\n\n⚠️ 출고처가 미지정 상태입니다. 상단 [출고처] 목록에서 알맞은 배송지를 직접 선택해 주세요.`);
+}
+
 function onHandwrittenExtracted(data) {
   showOcrLoadingModal(false);
   if (!data || !data.results || data.results.length === 0) {
@@ -4314,27 +4635,14 @@ function onHandwrittenExtracted(data) {
   const currentLocValue = currentLocEl ? currentLocEl.value.trim() : '';
   const currentAdminValue = currentAdminEl ? currentAdminEl.value.trim() : '';
 
-  // 1-1. 지점명(출고처) 매칭
+  // 1-1. 지점명(출고처) 다중 후보 매칭 분석
   let detectedLoc = '';
+  let candidateLocations = [];
   if (data.branch && currentType === 'out') {
-    const rawBranch = String(data.branch).trim().toLowerCase();
-    if (currentLocEl) {
-      let bestLoc = '';
-      let bestLocScore = 0;
-      let bestLocIndex = -1;
-      for (let i = 0; i < currentLocEl.options.length; i++) {
-        const optText = currentLocEl.options[i].text.toLowerCase();
-        const score = sequenceMatcher(rawBranch, optText);
-        if (score > bestLocScore) {
-          bestLocScore = score;
-          bestLocIndex = i;
-          bestLoc = currentLocEl.options[i].value;
-        }
-      }
-      if (bestLocScore >= 0.50 && bestLocIndex >= 0) {
-        detectedLoc = bestLoc;
-      }
-    }
+    const allLocations = (locationCache && locationCache.length > 0)
+      ? locationCache
+      : (currentLocEl ? Array.from(currentLocEl.options).map(o => o.value).filter(Boolean) : []);
+    candidateLocations = findMatchingLocations(data.branch, allLocations);
   }
 
   // 1-2. 주문요청자(관리자) 매칭
@@ -4361,13 +4669,20 @@ function onHandwrittenExtracted(data) {
     }
   }
 
-  // 🚨 [사장님 업무 규칙] 기존 장바구니에 품목이 이미 있는 경우 (두 번째 장 이상):
+  // 1-3. 🚨 [사장님 업무 규칙] 기존 장바구니에 품목이 이미 있는 경우 (두 번째 장 이상):
   // 제출 전까지는 첫 번째 장의 헤더(출고처/관리자)를 반드시 유지해야 함.
-  // 두 번째 장에서 다른 출고처나 관리자가 감지되면 에러 경고를 띄우고 입력을 즉시 차단!
+  // 동일 고객의 연속 장인지 판별 (후보 배송지 목록에 현재 장바구니 출고처가 포함되어 있는 경우)
   if (hasExistingRecords) {
+    const matchesCurrentLoc = candidateLocations.some(c => c.fullLoc.toUpperCase() === currentLocValue.toUpperCase());
+    if (matchesCurrentLoc) {
+      detectedLoc = currentLocValue;
+    } else if (candidateLocations.length === 1) {
+      detectedLoc = candidateLocations[0].fullLoc;
+    }
+
     const mismatchErrors = [];
-    if (detectedLoc && currentLocValue && detectedLoc.toUpperCase() !== currentLocValue.toUpperCase()) {
-      mismatchErrors.push(`• 출고처 불일치: 현재 장바구니 [${currentLocValue}] vs 이번 주문서 [${detectedLoc}]`);
+    if (candidateLocations.length > 0 && !matchesCurrentLoc && currentLocValue) {
+      mismatchErrors.push(`• 출고처 불일치: 현재 장바구니 [${currentLocValue}] vs 이번 주문서 [${candidateLocations[0]?.baseName || data.branch}]`);
     }
     if (detectedAdmin && currentAdminValue && detectedAdmin.toUpperCase() !== currentAdminValue.toUpperCase()) {
       mismatchErrors.push(`• 관리자(요청자) 불일치: 현재 장바구니 [${currentAdminValue}] vs 이번 주문서 [${detectedAdmin}]`);
@@ -4378,10 +4693,13 @@ function onHandwrittenExtracted(data) {
       return;
     }
   } else {
-    // 첫 번째 장인 경우: 감지된 출고처 및 관리자 자동 선택
-    if (detectedLoc && currentLocEl) {
-      currentLocEl.value = detectedLoc;
-      saveMetadata();
+    // 첫 번째 장인 경우: 단일 후보 감지 시 자동 선택
+    if (candidateLocations.length === 1) {
+      detectedLoc = candidateLocations[0].fullLoc;
+      if (currentLocEl) {
+        currentLocEl.value = detectedLoc;
+        saveMetadata();
+      }
     }
     if (detectedAdmin && currentAdminEl) {
       currentAdminEl.value = detectedAdmin;
@@ -4544,37 +4862,56 @@ function onHandwrittenExtracted(data) {
     addedCount++;
   });
 
-  if (addedCount > 0) {
-    records.push(...newRecords);
-    saveTableData();
-    updateTable();
-    updateTotals();
-    
-    let msg = `🎉 손글씨 주문서 인식 성공!\n\n총 ${addedCount}개 품목이 장바구니에 추가되었습니다.`;
-    if (!hasExistingRecords) {
-      if (detectedLoc) msg += `\n출고처: [${detectedLoc}] 자동 선택됨`;
-      if (detectedAdmin) msg += `\n요청자(관리자): [${detectedAdmin}] 자동 선택됨`;
-    } else {
-      msg += `\n(기존 [${currentLocValue}] 주문서에 이어서 누적 추가됨)`;
-    }
-
-    msg += '\n\n📋 [인식된 품목 상세]:\n' + newRecords.map((rec, i) => 
-      ` ${i + 1}. ${rec.itemName} | 컬러: ${rec.color} | ${rec.unitType === 'individual' ? Math.abs(rec.individualQty) + '개' : Math.abs(rec.boxQty) + '상자'}`
-    ).join('\n');
-
-    if (data.usageMetadata) {
-      const meta = data.usageMetadata;
-      const totalTokens = (meta.totalTokenCount || 0).toLocaleString();
-      const promptTokens = (meta.promptTokenCount || 0).toLocaleString();
-      const outputTokens = (meta.candidatesTokenCount || 0).toLocaleString();
-      const modelName = data.usedModel || 'Gemini 3 Flash';
-      msg += `\n\n⚡ [AI 소비 토큰]: 총 ${totalTokens} 토큰\n(입력: ${promptTokens} / 출력: ${outputTokens} · ${modelName})`;
-    }
-
-    alert(msg);
-  } else {
+  if (addedCount === 0) {
     alert('⚠️ 유효한 품목 또는 수량을 추출하지 못했습니다.');
+    return;
   }
+
+  // 🚨 [사장님 업무 규칙] 동일 고객 다중 배송지 감지 시 선택 모달 분기
+  if (!hasExistingRecords && candidateLocations.length >= 2) {
+    pendingMultiLocState = {
+      records: newRecords,
+      detectedAdmin: detectedAdmin,
+      usageMetadata: data.usageMetadata,
+      usedModel: data.usedModel,
+      customerName: candidateLocations[0].baseName || data.branch
+    };
+    openMultiLocationSelectModal(candidateLocations, candidateLocations[0].baseName || data.branch);
+    return;
+  }
+
+  // 단일 배송지이거나 기존 장바구니에 누적 추가되는 경우:
+  records.push(...newRecords);
+  saveTableData();
+  updateTable();
+  updateTotals();
+  
+  let msg = `🎉 손글씨 주문서 인식 성공!\n\n총 ${addedCount}개 품목이 장바구니에 추가되었습니다.`;
+  if (!hasExistingRecords) {
+    if (detectedLoc) {
+      msg += `\n출고처: [${detectedLoc}] 자동 선택됨`;
+    } else if (data.branch) {
+      msg += `\n⚠️ 주문서 지점명 [${data.branch}]이(가) 출고처 목록에 없어 미지정되었습니다. 상단 [출고처]에서 선택해 주세요.`;
+    }
+    if (detectedAdmin) msg += `\n요청자(관리자): [${detectedAdmin}] 자동 선택됨`;
+  } else {
+    msg += `\n(기존 [${currentLocValue}] 주문서에 이어서 누적 추가됨)`;
+  }
+
+  msg += '\n\n📋 [인식된 품목 상세]:\n' + newRecords.map((rec, i) => 
+    ` ${i + 1}. ${rec.itemName} | 컬러: ${rec.color} | ${rec.unitType === 'individual' ? Math.abs(rec.individualQty) + '개' : Math.abs(rec.boxQty) + '상자'}`
+  ).join('\n');
+
+  if (data.usageMetadata) {
+    const meta = data.usageMetadata;
+    const totalTokens = (meta.totalTokenCount || 0).toLocaleString();
+    const promptTokens = (meta.promptTokenCount || 0).toLocaleString();
+    const outputTokens = (meta.candidatesTokenCount || 0).toLocaleString();
+    const modelName = data.usedModel || 'Gemini 3 Flash';
+    msg += `\n\n⚡ [AI 소비 토큰]: 총 ${totalTokens} 토큰\n(입력: ${promptTokens} / 출력: ${outputTokens} · ${modelName})`;
+  }
+
+  alert(msg);
 }
 
 // 전역 클립보드 붙여넣기(Ctrl+V) 이벤트 리스너 (이미지 감지)
@@ -5211,6 +5548,23 @@ function confirmAddSubWarehouseOrder() {
 
 function setupHotkeyShortcuts() {
   window.addEventListener('keydown', (e) => {
+    // 🏢 다중 배송지(출고처) 선택 모달이 열려 있는 경우 숫자키(1~9) 및 Escape 처리
+    const multiLocModal = document.getElementById('multiLocationSelectModal');
+    if (multiLocModal && multiLocModal.style.display === 'block') {
+      if (!e.altKey && !e.shiftKey && !e.ctrlKey && e.key >= '1' && e.key <= '9') {
+        const idx = parseInt(e.key, 10) - 1;
+        if (currentMultiLocMatches && idx >= 0 && idx < currentMultiLocMatches.length) {
+          e.preventDefault();
+          selectDisambiguatedLocation(currentMultiLocMatches[idx].fullLoc);
+          return;
+        }
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        cancelMultiLocationSelect();
+        return;
+      }
+    }
+
     // Alt + Q/W/E : 핫키 탭 전환
     if (e.altKey && !e.shiftKey && !e.ctrlKey) {
       const key = e.key.toLowerCase();
@@ -5233,6 +5587,7 @@ function setupHotkeyShortcuts() {
     }
     // Escape : 열린 모달 닫기
     else if (e.key === 'Escape') {
+      closeMultiLocationSelectModal();
       closeGridSelectionModal();
       closeHotkeyConfigModal();
       closeQuickStockModal();
