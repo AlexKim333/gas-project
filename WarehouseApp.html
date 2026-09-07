@@ -4091,34 +4091,49 @@ function submitQuickStockAdjustment() {
       if (btn) { btn.disabled = false; btn.textContent = '💾 재고조정 실행'; }
       closeQuickStockModal();
 
-      // In-memory stockDataCache 즉시 갱신
-      if (res && res.updatedItems) {
-        res.updatedItems.forEach(u => {
-          const item = stockDataCache.find(s => 
-            s.name.toLowerCase() === u.name.toLowerCase() && 
-            (s.color || 'SURTIDO').toLowerCase() === (u.color || 'SURTIDO').toLowerCase()
-          );
-          if (item) {
-            item.stockBox = u.box;
-            item.stockIndividual = u.individual;
-          } else {
-            stockDataCache.push({
-              name: u.name,
-              color: u.color,
-              stockBox: u.box,
-              stockIndividual: u.individual,
-              boxContent: u.boxContent,
-              safeStock: 0
-            });
+      // In-memory stockDataCache 즉시 갱신 (공백/대소문자 무시 정밀 매칭)
+      const targetCleanName = (payload[0].itemName || '').replace(/[\s_\-]/g, '').toLowerCase();
+      const targetCleanColor = (payload[0].color || 'SURTIDO').trim().toLowerCase();
+      let cacheUpdated = false;
+
+      if (stockDataCache && stockDataCache.length > 0) {
+        stockDataCache.forEach(s => {
+          const sCleanName = (s.name || '').replace(/[\s_\-]/g, '').toLowerCase();
+          const sCleanColor = (s.color || 'SURTIDO').trim().toLowerCase();
+          if (sCleanName === targetCleanName && sCleanColor === targetCleanColor) {
+            s.stockBox = targetBox;
+            s.stockIndividual = targetIndiv;
+            cacheUpdated = true;
           }
         });
       }
 
-      // 테이블 새로고침 (경고 해제)
+      if (!cacheUpdated) {
+        stockDataCache.push({
+          name: payload[0].itemName,
+          color: payload[0].color || 'SURTIDO',
+          stockBox: targetBox,
+          stockIndividual: targetIndiv,
+          boxContent: payload[0].boxContent || 0,
+          safeStock: 0
+        });
+      }
+
+      // 로컬 스토리지 캐시 및 창간 동기화 즉시 갱신
+      try {
+        localStorage.setItem('cached_stock_data', JSON.stringify(stockDataCache));
+        localStorage.setItem('stock_data_updated', Date.now().toString());
+        localStorage.setItem('wms_cross_window_stock_sync', Date.now().toString());
+      } catch (e) {}
+
+      // 즉각 화면 렌더링 (재고부족 빨간색 경고 및 퀵재고 버튼 즉시 해제)
       updateTable();
       updateTotals();
 
-      alert(`✅ [${payload[0].itemName} (${payload[0].color})] 재고가 ${targetBox}상자로 즉시 조정되었습니다.\n\nPendingSheet에 '재고조정' 트랜잭션이 기록되었습니다.`);
+      // 백그라운드에서 구글 시트 실제 재고와 2중 자동 무음 동기화
+      loadStockData(true);
+
+      alert(`✅ [${payload[0].itemName} (${payload[0].color})] 재고가 ${targetBox}상자로 즉시 조정되었습니다.\n\n테이블 가용재고가 (${targetBox}+${targetIndiv})로 즉각 반영되었습니다.`);
     })
     .withFailureHandler(function(err) {
       if (btn) { btn.disabled = false; btn.textContent = '💾 재고조정 실행'; }
