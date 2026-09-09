@@ -1450,6 +1450,10 @@ Rules:
    - Do NOT merge different rows!
    - For quantities: If 'P' or 'pz' (meaning piezas/낱개, e.g. "10P", "5p", "12 pz") is written after or with the number, preserve 'P' with the number (e.g. "10P"). Otherwise extract the positive integer number (e.g. "./ 1" or ". 1" is 1).
 
+5. Orientation & Fast Extraction Guard:
+   - The order sheet photo may be tilted, taken at an angle, or rotated.
+   - Infer the baseline grid or line orientation directly and read along that axis without excessive internal deliberation.
+
 Return ONLY valid JSON:
 {
   "branch": "...",
@@ -1478,7 +1482,10 @@ Return ONLY valid JSON:
       }],
       generationConfig: {
         response_mime_type: 'application/json',
-        temperature: 0.1
+        temperature: 0.1,
+        thinking_config: {
+          thinking_budget: 1024
+        }
       }
     };
 
