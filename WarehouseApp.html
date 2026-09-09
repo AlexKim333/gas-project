@@ -5124,8 +5124,13 @@ function onHandwrittenExtracted(data) {
     const totalTokens = (meta.totalTokenCount || 0).toLocaleString();
     const promptTokens = (meta.promptTokenCount || 0).toLocaleString();
     const outputTokens = (meta.candidatesTokenCount || 0).toLocaleString();
+    const thoughtTokens = meta.thoughtsTokenCount ? meta.thoughtsTokenCount.toLocaleString() : null;
     const modelName = data.usedModel || 'Gemini 3 Flash';
-    msg += `\n\n⚡ [AI 소비 토큰]: 총 ${totalTokens} 토큰\n(입력: ${promptTokens} / 출력: ${outputTokens} · ${modelName})`;
+    let detail = `입력: ${promptTokens} / 출력: ${outputTokens}`;
+    if (thoughtTokens) {
+      detail += ` / 추론: ${thoughtTokens}`;
+    }
+    msg += `\n\n⚡ [AI 소비 토큰]: 총 ${totalTokens} 토큰\n(${detail} · ${modelName})`;
   }
 
   alert(msg);
