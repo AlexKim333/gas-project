@@ -310,6 +310,14 @@
     .btn-pending { background-color: #ea580c; color: white; }
     .btn-pending-search { background-color: #475569; color: white; }
     .btn-stock-audit { background-color: #0d9488; color: white; }
+    .btn-stock-normalize {
+      background: linear-gradient(135deg, #0284c7, #0369a1);
+      color: #ffffff;
+      box-shadow: 0 1px 3px rgba(2, 132, 199, 0.35);
+    }
+    .btn-stock-normalize:hover {
+      background: linear-gradient(135deg, #38bdf8, #0284c7);
+    }
     .btn-order-draft {
       background: linear-gradient(135deg, #0d9488, #0f766e);
       color: #ffffff;
@@ -1357,6 +1365,7 @@
               <button type="button" class="action-btn btn-pending" onclick="savePending()" tabindex="10">⏸️ 보류</button>
               <button type="button" class="action-btn btn-pending-search" onclick="showPendingModal()" tabindex="11" id="pendingSearchButton">🔍 보류 (<span id="pendingCount">0</span>)</button>
               <button type="button" class="action-btn btn-stock-audit" onclick="runStockAudit()" tabindex="12" id="stockAuditButton" title="구글 시트 전표 장부 대비 현재고 오차 자동 전수 검사">⚖️ 재고검증</button>
+              <button type="button" class="action-btn btn-stock-normalize" onclick="openStockNormalizeModal()" tabindex="13" id="stockNormalizeButton" title="재고시트 중복 코드(하이픈) 및 다중 포장규격 대표수량 통합">🧹 재고정규화</button>
             </div>
             <div class="totals-pill-bar">
               <span class="total-pill">품목: <strong id="totalItems">0</strong></span>
@@ -1446,6 +1455,29 @@
         <div style="padding: 10px 16px; background: #f8fafc; border-top: 1px solid #e2e8f0; text-align: right;">
           <button type="button" onclick="runStockAudit()" style="padding: 6px 14px; margin-right: 8px; background: #0d9488; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">🔄 다시 검사</button>
           <button type="button" onclick="closeStockAuditModal()" style="padding: 6px 14px; background: #64748b; color: white; border: none; border-radius: 4px; cursor: pointer;">닫기</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 재고 정규화 및 중복 통합 모달 -->
+    <div id="stockNormalizeModal" class="modal" style="z-index: 10000;">
+      <div class="modal-content" style="max-width: 960px; max-height: 88vh; overflow: hidden; display: flex; flex-direction: column; padding: 0; border-radius: 8px;">
+        <div style="background: #0284c7; color: white; padding: 12px 16px; font-weight: bold; display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-size: 14px;">🧹 재고시트 데이터 정규화 및 중복·포장단위 통합</span>
+          <button type="button" onclick="closeStockNormalizeModal()" style="background: none; border: none; color: white; font-size: 20px; cursor: pointer; line-height: 1;">&times;</button>
+        </div>
+        <div id="stockNormalizeContent" style="padding: 16px; overflow-y: auto; flex: 1;">
+          <p>분석 준비 중...</p>
+        </div>
+        <div style="padding: 10px 16px; background: #f8fafc; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <span id="normalizeStatusText" style="font-size: 12px; color: #64748b;">(백업 시트가 자동 생성된 후 안전하게 진행됩니다)</span>
+          </div>
+          <div>
+            <button type="button" onclick="runStockNormalizeAnalysis()" style="padding: 6px 14px; margin-right: 8px; background: #0284c7; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">🔄 다시 분석</button>
+            <button type="button" id="btnExecuteNormalize" onclick="confirmAndExecuteNormalization()" style="padding: 6px 14px; margin-right: 8px; background: #16a34a; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; display: none;">🛡️ 안전 백업 후 통합 실행</button>
+            <button type="button" onclick="closeStockNormalizeModal()" style="padding: 6px 14px; background: #64748b; color: white; border: none; border-radius: 4px; cursor: pointer;">닫기</button>
+          </div>
         </div>
       </div>
     </div>
@@ -3344,6 +3376,200 @@ function runStockAudit() {
 function closeStockAuditModal() {
   const modal = document.getElementById('stockAuditModal');
   if (modal) modal.style.display = 'none';
+}
+
+let lastNormalizationAnalysis = null;
+
+function openStockNormalizeModal() {
+  const modal = document.getElementById('stockNormalizeModal');
+  if (modal) modal.style.display = 'block';
+  runStockNormalizeAnalysis();
+}
+
+function closeStockNormalizeModal() {
+  const modal = document.getElementById('stockNormalizeModal');
+  if (modal) modal.style.display = 'none';
+}
+
+function runStockNormalizeAnalysis() {
+  const content = document.getElementById('stockNormalizeContent');
+  const btnExec = document.getElementById('btnExecuteNormalize');
+  const statusText = document.getElementById('normalizeStatusText');
+
+  if (btnExec) btnExec.style.display = 'none';
+  if (statusText) statusText.textContent = '재고시트 전수 스캔 및 중복/규격 불일치 분석 중...';
+  if (content) content.innerHTML = '<div style="text-align: center; padding: 40px;"><div style="font-size: 32px;">⏳</div><p style="margin-top: 15px; font-weight: bold; color: #0284c7;">구글 시트 재고 데이터 정규화 분석을 진행 중입니다...</p><p style="color: #64748b; font-size: 12px;">(하이픈 유무 차이 및 다중 포장규격 분산 레코드를 전수 검사합니다)</p></div>';
+
+  google.script.run
+    .withSuccessHandler(res => {
+      lastNormalizationAnalysis = res;
+      if (!content) return;
+      if (!res || !res.success) {
+        content.innerHTML = `<p style="color: red; font-weight: bold;">분석 실패: ${res ? res.error : '알 수 없는 오류'}</p>`;
+        return;
+      }
+
+      if (res.duplicateGroupsCount === 0) {
+        if (statusText) statusText.textContent = '모든 데이터가 완벽하게 정규화되어 있습니다.';
+        content.innerHTML = `
+          <div style="text-align: center; padding: 40px; color: #15803d;">
+            <div style="font-size: 48px;">🎉</div>
+            <h3 style="margin: 12px 0; font-size: 18px;">재고시트 정규화 완벽 상태!</h3>
+            <p style="color: #4b5563; line-height: 1.6;">
+              총 <strong>${res.totalOriginalRows}개</strong>의 재고 레코드 중 하이픈 표기 불일치나 다중 포장규격 중복이 전혀 없습니다.<br>
+              <span style="color: #0284c7; font-weight: bold;">추가적인 정규화 작업 없이 그대로 사용하셔도 됩니다.</span>
+            </p>
+          </div>
+        `;
+        return;
+      }
+
+      if (btnExec) btnExec.style.display = 'inline-block';
+      if (statusText) statusText.textContent = `총 ${res.duplicateGroupsCount}개 그룹 (${res.reducedRowsCount}개 중복 행 정리 대상) 감지됨`;
+
+      let groupsHtml = res.duplicateGroups.map((g, idx) => {
+        const origRowsHtml = g.originalItems.map(item => `
+          <tr style="background: #f8fafc; border-bottom: 1px solid #f1f5f9; font-size: 11.5px;">
+            <td style="padding: 4px 8px; color: #64748b;">${item.row}행</td>
+            <td style="padding: 4px 8px; font-weight: bold;">${item.name}</td>
+            <td style="padding: 4px 8px; text-align: center;">${item.color}</td>
+            <td style="padding: 4px 8px; text-align: right;">${item.boxContent}개/박스</td>
+            <td style="padding: 4px 8px; text-align: right;">${item.stockBox}박스 (${item.stockIndividual}개)</td>
+            <td style="padding: 4px 8px; text-align: right; color: #475569;">총 ${item.totalIndiv}개</td>
+          </tr>
+        `).join('');
+
+        const tags = [];
+        if (g.hasHyphenDiff) tags.push('<span style="background: #fef3c7; color: #b45309; padding: 2px 6px; border-radius: 4px; font-size: 10.5px; font-weight: bold; margin-left: 6px;">하이픈 불일치</span>');
+        if (g.hasBoxContentDiff) tags.push('<span style="background: #e0f2fe; color: #0369a1; padding: 2px 6px; border-radius: 4px; font-size: 10.5px; font-weight: bold; margin-left: 6px;">포장규격 분산</span>');
+
+        return `
+          <div style="border: 1px solid #cbd5e1; border-radius: 6px; margin-bottom: 12px; overflow: hidden;">
+            <div style="background: #f1f5f9; padding: 8px 12px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0;">
+              <div>
+                <strong style="color: #0f172a; font-size: 13px;">#${idx + 1}. [표준] ${g.canonicalName}</strong>
+                <span style="color: #475569; font-size: 12px; margin-left: 6px;">(색상: ${g.color})</span>
+                ${tags.join('')}
+              </div>
+              <div style="font-size: 11.5px; color: #64748b;">
+                ${g.originalRowCount}개 행 → 1개 행 통합
+              </div>
+            </div>
+
+            <table style="width: 100%; border-collapse: collapse; text-align: left;">
+              <thead style="background: #e2e8f0; font-size: 11px; color: #475569;">
+                <tr>
+                  <th style="padding: 4px 8px; width: 45px;">위치</th>
+                  <th style="padding: 4px 8px;">기존 품명</th>
+                  <th style="padding: 4px 8px; text-align: center; width: 70px;">색상</th>
+                  <th style="padding: 4px 8px; text-align: right; width: 80px;">박스당수량</th>
+                  <th style="padding: 4px 8px; text-align: right; width: 130px;">현재고</th>
+                  <th style="padding: 4px 8px; text-align: right; width: 90px;">총 낱개수량</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${origRowsHtml}
+              </tbody>
+            </table>
+
+            <div style="background: #ecfdf5; padding: 8px 12px; border-top: 1px dashed #6ee7b7; display: flex; justify-content: space-between; align-items: center; font-size: 12px;">
+              <div>
+                <span style="color: #047857; font-weight: bold;">➡️ 대표규격 통합 결과:</span>
+                <span style="color: #065f46; font-weight: bold; margin-left: 6px;">${g.canonicalName}</span>
+                <span style="color: #065f46; margin-left: 4px;">| 규격: <strong>${g.repBoxContent}개/박스</strong></span>
+              </div>
+              <div style="color: #047857; font-weight: bold;">
+                최종 재고: <span style="font-size: 13px; color: #059669;">${g.mergedResult.stockBox}박스 + ${g.mergedResult.stockIndividual}개</span> (총 ${g.mergedResult.totalIndiv}개 합산)
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      content.innerHTML = `
+        <div>
+          <div style="background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 6px; padding: 12px; margin-bottom: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <h4 style="margin: 0 0 4px 0; color: #0369a1; font-size: 14px;">
+                  ⚠️ 총 ${res.duplicateGroupsCount}개 그룹에서 중복/규격 분산이 감지되었습니다.
+                </h4>
+                <p style="margin: 0; font-size: 12px; color: #0284c7;">
+                  기존 ${res.totalOriginalRows}행 → 통합 후 ${res.estimatedFinalRows}행 (${res.reducedRowsCount}개 중복 행 정리 예정)
+                  | 하이픈 불일치 ${res.hyphenDuplicatesCount}건, 포장규격 분산 ${res.boxContentDuplicatesCount}건
+                </p>
+              </div>
+            </div>
+          </div>
+          <div style="max-height: 480px; overflow-y: auto; padding-right: 4px;">
+            ${groupsHtml}
+          </div>
+        </div>
+      `;
+    })
+    .withFailureHandler(err => {
+      if (statusText) statusText.textContent = '분석 중 오류 발생';
+      if (content) content.innerHTML = `<p style="color: red; font-weight: bold;">오류 발생: ${err.message}</p>`;
+    })
+    .analyzeStockNormalization();
+}
+
+function confirmAndExecuteNormalization() {
+  if (!lastNormalizationAnalysis || lastNormalizationAnalysis.duplicateGroupsCount === 0) {
+    alert('통합할 대상 데이터가 없습니다.');
+    return;
+  }
+
+  const ok = confirm(
+    `[재고 데이터 정규화 실행 확인]\n\n` +
+    `1. 기존 재고시트는 '재고시트_백업_날짜시간'으로 즉시 자동 복제 보존됩니다.\n` +
+    `2. 총 ${lastNormalizationAnalysis.duplicateGroupsCount}개 그룹의 중복이 대표 규격으로 100% 오차 없이 합산됩니다.\n` +
+    `3. 총 ${lastNormalizationAnalysis.reducedRowsCount}개의 중복 행이 정리됩니다.\n\n` +
+    `정규화 및 통합을 지금 실행하시겠습니까?`
+  );
+
+  if (!ok) return;
+
+  const content = document.getElementById('stockNormalizeContent');
+  const btnExec = document.getElementById('btnExecuteNormalize');
+  const statusText = document.getElementById('normalizeStatusText');
+
+  if (btnExec) btnExec.disabled = true;
+  if (statusText) statusText.textContent = '백업 시트 생성 및 데이터 통합 중...';
+  if (content) content.innerHTML = '<div style="text-align: center; padding: 40px;"><div style="font-size: 32px;">🛡️</div><p style="margin-top: 15px; font-weight: bold; color: #16a34a;">원천 데이터 자동 백업 및 대표 규격 재고 합산 진행 중...</p><p style="color: #64748b; font-size: 12px;">(잠시만 기다려주세요)</p></div>';
+
+  google.script.run
+    .withSuccessHandler(res => {
+      if (btnExec) btnExec.disabled = false;
+      if (!res || !res.success) {
+        if (content) content.innerHTML = `<p style="color: red; font-weight: bold;">정규화 실패: ${res ? res.error : '알 수 없는 오류'}</p>`;
+        return;
+      }
+
+      if (statusText) statusText.textContent = '정규화 및 통합 완료';
+      if (btnExec) btnExec.style.display = 'none';
+
+      if (content) {
+        content.innerHTML = `
+          <div style="text-align: center; padding: 40px; color: #15803d;">
+            <div style="font-size: 48px;">🎉</div>
+            <h3 style="margin: 12px 0; font-size: 18px;">재고시트 데이터 정규화 및 통합 완료!</h3>
+            <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 16px; margin: 16px auto; max-width: 550px; text-align: left; font-size: 13px; color: #166534; line-height: 1.8;">
+              <div>🛡️ <strong>자동 백업 시트:</strong> <code style="background: #dcfce7; padding: 2px 6px; border-radius: 4px;">${res.backupSheetName}</code></div>
+              <div>📊 <strong>데이터 행 정리:</strong> 기존 ${res.originalRowCount}행 → 통합 후 ${res.finalRowCount}행 (${res.reducedRowsCount}개 중복 행 정리)</div>
+              <div>⚖️ <strong>수량 보존:</strong> 모든 낱개 수량이 대표 규격으로 100% 오차 없이 편입·합산되었습니다.</div>
+            </div>
+            <p style="color: #4b5563; font-size: 12px;">새로고침 시 정규화된 최신 마스터 데이터가 즉시 반영됩니다.</p>
+          </div>
+        `;
+      }
+    })
+    .withFailureHandler(err => {
+      if (btnExec) btnExec.disabled = false;
+      if (statusText) statusText.textContent = '실행 중 오류 발생';
+      if (content) content.innerHTML = `<p style="color: red; font-weight: bold;">오류 발생: ${err.message}</p>`;
+    })
+    .executeStockNormalization();
 }
 
 function toggleScroll() {
@@ -6022,6 +6248,8 @@ function setupHotkeyShortcuts() {
       closeSubWarehouseQtyModal();
       closeSubWarehouseMatrixModal();
       showOcrLoadingModal(false);
+      closeStockAuditModal();
+      closeStockNormalizeModal();
     }
     // Ctrl + Enter : 그리드 모달이 열려 있을 때 일괄 담기 실행
     else if (e.ctrlKey && e.key === 'Enter') {

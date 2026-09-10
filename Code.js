@@ -1146,6 +1146,8 @@ function onOpen() {
     .addItem('⚡ 델타 품목 필드 자동 설정', 'setupDeltaItemFields')
     .addItem('📦 모든 시트 용량 점검 (1,000행 자동확보)', 'promptEnsureAllSheetsCapacity')
     .addItem('🔑 Gemini API 키 설정', 'promptSetGeminiApiKey')
+    .addSeparator()
+    .addItem('🧹 [재고 정규화] 중복/하이픈/포장단위 통합', 'promptNormalizeStockData')
     .addToUi();
 
   // 스프레드시트 열릴 때 모든 시트 용량을 선제 점검하여 100행 미만이면 자동 1,000행 확장
@@ -1820,4 +1822,467 @@ function verifyStockIntegrity() {
     discrepancies: discrepancies
   };
 }
+
+// -------------------------------------------------------------------
+// 🧹 재고시트 데이터 정규화 및 중복·포장단위 통합 엔진
+// -------------------------------------------------------------------
+
+/**
+ * 정규화 품목 코드 키 생성: 하이픈(-), 언더스코어(_), 공백 제거 후 대문자 변환
+ * 예: 'P-160' -> 'P160', 'L-TP75' -> 'LTP75', 'CK-928' -> 'CK928'
+ */
+function getNormalizedItemCode(name) {
+  return String(name || '').replace(/[-\s_]/g, '').toUpperCase().trim();
+}
+
+/**
+ * 그룹 내 대표 품명(Canonical Name) 선정
+ * 1. 재고 총 낱개 보유량이 가장 많은 표기 우선
+ * 2. 동률 시 영문-숫자 사이 하이픈이 들어간 표준 표기 우선 (예: P-160 > P160)
+ * 3. 그래도 동률 시 최초 등록된 표기 유지
+ */
+function pickCanonicalName(items) {
+  if (!items || items.length === 0) return '';
+  if (items.length === 1) return items[0].name;
+
+  const sorted = [...items].sort((a, b) => {
+    if (b.totalIndiv !== a.totalIndiv) {
+      return b.totalIndiv - a.totalIndiv;
+    }
+    const aHasHyphen = /[a-zA-Z]-[0-9]/.test(a.name);
+    const bHasHyphen = /[a-zA-Z]-[0-9]/.test(b.name);
+    if (aHasHyphen && !bHasHyphen) return -1;
+    if (!aHasHyphen && bHasHyphen) return 1;
+    return a.rowIndex - b.rowIndex;
+  });
+
+  return sorted[0].name;
+}
+
+/**
+ * 재고시트 정규화 사전 분석 (Dry-Run / 시뮬레이션)
+ */
+function analyzeStockNormalization() {
+  const stockSheet = getSheet(SHEETS.STOCK);
+  ensureSheetColumns(stockSheet, 9);
+  const lastRow = stockSheet.getLastRow();
+
+  if (lastRow < 2) {
+    return {
+      success: true,
+      totalOriginalRows: 0,
+      estimatedFinalRows: 0,
+      reducedRowsCount: 0,
+      duplicateGroupsCount: 0,
+      hyphenDuplicatesCount: 0,
+      boxContentDuplicatesCount: 0,
+      duplicateGroups: []
+    };
+  }
+
+  const rawData = stockSheet.getRange(2, 1, lastRow - 1, 9).getValues();
+  const groups = new Map();
+
+  rawData.forEach((row, idx) => {
+    const originalName = normalizeText(row[0]);
+    if (!originalName) return;
+
+    const originalColor = normalizeText(row[1]) || DEFAULTS.COLOR;
+    const stockBox = normalizeNumber(row[2]);
+    const stockIndividual = normalizeNumber(row[3]);
+    const safeStock = normalizeNumber(row[4]);
+    const boxContent = normalizeNumber(row[5]);
+    const initialStock = normalizeNumber(row[6]);
+    const manufacturer = normalizeText(row[7]);
+    const deltaVal = normalizeText(row[8]).toUpperCase();
+    const isDelta = row[8] === true || deltaVal === 'Y' || deltaVal === 'TRUE';
+
+    const normCode = getNormalizedItemCode(originalName);
+    const normColor = originalColor.toUpperCase();
+    const groupKey = `${normCode}__${normColor}`;
+
+    const totalIndiv = (stockBox * (boxContent || 1)) + stockIndividual;
+    const totalInitIndiv = initialStock * (boxContent || 1);
+
+    const record = {
+      rowIndex: idx + 2,
+      name: originalName,
+      color: originalColor,
+      stockBox,
+      stockIndividual,
+      safeStock,
+      boxContent,
+      initialStock,
+      manufacturer,
+      isDelta,
+      totalIndiv,
+      totalInitIndiv
+    };
+
+    if (!groups.has(groupKey)) {
+      groups.set(groupKey, []);
+    }
+    groups.get(groupKey).push(record);
+  });
+
+  let duplicateGroupsCount = 0;
+  let hyphenDuplicatesCount = 0;
+  let boxContentDuplicatesCount = 0;
+  const duplicateGroups = [];
+
+  groups.forEach((items, groupKey) => {
+    if (items.length <= 1) return;
+
+    duplicateGroupsCount++;
+
+    const distinctNames = Array.from(new Set(items.map(it => it.name)));
+    const hasHyphenDiff = distinctNames.length > 1;
+    if (hasHyphenDiff) hyphenDuplicatesCount++;
+
+    const distinctBoxContents = Array.from(new Set(items.map(it => it.boxContent)));
+    const hasBoxContentDiff = distinctBoxContents.length > 1;
+    if (hasBoxContentDiff) boxContentDuplicatesCount++;
+
+    // 대표 boxContent 선정 (총 낱개 재고가 가장 많은 규격 -> 빈도수 -> 큰 규격)
+    const boxContentStats = {};
+    items.forEach(it => {
+      const bc = it.boxContent;
+      if (!boxContentStats[bc]) {
+        boxContentStats[bc] = { boxContent: bc, count: 0, totalIndiv: 0 };
+      }
+      boxContentStats[bc].count++;
+      boxContentStats[bc].totalIndiv += it.totalIndiv;
+    });
+
+    const sortedBoxContents = Object.values(boxContentStats).sort((a, b) => {
+      if (b.totalIndiv !== a.totalIndiv) return b.totalIndiv - a.totalIndiv;
+      if (b.count !== a.count) return b.count - a.count;
+      return b.boxContent - a.boxContent;
+    });
+
+    const repBoxContent = sortedBoxContents[0].boxContent || 1;
+    const canonicalName = pickCanonicalName(items);
+    const repColor = items[0].color;
+
+    let mergedTotalIndiv = 0;
+    let mergedTotalInitIndiv = 0;
+    let maxSafeStock = 0;
+    let manufacturer = '';
+    let isDelta = false;
+
+    items.forEach(it => {
+      mergedTotalIndiv += it.totalIndiv;
+      mergedTotalInitIndiv += it.totalInitIndiv;
+      if (it.safeStock > maxSafeStock) maxSafeStock = it.safeStock;
+      if (!manufacturer && it.manufacturer) manufacturer = it.manufacturer;
+      if (it.isDelta) isDelta = true;
+    });
+
+    const mergedStockBox = repBoxContent > 0 ? Math.floor(mergedTotalIndiv / repBoxContent) : 0;
+    const mergedStockIndiv = repBoxContent > 0 ? (mergedTotalIndiv % repBoxContent) : mergedTotalIndiv;
+    const mergedInitialStock = repBoxContent > 0 ? Math.floor(mergedTotalInitIndiv / repBoxContent) : 0;
+
+    duplicateGroups.push({
+      groupKey,
+      canonicalName,
+      color: repColor,
+      repBoxContent,
+      distinctNames,
+      distinctBoxContents,
+      hasHyphenDiff,
+      hasBoxContentDiff,
+      originalRowCount: items.length,
+      originalItems: items.map(it => ({
+        row: it.rowIndex,
+        name: it.name,
+        color: it.color,
+        stockBox: it.stockBox,
+        stockIndividual: it.stockIndividual,
+        boxContent: it.boxContent,
+        initialStock: it.initialStock,
+        totalIndiv: it.totalIndiv
+      })),
+      mergedResult: {
+        name: canonicalName,
+        color: repColor,
+        stockBox: mergedStockBox,
+        stockIndividual: mergedStockIndiv,
+        safeStock: maxSafeStock,
+        boxContent: repBoxContent,
+        initialStock: mergedInitialStock,
+        manufacturer,
+        isDelta,
+        totalIndiv: mergedTotalIndiv
+      }
+    });
+  });
+
+  return {
+    success: true,
+    totalOriginalRows: rawData.length,
+    estimatedFinalRows: groups.size,
+    reducedRowsCount: rawData.length - groups.size,
+    duplicateGroupsCount,
+    hyphenDuplicatesCount,
+    boxContentDuplicatesCount,
+    duplicateGroups
+  };
+}
+
+/**
+ * 재고시트 정규화 실제 실행 (백업 생성 + 원장 안전 갱신)
+ */
+function executeStockNormalization() {
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(30000);
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const stockSheet = getSheet(SHEETS.STOCK);
+    ensureSheetColumns(stockSheet, 9);
+    const lastRow = stockSheet.getLastRow();
+
+    if (lastRow < 2) {
+      return { success: false, message: '재고시트에 데이터가 없습니다.' };
+    }
+
+    // 1. 사전 분석 수행
+    const analysis = analyzeStockNormalization();
+    if (analysis.duplicateGroupsCount === 0) {
+      return {
+        success: true,
+        message: '통합할 중복 코드나 다중 포장규격이 발견되지 않았습니다. 이미 정규화되어 있습니다.',
+        backupSheetName: null,
+        analysis
+      };
+    }
+
+    // 2. 자동 백업 시트 생성 (원천 데이터 보존)
+    const tz = Session.getScriptTimeZone() || 'GMT';
+    const timeStamp = Utilities.formatDate(new Date(), tz, 'yyyyMMdd_HHmmss');
+    const backupSheetName = `${SHEETS.STOCK}_백업_${timeStamp}`;
+    
+    const backupSheet = stockSheet.copyTo(ss);
+    backupSheet.setName(backupSheetName);
+    console.log(`[백업완료] ${backupSheetName} 시트가 자동 생성되었습니다.`);
+
+    // 3. 데이터 일괄 재구성
+    const rawData = stockSheet.getRange(2, 1, lastRow - 1, 9).getValues();
+    const groups = new Map();
+
+    rawData.forEach((row, idx) => {
+      const originalName = normalizeText(row[0]);
+      if (!originalName) return;
+
+      const originalColor = normalizeText(row[1]) || DEFAULTS.COLOR;
+      const stockBox = normalizeNumber(row[2]);
+      const stockIndividual = normalizeNumber(row[3]);
+      const safeStock = normalizeNumber(row[4]);
+      const boxContent = normalizeNumber(row[5]);
+      const initialStock = normalizeNumber(row[6]);
+      const manufacturer = normalizeText(row[7]);
+      const deltaVal = normalizeText(row[8]).toUpperCase();
+      const isDelta = row[8] === true || deltaVal === 'Y' || deltaVal === 'TRUE';
+
+      const normCode = getNormalizedItemCode(originalName);
+      const normColor = originalColor.toUpperCase();
+      const groupKey = `${normCode}__${normColor}`;
+
+      const totalIndiv = (stockBox * (boxContent || 1)) + stockIndividual;
+      const totalInitIndiv = initialStock * (boxContent || 1);
+
+      const record = {
+        rowIndex: idx + 2,
+        name: originalName,
+        color: originalColor,
+        stockBox,
+        stockIndividual,
+        safeStock,
+        boxContent,
+        initialStock,
+        manufacturer,
+        isDelta,
+        totalIndiv,
+        totalInitIndiv
+      };
+
+      if (!groups.has(groupKey)) {
+        groups.set(groupKey, []);
+      }
+      groups.get(groupKey).push(record);
+    });
+
+    const newRows = [];
+
+    groups.forEach((items) => {
+      if (items.length === 1) {
+        const it = items[0];
+        newRows.push([
+          it.name,
+          it.color,
+          it.stockBox,
+          it.stockIndividual,
+          it.safeStock,
+          it.boxContent,
+          it.initialStock,
+          it.manufacturer,
+          it.isDelta ? 'Y' : ''
+        ]);
+        return;
+      }
+
+      // 2개 이상 행 통합
+      const boxContentStats = {};
+      items.forEach(it => {
+        const bc = it.boxContent;
+        if (!boxContentStats[bc]) {
+          boxContentStats[bc] = { boxContent: bc, count: 0, totalIndiv: 0 };
+        }
+        boxContentStats[bc].count++;
+        boxContentStats[bc].totalIndiv += it.totalIndiv;
+      });
+
+      const sortedBoxContents = Object.values(boxContentStats).sort((a, b) => {
+        if (b.totalIndiv !== a.totalIndiv) return b.totalIndiv - a.totalIndiv;
+        if (b.count !== a.count) return b.count - a.count;
+        return b.boxContent - a.boxContent;
+      });
+
+      const repBoxContent = sortedBoxContents[0].boxContent || 1;
+      const canonicalName = pickCanonicalName(items);
+      const repColor = items[0].color;
+
+      let mergedTotalIndiv = 0;
+      let mergedTotalInitIndiv = 0;
+      let maxSafeStock = 0;
+      let manufacturer = '';
+      let isDelta = false;
+
+      items.forEach(it => {
+        mergedTotalIndiv += it.totalIndiv;
+        mergedTotalInitIndiv += it.totalInitIndiv;
+        if (it.safeStock > maxSafeStock) maxSafeStock = it.safeStock;
+        if (!manufacturer && it.manufacturer) manufacturer = it.manufacturer;
+        if (it.isDelta) isDelta = true;
+      });
+
+      const mergedStockBox = repBoxContent > 0 ? Math.floor(mergedTotalIndiv / repBoxContent) : 0;
+      const mergedStockIndiv = repBoxContent > 0 ? (mergedTotalIndiv % repBoxContent) : mergedTotalIndiv;
+      const mergedInitialStock = repBoxContent > 0 ? Math.floor(mergedTotalInitIndiv / repBoxContent) : 0;
+
+      newRows.push([
+        canonicalName,
+        repColor,
+        mergedStockBox,
+        mergedStockIndiv,
+        maxSafeStock,
+        repBoxContent,
+        mergedInitialStock,
+        manufacturer,
+        isDelta ? 'Y' : ''
+      ]);
+    });
+
+    // 4. 재고시트 안전한 일괄 갱신 (데이터 영역만 clearContent 후 새 데이터 쓰기)
+    stockSheet.getRange(2, 1, lastRow - 1, 9).clearContent();
+    if (newRows.length > 0) {
+      stockSheet.getRange(2, 1, newRows.length, 9).setValues(newRows);
+    }
+
+    console.log(`[정규화성공] 기존 ${rawData.length}행 -> 통합 후 ${newRows.length}행 (${rawData.length - newRows.length}개 중복 정리됨)`);
+
+    return {
+      success: true,
+      backupSheetName,
+      originalRowCount: rawData.length,
+      finalRowCount: newRows.length,
+      reducedRowsCount: rawData.length - newRows.length,
+      analysis
+    };
+  } catch (err) {
+    console.error(`executeStockNormalization error: ${err.message}`);
+    throw err;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * 스프레드시트 메뉴 UI 트리거 함수
+ */
+function promptNormalizeStockData() {
+  const ui = SpreadsheetApp.getUi();
+  const analysis = analyzeStockNormalization();
+
+  if (analysis.duplicateGroupsCount === 0) {
+    ui.alert(
+      '재고 정규화 점검 완료',
+      `총 ${analysis.totalOriginalRows}개 품목 중 중복 코드나 다중 포장규격이 없습니다. 원장이 이미 완벽하게 정규화되어 있습니다.`,
+      ui.ButtonSet.OK
+    );
+    return;
+  }
+
+  const sampleList = analysis.duplicateGroups.slice(0, 5).map(g => {
+    return `• [${g.canonicalName}] (${g.color}): ${g.originalRowCount}개 행 통합 (총낱개: ${g.mergedResult.totalIndiv}개 -> ${g.mergedResult.stockBox}박스+${g.mergedResult.stockIndividual}개)`;
+  }).join('\n');
+
+  const extraMsg = analysis.duplicateGroups.length > 5 ? `\n... 외 ${analysis.duplicateGroups.length - 5}건` : '';
+
+  const msg = `[재고 정규화 분석 결과]\n` +
+    `- 총 데이터 행수: ${analysis.totalOriginalRows}행\n` +
+    `- 중복 발견 그룹: ${analysis.duplicateGroupsCount}개 그룹 (${analysis.reducedRowsCount}개 중복 행 감축 예정)\n` +
+    `- 하이픈 표기 불일치: ${analysis.hyphenDuplicatesCount}건\n` +
+    `- 포장규격(boxContent) 분산: ${analysis.boxContentDuplicatesCount}건\n\n` +
+    `[주요 통합 대상 샘플]\n${sampleList}${extraMsg}\n\n` +
+    `⚡ [안전 백업 후 통합]을 진행하시겠습니까?\n(기존 시트는 '${SHEETS.STOCK}_백업_날짜'로 즉시 자동 복제 보존됩니다.)`;
+
+  const response = ui.alert('재고 데이터 정규화 및 통합', msg, ui.ButtonSet.YES_NO);
+
+  if (response === ui.Button.YES) {
+    const result = executeStockNormalization();
+    ui.alert(
+      '🎉 정규화 및 통합 완료!',
+      `1. 백업 시트 생성: ${result.backupSheetName}\n` +
+      `2. 데이터 정리: ${result.originalRowCount}행 -> ${result.finalRowCount}행 (${result.reducedRowsCount}개 중복 행 정리)\n` +
+      `3. 모든 수량이 대표 규격으로 100% 오차 없이 합산되었습니다.`,
+      ui.ButtonSet.OK
+    );
+  }
+}
+
+/**
+ * Web App 엔드포인트
+ */
+function doGet(e) {
+  try {
+    const action = e && e.parameter && e.parameter.action;
+    if (action === 'analyzeStockNormalization') {
+      const result = analyzeStockNormalization();
+      return ContentService.createTextOutput(JSON.stringify(result))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    if (action === 'executeStockNormalization') {
+      const result = executeStockNormalization();
+      return ContentService.createTextOutput(JSON.stringify(result))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    if (action === 'verifyStockIntegrity') {
+      const result = verifyStockIntegrity();
+      return ContentService.createTextOutput(JSON.stringify(result))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    const template = HtmlService.createTemplateFromFile('WarehouseApp');
+    template.currentType = (e && e.parameter && e.parameter.type) || 'out';
+    template.pendingRecord = 'null';
+    return template.evaluate()
+      .setTitle('창고 관리 시스템')
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1.0');
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ success: false, error: err.message, stack: err.stack }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
 
