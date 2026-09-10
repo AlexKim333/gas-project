@@ -326,6 +326,14 @@
     .btn-order-draft:hover {
       background: linear-gradient(135deg, #14b8a6, #0d9488);
     }
+    .btn-print-order {
+      background: linear-gradient(135deg, #475569, #334155);
+      color: #ffffff;
+      box-shadow: 0 1px 3px rgba(51, 65, 85, 0.35);
+    }
+    .btn-print-order:hover {
+      background: linear-gradient(135deg, #334155, #1e293b);
+    }
     .nav-badge {
       display: inline-block;
       background-color: #ef4444;
@@ -1290,6 +1298,12 @@
         <div id="invoiceRow" class="invoice-badge">
           <span id="invoiceLabel">출고증번호:</span> <strong id="invoiceNumber">001</strong>
         </div>
+        <!-- 🏢 상단으로 분산된 관리/유틸 버튼 그룹 -->
+        <div class="banner-util-buttons" style="display: flex; align-items: center; gap: 6px; margin-left: 6px;">
+          <button type="button" class="action-btn btn-order-draft" onclick="addSelectedToOrderDraft()" title="선택한 품목을 외부창고 발주 주문서 목록에 추가" style="padding: 4px 10px; font-size: 8.5pt;">📋 주문목록추가</button>
+          <button type="button" class="action-btn btn-stock-audit" onclick="runStockAudit()" tabindex="12" id="stockAuditButton" title="구글 시트 전표 장부 대비 현재고 오차 자동 전수 검사" style="padding: 4px 10px; font-size: 8.5pt;">⚖️ 재고검증</button>
+          <button type="button" class="action-btn btn-stock-normalize" onclick="openStockNormalizeModal()" tabindex="13" id="stockNormalizeButton" title="재고시트 중복 코드(하이픈) 및 다중 포장규격 대표수량 통합" style="padding: 4px 10px; font-size: 8.5pt;">🧹 재고정규화</button>
+        </div>
       </div>
       <div class="banner-right">
         <div class="banner-field">
@@ -1360,12 +1374,10 @@
               <input type="file" id="orderImageFileInput" accept="image/*" style="display:none;" onchange="handleImageFileSelect(event)">
               <button type="button" class="action-btn btn-add" onclick="addRecord()" tabindex="7">➕ 추가</button>
               <button type="button" class="action-btn btn-delete" onclick="deleteRecord()" tabindex="8">🗑️ 삭제</button>
-              <button type="button" class="action-btn btn-order-draft" onclick="addSelectedToOrderDraft()" title="선택한 품목을 외부창고 발주 주문서 목록에 추가">📋 주문목록추가</button>
-              <button type="button" class="action-btn btn-submit" onclick="submitForm()" tabindex="9">🚀 제출</button>
-              <button type="button" class="action-btn btn-pending" onclick="savePending()" tabindex="10">⏸️ 보류</button>
-              <button type="button" class="action-btn btn-pending-search" onclick="showPendingModal()" tabindex="11" id="pendingSearchButton">🔍 보류 (<span id="pendingCount">0</span>)</button>
-              <button type="button" class="action-btn btn-stock-audit" onclick="runStockAudit()" tabindex="12" id="stockAuditButton" title="구글 시트 전표 장부 대비 현재고 오차 자동 전수 검사">⚖️ 재고검증</button>
-              <button type="button" class="action-btn btn-stock-normalize" onclick="openStockNormalizeModal()" tabindex="13" id="stockNormalizeButton" title="재고시트 중복 코드(하이픈) 및 다중 포장규격 대표수량 통합">🧹 재고정규화</button>
+              <button type="button" class="action-btn btn-print-order" onclick="printWorkOrder()" tabindex="9" title="현재 장바구니 품목을 스페인어 작업지시서(ORDEN DE TRABAJO)로 인쇄">🖨️ 작업지시서</button>
+              <button type="button" class="action-btn btn-submit" onclick="submitForm()" tabindex="10">🚀 제출</button>
+              <button type="button" class="action-btn btn-pending" onclick="savePending()" tabindex="11">⏸️ 보류</button>
+              <button type="button" class="action-btn btn-pending-search" onclick="showPendingModal()" tabindex="12" id="pendingSearchButton">🔍 보류 (<span id="pendingCount">0</span>)</button>
             </div>
             <div class="totals-pill-bar">
               <span class="total-pill">품목: <strong id="totalItems">0</strong></span>
@@ -3764,6 +3776,192 @@ function printReceipt(records, type, selectedDate, admin, invoiceNumber, callbac
       }
     }, 3000);
   }, 500);
+}
+
+// 🖨️ [사장님 업무 지시] 장바구니 품목 스페인어 작업지시서(ORDEN DE TRABAJO) 즉시 인쇄
+function printWorkOrder() {
+  if (!records || records.length === 0) {
+    alert('⚠️ 장바구니에 인쇄할 품목이 없습니다.');
+    return;
+  }
+
+  const iframe = document.getElementById('printFrame');
+  if (!iframe) return;
+  const doc = iframe.contentWindow.document;
+
+  const currentLocEl = document.getElementById('location');
+  const locationValue = (records.find(r => r.location && r.location.trim())?.location) 
+    || (currentLocEl ? currentLocEl.value.trim() : '') 
+    || '미지정 (SIN ASIGNAR)';
+
+  const invoiceSpan = document.getElementById('invoiceNumber');
+  const invoiceNumber = (invoiceSpan ? invoiceSpan.textContent.trim() : '') || currentInvoiceNumber || '-';
+
+  const datetimeInput = document.getElementById('datetime');
+  const datetimeStr = (datetimeInput ? datetimeInput.value.trim() : '') || new Date().toLocaleString();
+
+  const adminSelect = document.getElementById('adminSelect');
+  const adminName = (adminSelect ? adminSelect.value.trim() : '') || 'ADMIN';
+
+  const totalItems = new Set(records.map(r => `${r.itemName}_${r.color}`)).size;
+  const totalBoxes = records.reduce((sum, r) => sum + Math.abs(r.boxQty || 0), 0);
+  const totalIndividuals = records.reduce((sum, r) => sum + Math.abs(r.individualQty || 0), 0);
+  const grandTotalPieces = records.reduce((sum, r) => {
+    const b = Math.abs(r.boxQty || 0);
+    const ind = Math.abs(r.individualQty || 0);
+    const bc = r.boxContent || 0;
+    return sum + (b * bc) + ind;
+  }, 0);
+
+  let tableRows = '';
+  records.forEach((rec, idx) => {
+    const b = Math.abs(rec.boxQty || 0);
+    const ind = Math.abs(rec.individualQty || 0);
+    const bc = rec.boxContent || 0;
+    const totalPzs = (b * bc) + ind;
+
+    let bStr = b > 0 ? `<strong>${b}</strong>` : '-';
+    let indStr = ind > 0 ? `<strong>${ind}</strong>` : '-';
+    let bcStr = bc > 0 ? `${bc}` : '-';
+
+    tableRows += `
+      <tr>
+        <td style="text-align: center; font-weight: bold; width: 35px;">${idx + 1}</td>
+        <td style="text-align: left; font-weight: bold; padding-left: 8px;">${escapeHtml(rec.itemName)}</td>
+        <td style="text-align: center;">${escapeHtml(rec.color || 'SURTIDO')}</td>
+        <td style="text-align: center; color: #1e40af;">${bStr}</td>
+        <td style="text-align: center; color: #b45309;">${indStr}</td>
+        <td style="text-align: center; color: #64748b;">${bcStr}</td>
+        <td style="text-align: center; font-weight: bold;">${totalPzs > 0 ? totalPzs.toLocaleString() : '-'}</td>
+        <td style="text-align: center; width: 50px;"><div style="width: 16px; height: 16px; border: 1.5px solid #475569; margin: 0 auto; border-radius: 3px;"></div></td>
+      </tr>
+    `;
+  });
+
+  doc.open();
+  doc.write(`
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <title>ORDEN DE TRABAJO - ${locationValue}</title>
+        <style>
+          @page { size: letter portrait; margin: 12mm 15mm; }
+          body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 0; color: #0f172a; }
+          .header-box { border: 2px solid #0f172a; border-radius: 8px; padding: 12px 16px; margin-bottom: 12px; }
+          .title-row { display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px solid #cbd5e1; padding-bottom: 8px; margin-bottom: 8px; }
+          .title-text { font-size: 18pt; font-weight: 900; letter-spacing: 1px; color: #0f172a; margin: 0; }
+          .subtitle-text { font-size: 9pt; color: #64748b; font-weight: 600; margin-top: 2px; }
+          .folio-badge { background: #0f172a; color: #ffffff; padding: 4px 10px; border-radius: 6px; font-size: 11pt; font-weight: 800; }
+          
+          .client-hero { background: #eff6ff; border: 2px solid #3b82f6; border-radius: 6px; padding: 10px 14px; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; }
+          .client-label { font-size: 11pt; font-weight: 800; color: #1e3a8a; }
+          .client-name { font-size: 16pt; font-weight: 900; color: #1d4ed8; }
+
+          .meta-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; font-size: 9pt; color: #334155; }
+          .meta-item { display: flex; gap: 4px; }
+          .meta-label { font-weight: 700; color: #64748b; }
+          .meta-val { font-weight: 600; }
+
+          table.order-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 9.5pt; }
+          table.order-table th { background: #f1f5f9; border: 1px solid #334155; padding: 7px 4px; font-weight: 800; font-size: 8.5pt; color: #0f172a; }
+          table.order-table td { border: 1px solid #94a3b8; padding: 6px 4px; font-size: 9pt; }
+          table.order-table tr:nth-child(even) { background-color: #f8fafc; }
+
+          .summary-container { margin-top: 14px; display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+          .summary-box { flex: 1; border: 1.5px solid #0f172a; border-radius: 6px; padding: 8px 12px; background: #f8fafc; }
+          .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); text-align: center; gap: 6px; }
+          .sum-label { font-size: 8pt; font-weight: 700; color: #64748b; }
+          .sum-val { font-size: 12pt; font-weight: 900; color: #0f172a; }
+
+          .signature-box { flex: 1.2; display: flex; justify-content: space-between; gap: 10px; margin-top: 8px; }
+          .sign-line { flex: 1; border-top: 1.5px solid #475569; text-align: center; padding-top: 4px; font-size: 8pt; font-weight: 700; color: #475569; }
+          
+          .footer-note { margin-top: 14px; font-size: 8pt; color: #94a3b8; text-align: center; border-top: 1px dashed #cbd5e1; padding-top: 6px; }
+        </style>
+      </head>
+      <body>
+        <div class="header-box">
+          <div class="title-row">
+            <div>
+              <h1 class="title-text">📋 ORDEN DE TRABAJO</h1>
+              <div class="subtitle-text">SURTIDO Y PREPARACIÓN DE PEDIDO (작업지시서)</div>
+            </div>
+            <div>
+              <span class="folio-badge">FOLIO: ${invoiceNumber}</span>
+            </div>
+          </div>
+
+          <div class="client-hero">
+            <span class="client-label">DESTINO / CLIENTE (출고처):</span>
+            <span class="client-name">${escapeHtml(locationValue)}</span>
+          </div>
+
+          <div class="meta-grid">
+            <div class="meta-item"><span class="meta-label">FECHA:</span> <span class="meta-val">${datetimeStr}</span></div>
+            <div class="meta-item"><span class="meta-label">VENDEDOR/EMISOR:</span> <span class="meta-val">${escapeHtml(adminName)}</span></div>
+            <div class="meta-item"><span class="meta-label">TIPO:</span> <span class="meta-val">SALIDA DE ALMACÉN</span></div>
+          </div>
+        </div>
+
+        <table class="order-table">
+          <thead>
+            <tr>
+              <th style="width: 30px;">NO.</th>
+              <th>PRODUCTO / MODELO (품명)</th>
+              <th style="width: 90px;">COLOR</th>
+              <th style="width: 65px;">BULTOS (상자)</th>
+              <th style="width: 65px;">PIEZAS (낱개)</th>
+              <th style="width: 65px;">PZS/CJ (규격)</th>
+              <th style="width: 75px;">TOTAL PZS</th>
+              <th style="width: 45px;">CHECK</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${tableRows}
+          </tbody>
+        </table>
+
+        <div class="summary-container">
+          <div class="summary-box">
+            <div class="summary-grid">
+              <div>
+                <div class="sum-label">TOTAL ITEMS</div>
+                <div class="sum-val">${totalItems}</div>
+              </div>
+              <div>
+                <div class="sum-label">TOTAL BULTOS</div>
+                <div class="sum-val" style="color: #1e40af;">${totalBoxes}</div>
+              </div>
+              <div>
+                <div class="sum-label">TOTAL PIEZAS (PZS)</div>
+                <div class="sum-val" style="color: #b45309;">${totalIndividuals}</div>
+              </div>
+              <div>
+                <div class="sum-label">GRAN TOTAL PZS</div>
+                <div class="sum-val" style="color: #0d9488;">${grandTotalPieces.toLocaleString()}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top: 24px; display: flex; gap: 20px;">
+          <div class="sign-line">SURTIDO POR (피킹 담당자)</div>
+          <div class="sign-line">REVISADO POR (검수 담당자)</div>
+          <div class="sign-line">RECIBIDO POR (인수자)</div>
+        </div>
+
+        <div class="footer-note">
+          SISTEMA WMS GAS • IMPRESO: ${new Date().toLocaleString()}
+        </div>
+      </body>
+    </html>
+  `);
+  doc.close();
+  iframe.contentWindow.focus();
+  setTimeout(() => {
+    iframe.contentWindow.print();
+  }, 400);
 }
 
 function setupDropdownEvents() {
