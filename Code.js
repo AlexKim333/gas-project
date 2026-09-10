@@ -1154,6 +1154,9 @@ function onOpen() {
     .addItem('🔑 Gemini API 키 설정', 'promptSetGeminiApiKey')
     .addSeparator()
     .addItem('🧹 [재고 정규화] 중복/하이픈/포장단위 통합', 'promptNormalizeStockData')
+    .addSeparator()
+    .addItem('❄️ [성수기 분석] 11~12월 피크 출고량 & 안전재고 산출', 'promptRunWinterSafeStockAnalysis')
+    .addItem('⚡ [안전재고 적용] 겨울 성수기 추천 안전재고 원장 반영', 'promptApplyWinterSafeStock')
     .addToUi();
 
   // 스프레드시트 열릴 때 모든 시트 용량을 선제 점검하여 100행 미만이면 자동 1,000행 확장
@@ -2293,6 +2296,17 @@ function doGet(e) {
         .setMimeType(ContentService.MimeType.JSON);
     }
 
+    if (action === 'analyzeWinterSafeStock') {
+      const result = analyzeWinterPeakDemandAndSafeStock();
+      return ContentService.createTextOutput(JSON.stringify(result))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    if (action === 'applyWinterSafeStock') {
+      const result = applyRecommendedSafeStockToMaster();
+      return ContentService.createTextOutput(JSON.stringify(result))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
     const template = HtmlService.createTemplateFromFile('WarehouseApp');
     template.currentType = (e && e.parameter && e.parameter.type) || 'out';
     template.pendingRecord = 'null';
@@ -2305,4 +2319,486 @@ function doGet(e) {
   }
 }
 
+// -------------------------------------------------------------------
+// ❄️ 11~12월 겨울 성수기 피크 출고량 분석 및 과학적 안전재고(Safe Stock) 산출 엔진
+// 아카이브 트랜잭션(1WJth...) + 현재 운영 트랜잭션(PendingSheet) + 서브창고 관심품목 전수 대사
+// -------------------------------------------------------------------
 
+const WINTER_ANALYSIS_CONFIG = {
+  ARCHIVE_SPREADSHEET_ID: '1WJthTMRwP7853UbIl--zxKb6DzqJIGctXl-HGHiiO_4',
+  SUB_WH_SPREADSHEET_ID: '17_FjWEFbuMvVhQZBnZCkmh59c9hzHDvWv68y11v4CX8',
+  REPORT_SHEET_NAME: '❄️겨울성수기_안전재고분석'
+};
+
+function extractWinterDateParts(rawDate, invoiceNumber) {
+  if (rawDate instanceof Date && !isNaN(rawDate.getTime())) {
+    return {
+      year: rawDate.getFullYear(),
+      month: rawDate.getMonth() + 1,
+      day: rawDate.getDate(),
+      dateStr: `${rawDate.getFullYear()}-${String(rawDate.getMonth() + 1).padStart(2, '0')}-${String(rawDate.getDate()).padStart(2, '0')}`
+    };
+  }
+  const str = String(rawDate || invoiceNumber || '');
+  const m = str.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
+  if (m) {
+    const y = parseInt(m[1], 10);
+    const mo = parseInt(m[2], 10);
+    const d = parseInt(m[3], 10);
+    return {
+      year: y,
+      month: mo,
+      day: d,
+      dateStr: `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+    };
+  }
+  return null;
+}
+
+function cleanItemModelNameForWinter(name) {
+  if (!name) return '';
+  let str = String(name).trim();
+  const categoryPrefixRegex = /^(?:termico\s*ni[ñn]os|termico\s*dama|termico\s*caballero|termico|blusa|faja|ropa\s*interior)\s+/i;
+  str = str.replace(categoryPrefixRegex, '').trim();
+  return str.replace(/[\s_\-]/g, '').toUpperCase();
+}
+
+function analyzeWinterPeakDemandAndSafeStock() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const mainStockSheet = getSheet(SHEETS.STOCK);
+  ensureSheetColumns(mainStockSheet, 9);
+  const stockLastRow = mainStockSheet.getLastRow();
+  if (stockLastRow < 2) {
+    throw new Error('재고시트에 등록된 데이터가 없습니다.');
+  }
+
+  // 1. 현재 메인 재고시트(정규화 완료본) 로드 및 카노니컬 매핑 구축
+  const stockValues = mainStockSheet.getRange(2, 1, stockLastRow - 1, 9).getValues();
+  const canonicalMasterMap = new Map();
+  const cleanKeyToCanonicalKey = new Map();
+
+  stockValues.forEach((row, idx) => {
+    const rawName = normalizeText(row[0]);
+    if (!rawName) return;
+    const rawColor = normalizeText(row[1]) || DEFAULTS.COLOR;
+    const currentBox = normalizeNumber(row[2]);
+    const safeStock = normalizeNumber(row[4]);
+    const boxContent = normalizeNumber(row[5]);
+
+    const canonicalKey = `${rawName}___${rawColor}`.toUpperCase();
+    const cleanKey = `${cleanItemModelNameForWinter(rawName)}___${rawColor.replace(/[\s_\-]/g, '')}`.toUpperCase();
+    const cleanNameOnly = cleanItemModelNameForWinter(rawName);
+
+    canonicalMasterMap.set(canonicalKey, {
+      name: rawName,
+      color: rawColor,
+      currentSafeStock: safeStock,
+      currentBox: currentBox,
+      boxContent: boxContent,
+      rowNumber: idx + 2,
+      canonicalKey: canonicalKey
+    });
+
+    cleanKeyToCanonicalKey.set(cleanKey, canonicalKey);
+    if (!cleanKeyToCanonicalKey.has(cleanNameOnly)) {
+      cleanKeyToCanonicalKey.set(cleanNameOnly, canonicalKey);
+    }
+  });
+
+  // 2. 외부 서브창고의 [관심품목] 시트 로드
+  const hotItemsFromSubWh = new Set();
+  try {
+    const subSS = SpreadsheetApp.openById(WINTER_ANALYSIS_CONFIG.SUB_WH_SPREADSHEET_ID);
+    const hotSheet = subSS.getSheetByName('관심품목') || subSS.getSheets().find(s => s.getName().indexOf('관심') !== -1);
+    if (hotSheet && hotSheet.getLastRow() >= 2) {
+      const hotData = hotSheet.getDataRange().getValues();
+      hotData.forEach(r => {
+        r.forEach(cell => {
+          const val = normalizeText(cell);
+          if (val && val.length >= 2) {
+            hotItemsFromSubWh.add(cleanItemModelNameForWinter(val));
+          }
+        });
+      });
+    }
+  } catch (e) {
+    console.warn('서브창고 관심품목 시트 로드 예외: ' + e.message);
+  }
+
+  // 3. 트랜잭션 데이터 모으기 (현재 시트 + 아카이브 시트)
+  const allOutboundRows = [];
+
+  // 3-A. 현재 운영 시트 PendingSheet
+  try {
+    const curPendingSheet = getSheet(SHEETS.PENDING);
+    const curLastRow = curPendingSheet.getLastRow();
+    if (curLastRow >= 2) {
+      const curData = curPendingSheet.getRange(2, 1, curLastRow - 1, 11).getValues();
+      curData.forEach(row => {
+        if (normalizeText(row[1]) === '출고') {
+          allOutboundRows.push({ row: row, source: '현재' });
+        }
+      });
+    }
+  } catch (e) {
+    console.warn('현재 PendingSheet 로드 오류: ' + e.message);
+  }
+
+  // 3-B. 별도 아카이브 파일 PendingSheet
+  try {
+    const archiveSS = SpreadsheetApp.openById(WINTER_ANALYSIS_CONFIG.ARCHIVE_SPREADSHEET_ID);
+    const allArcSheets = archiveSS.getSheets();
+    const arcSheet = archiveSS.getSheetByName('PendingSheet') ||
+                     allArcSheets.find(s => s.getSheetId() === 462915407) ||
+                     allArcSheets[0];
+    const arcLastRow = arcSheet.getLastRow();
+    if (arcLastRow >= 2) {
+      const arcData = arcSheet.getRange(2, 1, arcLastRow - 1, 11).getValues();
+      arcData.forEach(row => {
+        if (normalizeText(row[1]) === '출고') {
+          allOutboundRows.push({ row: row, source: '아카이브' });
+        }
+      });
+    }
+  } catch (e) {
+    console.warn('아카이브 PendingSheet 로드 오류: ' + e.message);
+  }
+
+  console.log(`[성수기 분석] 총 출고 트랜잭션 ${allOutboundRows.length}건 수집 완료`);
+
+  // 4. 11월 및 12월 트랜잭션 필터링 & 일자별 집계
+  const itemDailyOut = new Map();
+  const itemNovBoxes = new Map();
+  const itemDecBoxes = new Map();
+  const itemTotalWinterBoxes = new Map();
+  const itemLocations = new Map();
+
+  let winterTxCount = 0;
+
+  allOutboundRows.forEach(({ row }) => {
+    const invNo = normalizeText(row[0]);
+    const rawDateVal = row[2];
+    const rawItemName = normalizeText(row[3]);
+    const rawColor = normalizeText(row[4]) || DEFAULTS.COLOR;
+    const boxQty = Math.abs(normalizeNumber(row[5]));
+    const location = normalizeText(row[8]);
+
+    if (!rawItemName || boxQty <= 0) return;
+
+    const dParts = extractWinterDateParts(rawDateVal, invNo);
+    if (!dParts) return;
+
+    const { month, dateStr } = dParts;
+    if (month !== 11 && month !== 12) return;
+
+    winterTxCount++;
+
+    const cleanItemKey = `${cleanItemModelNameForWinter(rawItemName)}___${rawColor.replace(/[\s_\-]/g, '')}`.toUpperCase();
+    const cleanNameOnly = cleanItemModelNameForWinter(rawItemName);
+
+    let canonicalKey = cleanKeyToCanonicalKey.get(cleanItemKey);
+    if (!canonicalKey) canonicalKey = cleanKeyToCanonicalKey.get(cleanNameOnly);
+    if (!canonicalKey) canonicalKey = `${rawItemName}___${rawColor}`.toUpperCase();
+
+    if (!itemDailyOut.has(canonicalKey)) {
+      itemDailyOut.set(canonicalKey, new Map());
+      itemNovBoxes.set(canonicalKey, 0);
+      itemDecBoxes.set(canonicalKey, 0);
+      itemTotalWinterBoxes.set(canonicalKey, 0);
+      itemLocations.set(canonicalKey, new Set());
+    }
+
+    const dayMap = itemDailyOut.get(canonicalKey);
+    dayMap.set(dateStr, (dayMap.get(dateStr) || 0) + boxQty);
+
+    if (month === 11) {
+      itemNovBoxes.set(canonicalKey, itemNovBoxes.get(canonicalKey) + boxQty);
+    } else if (month === 12) {
+      itemDecBoxes.set(canonicalKey, itemDecBoxes.get(canonicalKey) + boxQty);
+    }
+    itemTotalWinterBoxes.set(canonicalKey, itemTotalWinterBoxes.get(canonicalKey) + boxQty);
+
+    if (location) {
+      itemLocations.get(canonicalKey).add(location);
+    }
+  });
+
+  // 5. 통계 분석 및 안전재고 계산
+  const analysisResults = [];
+
+  itemDailyOut.forEach((dayMap, canonicalKey) => {
+    let peakDailyBoxes = 0;
+    let peakDate = '';
+
+    dayMap.forEach((qty, dStr) => {
+      if (qty > peakDailyBoxes) {
+        peakDailyBoxes = qty;
+        peakDate = dStr;
+      }
+    });
+
+    const novBoxes = itemNovBoxes.get(canonicalKey) || 0;
+    const decBoxes = itemDecBoxes.get(canonicalKey) || 0;
+    const totalWinter = itemTotalWinterBoxes.get(canonicalKey) || 0;
+    const activeDays = dayMap.size;
+    const avgDailyBoxes = activeDays > 0 ? Number((totalWinter / activeDays).toFixed(1)) : 0;
+
+    const masterInfo = canonicalMasterMap.get(canonicalKey) || {
+      name: canonicalKey.split('___')[0],
+      color: canonicalKey.split('___')[1] || DEFAULTS.COLOR,
+      currentSafeStock: 0,
+      currentBox: 0,
+      boxContent: 0,
+      rowNumber: -1
+    };
+
+    const cleanName = cleanItemModelNameForWinter(masterInfo.name);
+    const isHotInSubWh = hotItemsFromSubWh.has(cleanName);
+    const isHot = isHotInSubWh || totalWinter >= 30 || peakDailyBoxes >= 15;
+
+    // 💡 허브창고 최적 안전재고 공식:
+    // Lead Time = 1일 (서브창고 100상자 트럭 배차 및 알라르꼰 입고 소요시간)
+    // 최소 안전재고: 피크일 출고량의 1.3배(5상자 단위 올림)와 일평균 2일치 중 큰 값
+    let recommendedSafe = 0;
+    if (peakDailyBoxes > 0) {
+      recommendedSafe = Math.ceil((peakDailyBoxes * 1.3) / 5) * 5;
+      recommendedSafe = Math.max(recommendedSafe, Math.ceil(avgDailyBoxes * 2));
+    }
+
+    const diff = recommendedSafe - masterInfo.currentSafeStock;
+
+    analysisResults.push({
+      canonicalKey: canonicalKey,
+      name: masterInfo.name,
+      color: masterInfo.color,
+      rowNumber: masterInfo.rowNumber,
+      isHot: isHot,
+      isHotInSubWh: isHotInSubWh,
+      currentSafeStock: masterInfo.currentSafeStock,
+      currentBox: masterInfo.currentBox,
+      peakDailyBoxes: peakDailyBoxes,
+      peakDate: peakDate,
+      novBoxes: novBoxes,
+      decBoxes: decBoxes,
+      totalWinterBoxes: totalWinter,
+      activeDays: activeDays,
+      avgDailyBoxes: avgDailyBoxes,
+      recommendedSafeStock: recommendedSafe,
+      safeStockDiff: diff,
+      topLocations: Array.from(itemLocations.get(canonicalKey) || []).slice(0, 3).join(', ')
+    });
+  });
+
+  // 정렬: 겨울 총 출고량 많은 순 내림차순
+  analysisResults.sort((a, b) => b.totalWinterBoxes - a.totalWinterBoxes);
+
+  // 6. 결과 리포트 시트 자동 작성/갱신
+  writeWinterSafeStockReportSheet(analysisResults);
+
+  return {
+    success: true,
+    totalAnalyzedItems: analysisResults.length,
+    winterTxCount: winterTxCount,
+    hotItemsCount: analysisResults.filter(r => r.isHot).length,
+    items: analysisResults
+  };
+}
+
+function writeWinterSafeStockReportSheet(results) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(WINTER_ANALYSIS_CONFIG.REPORT_SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(WINTER_ANALYSIS_CONFIG.REPORT_SHEET_NAME);
+  } else {
+    sheet.clear();
+  }
+
+  ensureSheetCapacity(sheet, results.length + 10);
+  ensureSheetColumns(sheet, 16);
+
+  const nowStr = formatDate(new Date()) + ' ' + new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+
+  // 1. 배너 헤더
+  sheet.getRange(1, 1).setValue(`❄️ 11~12월 겨울 성수기 피크 출고량 분석 및 과학적 안전재고(Safe Stock) 산출 리포트 (생성일시: ${nowStr})`);
+  sheet.getRange(1, 1, 1, 16).merge()
+    .setBackground('#0f172a')
+    .setFontColor('#38bdf8')
+    .setFontWeight('bold')
+    .setFontSize(11);
+
+  sheet.getRange(2, 1).setValue(`※ 과거 트랜잭션 보관소(PendingSheet) + 현재 운영 트랜잭션 전수 분석 기반 / 허브창고 1일 리드타임 최적 버퍼 (피크 1.3배 올림 계산)`);
+  sheet.getRange(2, 1, 1, 16).merge()
+    .setBackground('#1e293b')
+    .setFontColor('#94a3b8')
+    .setFontSize(9);
+
+  // 2. 테이블 컬럼 헤더
+  const headers = [
+    '순위', '품명', '색상', '관심품목', '현재 안전재고', '피크 일일출고(Peak)', '피크 발생일자',
+    '11월 총출고', '12월 총출고', '겨울 총출고(11~12월)', '출고 일수', '일평균 출고량',
+    '권장 안전재고(1.3x)', '보강 필요분(부족)', '현재고(박스)', '주요 출고처'
+  ];
+
+  sheet.getRange(3, 1, 1, headers.length).setValues([headers])
+    .setBackground('#334155')
+    .setFontColor('#ffffff')
+    .setFontWeight('bold')
+    .setFontSize(9)
+    .setHorizontalAlignment('center');
+
+  if (results.length === 0) {
+    sheet.getRange(4, 1).setValue('11월 및 12월 출고 트랜잭션 데이터가 없습니다.');
+    return;
+  }
+
+  // 3. 데이터 행 작성
+  const dataRows = results.map((item, idx) => [
+    idx + 1,
+    item.name,
+    item.color,
+    item.isHotInSubWh ? '🌟서브창고 관심' : (item.isHot ? '🔥성수기 피크' : '일반'),
+    item.currentSafeStock,
+    item.peakDailyBoxes,
+    item.peakDate,
+    item.novBoxes,
+    item.decBoxes,
+    item.totalWinterBoxes,
+    item.activeDays,
+    item.avgDailyBoxes,
+    item.recommendedSafeStock,
+    item.safeStockDiff > 0 ? `+${item.safeStockDiff}` : (item.safeStockDiff < 0 ? String(item.safeStockDiff) : '적정'),
+    item.currentBox,
+    item.topLocations
+  ]);
+
+  sheet.getRange(4, 1, dataRows.length, headers.length).setValues(dataRows)
+    .setFontSize(9);
+
+  // 4. 서식 지정
+  sheet.getRange(4, 1, dataRows.length, 1).setHorizontalAlignment('center'); // 순위
+  sheet.getRange(4, 3, dataRows.length, 2).setHorizontalAlignment('center'); // 색상, 관심품목
+  sheet.getRange(4, 5, dataRows.length, 2).setHorizontalAlignment('right'); // 현재 안전재고, 피크
+  sheet.getRange(4, 7, dataRows.length, 1).setHorizontalAlignment('center'); // 피크일
+  sheet.getRange(4, 8, dataRows.length, 6).setHorizontalAlignment('right'); // 수량들
+  sheet.getRange(4, 14, dataRows.length, 1).setHorizontalAlignment('center'); // 부족분
+  sheet.getRange(4, 15, dataRows.length, 1).setHorizontalAlignment('right'); // 현재고
+
+  // 권장 안전재고 열 하이라이트 (M열: 13열)
+  sheet.getRange(4, 13, dataRows.length, 1)
+    .setBackground('#ecfdf5')
+    .setFontWeight('bold')
+    .setFontColor('#065f46');
+
+  // 피크 일일출고 열 하이라이트 (F열: 6열)
+  sheet.getRange(4, 6, dataRows.length, 1)
+    .setBackground('#eff6ff')
+    .setFontWeight('bold')
+    .setFontColor('#1d4ed8');
+
+  sheet.setFrozenRows(3);
+  SpreadsheetApp.flush();
+}
+
+function applyRecommendedSafeStockToMaster() {
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(30000);
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const stockSheet = getSheet(SHEETS.STOCK);
+    ensureSheetColumns(stockSheet, 9);
+    const stockLastRow = stockSheet.getLastRow();
+    if (stockLastRow < 2) {
+      throw new Error('재고시트에 등록된 데이터가 없습니다.');
+    }
+
+    // 1. 안전 백업 시트 생성
+    const todayStr = formatDate(new Date()).replace(/[-/]/g, '');
+    const backupName = `${SHEETS.STOCK}_안전재고적용전_${todayStr}`;
+    let backupSheet = ss.getSheetByName(backupName);
+    if (backupSheet) ss.deleteSheet(backupSheet);
+    backupSheet = stockSheet.copyTo(ss).setName(backupName);
+
+    // 2. 성수기 분석 데이터 실행
+    const analysis = analyzeWinterPeakDemandAndSafeStock();
+    const recMap = new Map();
+    analysis.items.forEach(item => {
+      if (item.rowNumber >= 2 && item.recommendedSafeStock > 0) {
+        recMap.set(item.rowNumber, item.recommendedSafeStock);
+      }
+    });
+
+    // 3. 재고시트 E열(안전재고) 일괄 갱신
+    const stockData = stockSheet.getRange(2, 1, stockLastRow - 1, 9).getValues();
+    let updatedCount = 0;
+
+    stockData.forEach((row, idx) => {
+      const rowNum = idx + 2;
+      if (recMap.has(rowNum)) {
+        row[4] = recMap.get(rowNum); // E열: index 4
+        updatedCount++;
+      }
+    });
+
+    stockSheet.getRange(2, 1, stockData.length, 9).setValues(stockData);
+    SpreadsheetApp.flush();
+
+    return {
+      success: true,
+      backupSheetName: backupName,
+      updatedCount: updatedCount,
+      totalAnalyzed: analysis.items.length
+    };
+  } catch (e) {
+    console.error('applyRecommendedSafeStockToMaster error: ' + e.message);
+    throw e;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function promptRunWinterSafeStockAnalysis() {
+  const ui = SpreadsheetApp.getUi();
+  ui.alert('❄️ 겨울 성수기 분석 시작', '과거 트랜잭션 보관소와 현재 운영 트랜잭션을 전수 스캔하여 11~12월 피크 출고량을 분석합니다. 잠시만 기다려주세요...', ui.ButtonSet.OK);
+  
+  try {
+    const result = analyzeWinterPeakDemandAndSafeStock();
+    const hotCount = result.hotItemsCount;
+    const totalCount = result.totalAnalyzedItems;
+    
+    ui.alert(
+      '🎉 겨울 성수기 안전재고 분석 완료!',
+      `1. 분석 완료: 총 ${totalCount}개 출고 품목 중 성수기 피크/관심품목 ${hotCount}개 도출\n` +
+      `2. 리포트 생성: '${WINTER_ANALYSIS_CONFIG.REPORT_SHEET_NAME}' 시트가 자동 생성/갱신되었습니다.\n` +
+      `3. 시트 탭을 확인하시면 품목별 하루 최대 출고량(Peak)과 권장 안전재고가 표기되어 있습니다.\n\n` +
+      `💡 확인 후 상단 메뉴 [창고 관리 -> ⚡ 안전재고 적용]을 누르시면 재고시트 원장에 1초 만에 자동 반영됩니다.`,
+      ui.ButtonSet.OK
+    );
+  } catch (err) {
+    ui.alert('❌ 분석 실패', err.message, ui.ButtonSet.OK);
+  }
+}
+
+function promptApplyWinterSafeStock() {
+  const ui = SpreadsheetApp.getUi();
+  const resp = ui.alert(
+    '⚡ 겨울 성수기 추천 안전재고 원장 반영',
+    `11~12월 피크 출고량 기반으로 산출된 '추천 안전재고'를 현재 재고시트(E열)에 일괄 갱신하시겠습니까?\n\n` +
+    `※ 기존 재고시트는 '재고시트_안전재고적용전_날짜'로 즉시 자동 백업 보존됩니다.`,
+    ui.ButtonSet.YES_NO
+  );
+
+  if (resp === ui.Button.YES) {
+    try {
+      const result = applyRecommendedSafeStockToMaster();
+      ui.alert(
+        '🎉 안전재고 반영 완료!',
+        `1. 백업 시트: ${result.backupSheetName}\n` +
+        `2. 갱신 완료: 총 ${result.updatedCount}개 품목의 안전재고가 겨울 성수기 최적 권장치로 자동 반영되었습니다!\n` +
+        `3. 이제 서브창고 발주 매트릭스에서 [안전재고 미만만 보기]를 누르면 부족 품목이 정확하게 필터링됩니다.`,
+        ui.ButtonSet.OK
+      );
+    } catch (e) {
+      ui.alert('❌ 반영 실패', e.message, ui.ButtonSet.OK);
+    }
+  }
+}

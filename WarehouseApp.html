@@ -1303,6 +1303,7 @@
           <button type="button" class="action-btn btn-order-draft" onclick="addSelectedToOrderDraft()" title="선택한 품목을 외부창고 발주 주문서 목록에 추가" style="padding: 4px 10px; font-size: 8.5pt;">📋 주문목록추가</button>
           <button type="button" class="action-btn btn-stock-audit" onclick="runStockAudit()" tabindex="12" id="stockAuditButton" title="구글 시트 전표 장부 대비 현재고 오차 자동 전수 검사" style="padding: 4px 10px; font-size: 8.5pt;">⚖️ 재고검증</button>
           <button type="button" class="action-btn btn-stock-normalize" onclick="openStockNormalizeModal()" tabindex="13" id="stockNormalizeButton" title="재고시트 중복 코드(하이픈) 및 다중 포장규격 대표수량 통합" style="padding: 4px 10px; font-size: 8.5pt;">🧹 재고정규화</button>
+          <button type="button" class="action-btn btn-stock-winter" onclick="openWinterSafeStockModal()" tabindex="14" id="winterSafeStockButton" title="과거 11~12월 트랜잭션 전수 분석 및 과학적 안전재고(Safe Stock) 산정" style="padding: 4px 10px; font-size: 8.5pt; background: #0284c7; color: #ffffff; border: 1px solid #0369a1; border-radius: 4px; font-weight: bold; cursor: pointer;">❄️ 성수기안전재고</button>
         </div>
       </div>
       <div class="banner-right">
@@ -1494,6 +1495,32 @@
       </div>
     </div>
 
+    <!-- ❄️ 겨울 성수기(11~12월) 피크 출고량 및 안전재고 분석 모달 -->
+    <div id="winterSafeStockModal" class="modal" style="z-index: 10000; display: none;">
+      <div class="modal-content" style="max-width: 1080px; max-height: 90vh; overflow: hidden; display: flex; flex-direction: column; padding: 0; border-radius: 10px; border: 1.5px solid #0284c7; box-shadow: 0 20px 50px rgba(0,0,0,0.35);">
+        <div style="background: linear-gradient(135deg, #0f172a 0%, #0369a1 100%); color: white; padding: 12px 18px; font-weight: bold; display: flex; justify-content: space-between; align-items: center;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 16pt;">❄️</span>
+            <span style="font-size: 12pt; letter-spacing: -0.3px;">11~12월 겨울 성수기 피크 출고량 분석 및 과학적 안전재고(Safe Stock) 산정</span>
+          </div>
+          <button type="button" onclick="closeWinterSafeStockModal()" style="background: none; border: none; color: white; font-size: 22pt; cursor: pointer; line-height: 1; padding: 0 4px;">&times;</button>
+        </div>
+        <div id="winterSafeStockContent" style="padding: 16px; overflow-y: auto; flex: 1; background: #ffffff;">
+          <p style="text-align: center; color: #64748b; padding: 30px;">분석 데이터를 불러오는 중입니다...</p>
+        </div>
+        <div style="padding: 10px 18px; background: #f8fafc; border-top: 1.5px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <span id="winterStatusText" style="font-size: 8.5pt; color: #64748b;">(과거 보관 트랜잭션 + 현재 운영 트랜잭션 전수 분석 / 원장 백업 자동 보존)</span>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button type="button" onclick="runWinterSafeStockAnalysisFromUI()" style="padding: 6px 14px; background: #0284c7; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 8.8pt;">🔄 다시 분석</button>
+            <button type="button" id="btnExecuteWinterSafeStock" onclick="confirmAndApplyWinterSafeStock()" style="padding: 6px 16px; background: #059669; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 8.8pt; display: none;">⚡ 추천 안전재고 원장에 일괄 반영</button>
+            <button type="button" onclick="closeWinterSafeStockModal()" style="padding: 6px 14px; background: #64748b; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 8.8pt;">닫기</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- 그리드 상품 일괄 입력 모달 -->
     <div id="gridSelectionModal" class="grid-modal">
       <div class="grid-modal-header">
@@ -1638,6 +1665,7 @@
           </label>
         </div>
         <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
+          <button type="button" onclick="openWinterSafeStockModal()" style="padding: 4px 10px; background: #0284c7; color: #ffffff; border: 1px solid #0369a1; border-radius: 4px; font-size: 8pt; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 4px;" title="과거 11~12월 트랜잭션 전수 분석 및 과학적 안전재고(Safe Stock) 산정">❄️ 성수기 안전재고</button>
           <button type="button" onclick="loadSubWarehouseMatrix(true)" style="padding: 4px 10px; background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; border-radius: 4px; font-size: 8pt; font-weight: 600; cursor: pointer;" title="서브창고 최신 재고 즉시 새로고침">🔄 새로고침</button>
           <button type="button" onclick="closeSubWarehouseMatrixModal()" style="border: none; background: none; font-size: 18pt; cursor: pointer; color: #94a3b8; line-height: 1; padding: 0 4px;">&times;</button>
         </div>
@@ -3621,6 +3649,195 @@ function confirmAndExecuteNormalization() {
       if (content) content.innerHTML = `<p style="color: red; font-weight: bold;">오류 발생: ${err.message}</p>`;
     })
     .executeStockNormalization();
+}
+
+// -------------------------------------------------------------------
+// ❄️ 11~12월 성수기 피크 출고량 분석 및 안전재고 UI 핸들러
+// -------------------------------------------------------------------
+
+let currentWinterAnalysisData = null;
+
+function openWinterSafeStockModal() {
+  const modal = document.getElementById('winterSafeStockModal');
+  const overlay = document.getElementById('modalOverlay');
+  if (modal) modal.style.display = 'block';
+  if (overlay) overlay.style.display = 'block';
+  runWinterSafeStockAnalysisFromUI();
+}
+
+function closeWinterSafeStockModal() {
+  const modal = document.getElementById('winterSafeStockModal');
+  const overlay = document.getElementById('modalOverlay');
+  if (modal) modal.style.display = 'none';
+  if (overlay && (!document.getElementById('subWarehouseMatrixModal') || document.getElementById('subWarehouseMatrixModal').style.display === 'none')) {
+    overlay.style.display = 'none';
+  }
+}
+
+function runWinterSafeStockAnalysisFromUI() {
+  const content = document.getElementById('winterSafeStockContent');
+  const btnExec = document.getElementById('btnExecuteWinterSafeStock');
+  const statusText = document.getElementById('winterStatusText');
+
+  if (btnExec) btnExec.style.display = 'none';
+  if (statusText) statusText.textContent = '❄️ 과거 트랜잭션 보관소 + 현재 운영 트랜잭션 전수 분석 중... (수초 소요)';
+  if (content) {
+    content.innerHTML = `
+      <div style="text-align: center; padding: 40px 20px;">
+        <div class="loading-spinner" style="border-top-color: #0284c7; margin-bottom: 12px;"></div>
+        <div style="font-weight: bold; color: #0f172a; font-size: 11pt;">과거 11~12월 출고 트랜잭션 및 피크 출고량 집계 중...</div>
+        <div style="font-size: 8.5pt; color: #64748b; margin-top: 6px;">수만 건의 과거 전표와 서브창고 관심품목 시트를 대조하고 있습니다.</div>
+      </div>
+    `;
+  }
+
+  google.script.run
+    .withSuccessHandler(onWinterSafeStockAnalysisLoaded)
+    .withFailureHandler(onWinterSafeStockAnalysisError)
+    .analyzeWinterPeakDemandAndSafeStock();
+}
+
+function onWinterSafeStockAnalysisError(err) {
+  const content = document.getElementById('winterSafeStockContent');
+  const statusText = document.getElementById('winterStatusText');
+  if (statusText) statusText.textContent = '분석 실패';
+  if (content) {
+    content.innerHTML = `
+      <div style="text-align: center; padding: 30px; color: #dc2626;">
+        <div style="font-size: 24pt; margin-bottom: 8px;">⚠️</div>
+        <div style="font-weight: bold; font-size: 11pt; margin-bottom: 6px;">성수기 데이터 분석 실패</div>
+        <div style="font-size: 8.5pt; color: #64748b;">${err.message || err}</div>
+        <button type="button" onclick="runWinterSafeStockAnalysisFromUI()" style="margin-top: 12px; padding: 6px 14px; background: #0284c7; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 8.5pt;">다시 시도</button>
+      </div>
+    `;
+  }
+}
+
+function onWinterSafeStockAnalysisLoaded(res) {
+  currentWinterAnalysisData = res;
+  const content = document.getElementById('winterSafeStockContent');
+  const btnExec = document.getElementById('btnExecuteWinterSafeStock');
+  const statusText = document.getElementById('winterStatusText');
+
+  if (!res || !res.items || res.items.length === 0) {
+    if (statusText) statusText.textContent = '11~12월 출고 데이터 없음';
+    if (content) {
+      content.innerHTML = `
+        <div style="text-align: center; padding: 30px; color: #64748b;">
+          <div style="font-size: 24pt; margin-bottom: 8px;">📦</div>
+          <div style="font-weight: bold; font-size: 10.5pt; color: #334155;">11월 및 12월 출고 트랜잭션이 발견되지 않았습니다.</div>
+        </div>
+      `;
+    }
+    return;
+  }
+
+  if (btnExec) btnExec.style.display = 'inline-block';
+  if (statusText) statusText.textContent = `분석 완료: 총 ${res.totalAnalyzedItems}개 출고 품목 중 관심/피크 품목 ${res.hotItemsCount}개 도출 ('❄️겨울성수기_안전재고분석' 시트 생성됨)`;
+
+  let html = `
+    <div style="margin-bottom: 12px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;">
+      <div style="background: #f0fdf4; border: 1.5px solid #bbf7d0; border-radius: 8px; padding: 10px 14px;">
+        <div style="font-size: 8pt; color: #166534; font-weight: bold;">총 분석 출고 품목</div>
+        <div style="font-size: 14pt; font-weight: 900; color: #15803d;">${res.totalAnalyzedItems}개</div>
+      </div>
+      <div style="background: #eff6ff; border: 1.5px solid #bfdbfe; border-radius: 8px; padding: 10px 14px;">
+        <div style="font-size: 8pt; color: #1e40af; font-weight: bold;">🔥 성수기 피크/관심품목</div>
+        <div style="font-size: 14pt; font-weight: 900; color: #1d4ed8;">${res.hotItemsCount}개</div>
+      </div>
+      <div style="background: #fff7ed; border: 1.5px solid #fed7aa; border-radius: 8px; padding: 10px 14px;">
+        <div style="font-size: 8pt; color: #9a3412; font-weight: bold;">11~12월 유효 전표</div>
+        <div style="font-size: 14pt; font-weight: 900; color: #ea580c;">${res.winterTxCount}건</div>
+      </div>
+      <div style="background: #fef2f2; border: 1.5px solid #fecaca; border-radius: 8px; padding: 10px 14px;">
+        <div style="font-size: 8pt; color: #991b1b; font-weight: bold;">안전재고 보강 필요 품목</div>
+        <div style="font-size: 14pt; font-weight: 900; color: #dc2626;">${res.items.filter(i => i.safeStockDiff > 0).length}개</div>
+      </div>
+    </div>
+
+    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 12px; margin-bottom: 12px; font-size: 8.5pt; color: #334155; line-height: 1.5;">
+      💡 <strong>과학적 안전재고 공식</strong>: 서브창고 100상자 트럭 배차 및 알라르꼰 입고 소요시간(1일)을 고려하여, <strong>단 하루 최대 출고량(Peak)의 1.3배</strong>를 최소 안전재고로 권장합니다. 하단 [원장에 일괄 반영] 버튼을 누르면 재고시트 E열이 자동 갱신됩니다.
+    </div>
+
+    <div style="max-height: 380px; overflow-y: auto; border: 1px solid #cbd5e1; border-radius: 6px;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 8.5pt; table-layout: fixed;">
+        <thead>
+          <tr style="background: #0f172a; color: #ffffff; position: sticky; top: 0; z-index: 2; text-align: center;">
+            <th style="padding: 7px 4px; width: 40px;">No</th>
+            <th style="padding: 7px 6px; width: 110px; text-align: left;">품명</th>
+            <th style="padding: 7px 4px; width: 70px;">색상</th>
+            <th style="padding: 7px 4px; width: 75px;">분류</th>
+            <th style="padding: 7px 4px; width: 65px;">현재 안전</th>
+            <th style="padding: 7px 4px; width: 75px; background: #1e3a8a; color: #93c5fd;">🔥피크일출고</th>
+            <th style="padding: 7px 4px; width: 80px;">피크일자</th>
+            <th style="padding: 7px 4px; width: 65px;">11월출고</th>
+            <th style="padding: 7px 4px; width: 65px;">12월출고</th>
+            <th style="padding: 7px 4px; width: 75px; font-weight: bold;">겨울총출고</th>
+            <th style="padding: 7px 4px; width: 80px; background: #064e3b; color: #6ee7b7;">⭐권장안전</th>
+            <th style="padding: 7px 4px; width: 65px;">보강필요</th>
+            <th style="padding: 7px 4px; width: 65px;">현재고</th>
+          </tr>
+        </thead>
+        <tbody>
+  `;
+
+  res.items.forEach((item, idx) => {
+    const isDiff = item.safeStockDiff > 0;
+    const rowBg = item.isHot ? '#fffbeb' : (idx % 2 === 0 ? '#ffffff' : '#f8fafc');
+
+    html += `
+      <tr style="background: ${rowBg}; border-bottom: 1px solid #e2e8f0;">
+        <td style="padding: 6px 4px; text-align: center; color: #64748b;">${idx + 1}</td>
+        <td style="padding: 6px 6px; font-weight: bold; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${item.name}">${item.name}</td>
+        <td style="padding: 6px 4px; text-align: center; color: #475569;">${item.color}</td>
+        <td style="padding: 6px 4px; text-align: center;">
+          ${item.isHotInSubWh ? '<span style="background: #fef08a; color: #854d0e; padding: 1px 4px; border-radius: 3px; font-size: 7.5pt; font-weight: bold;">🌟관심</span>' : (item.isHot ? '<span style="background: #fed7aa; color: #9a3412; padding: 1px 4px; border-radius: 3px; font-size: 7.5pt; font-weight: bold;">🔥피크</span>' : '<span style="color: #94a3b8; font-size: 7.5pt;">일반</span>')}
+        </td>
+        <td style="padding: 6px 4px; text-align: right; color: #475569; font-weight: 600;">${item.currentSafeStock}</td>
+        <td style="padding: 6px 4px; text-align: right; font-weight: 900; color: #1d4ed8; background: #eff6ff;">${item.peakDailyBoxes}</td>
+        <td style="padding: 6px 4px; text-align: center; font-size: 7.5pt; color: #64748b;">${item.peakDate || '-'}</td>
+        <td style="padding: 6px 4px; text-align: right; color: #475569;">${item.novBoxes}</td>
+        <td style="padding: 6px 4px; text-align: right; color: #475569;">${item.decBoxes}</td>
+        <td style="padding: 6px 4px; text-align: right; font-weight: bold; color: #0f172a;">${item.totalWinterBoxes}</td>
+        <td style="padding: 6px 4px; text-align: right; font-weight: 900; color: #047857; background: #ecfdf5;">${item.recommendedSafeStock}</td>
+        <td style="padding: 6px 4px; text-align: center; font-weight: bold; color: ${isDiff ? '#dc2626' : '#16a34a'};">
+          ${isDiff ? `+${item.safeStockDiff}` : '적정'}
+        </td>
+        <td style="padding: 6px 4px; text-align: right; font-weight: 600; color: ${item.currentBox > 0 ? '#0284c7' : '#ef4444'};">${item.currentBox}</td>
+      </tr>
+    `;
+  });
+
+  html += `
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  content.innerHTML = html;
+}
+
+function confirmAndApplyWinterSafeStock() {
+  if (!confirm('겨울 성수기 추천 안전재고를 현재 재고시트(E열)에 일괄 반영하시겠습니까?\n\n※ 기존 재고시트는 안전하게 자동 백업됩니다.')) return;
+
+  const statusText = document.getElementById('winterStatusText');
+  const btnExec = document.getElementById('btnExecuteWinterSafeStock');
+  if (statusText) statusText.textContent = '안전재고 원장 반영 중...';
+  if (btnExec) btnExec.disabled = true;
+
+  google.script.run
+    .withSuccessHandler((res) => {
+      alert(`🎉 안전재고 반영 완료!\n\n총 ${res.updatedCount}개 품목의 안전재고가 성공적으로 갱신되었습니다.\n(백업 시트: ${res.backupSheetName})`);
+      closeWinterSafeStockModal();
+      if (typeof loadStockData === 'function') {
+        loadStockData();
+      }
+    })
+    .withFailureHandler((err) => {
+      alert('❌ 안전재고 반영 실패:\n' + (err.message || err));
+      if (btnExec) btnExec.disabled = false;
+    })
+    .applyRecommendedSafeStockToMaster();
 }
 
 function toggleScroll() {
@@ -6730,6 +6947,7 @@ function setupHotkeyShortcuts() {
       showOcrLoadingModal(false);
       closeStockAuditModal();
       closeStockNormalizeModal();
+      closeWinterSafeStockModal();
     }
     // Ctrl + Enter : 그리드 모달이 열려 있을 때 일괄 담기 실행
     else if (e.ctrlKey && e.key === 'Enter') {
