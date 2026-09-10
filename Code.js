@@ -458,33 +458,36 @@ function processForm(tableData, mode, admin) {
         stockMap[key] = current;
       }
 
-      if (record.unitType === 'box') {
-        const qty = Math.abs(normalizeNumber(record.boxQty));
+      const boxQty = Math.abs(normalizeNumber(record.boxQty));
+      const indQty = Math.abs(normalizeNumber(record.individualQty));
+
+      if (boxQty > 0) {
         if (mode === 'in') {
-          current.box += qty;
+          current.box += boxQty;
         } else {
-          if (current.box < qty) {
-            throw new Error(`[${current.name}(${current.color})] 박스 재고가 부족합니다. (현재: ${current.box}박스, 요청: ${qty}박스)`);
+          if (current.box < boxQty) {
+            throw new Error(`[${current.name}(${current.color})] 박스 재고가 부족합니다. (현재: ${current.box}박스, 요청: ${boxQty}박스)`);
           }
-          current.box -= qty;
+          current.box -= boxQty;
         }
-      } else if (record.unitType === 'individual') {
-        const qty = Math.abs(normalizeNumber(record.individualQty));
+      }
+
+      if (indQty > 0) {
         if (mode === 'in') {
-          current.individual += qty;
+          current.individual += indQty;
         } else {
           // 낱개 부족 시 박스 언패킹
-          while (current.individual < qty && current.box > 0) {
+          while (current.individual < indQty && current.box > 0) {
             if (current.boxContent <= 0) {
               throw new Error(`[${current.name}(${current.color})] 박스당 낱개 수량이 0이어서 박스를 개봉할 수 없습니다.`);
             }
             current.box -= 1;
             current.individual += current.boxContent;
           }
-          if (current.individual < qty) {
-            throw new Error(`[${current.name}(${current.color})] 낱개 재고가 부족합니다. (현재 가용: ${current.individual}개, 요청: ${qty}개)`);
+          if (current.individual < indQty) {
+            throw new Error(`[${current.name}(${current.color})] 낱개 재고가 부족합니다. (현재 가용: ${current.individual}개, 요청: ${indQty}개)`);
           }
-          current.individual -= qty;
+          current.individual -= indQty;
         }
       }
     });
@@ -508,8 +511,8 @@ function processForm(tableData, mode, admin) {
         new Date(),
         name,
         color,
-        record.unitType === 'box' ? Math.abs(normalizeNumber(record.boxQty)) : 0,
-        record.unitType === 'individual' ? Math.abs(normalizeNumber(record.individualQty)) : 0,
+        record.boxQty ? Math.abs(normalizeNumber(record.boxQty)) : 0,
+        record.individualQty ? Math.abs(normalizeNumber(record.individualQty)) : 0,
         boxContent,
         normalizeText(record.location),
         adminName,
@@ -613,26 +616,29 @@ function updateStockSheet(tableData, mode) {
         stockMap[key] = current;
       }
 
-      if (record.unitType === 'box') {
-        const qty = Math.abs(normalizeNumber(record.boxQty));
+      const boxQty = Math.abs(normalizeNumber(record.boxQty));
+      const indQty = Math.abs(normalizeNumber(record.individualQty));
+
+      if (boxQty > 0) {
         if (mode === 'in') {
-          current.box += qty;
+          current.box += boxQty;
         } else {
-          if (current.box < qty) throw new Error(`[${current.name}] 박스 재고가 부족합니다.`);
-          current.box -= qty;
+          if (current.box < boxQty) throw new Error(`[${current.name}] 박스 재고가 부족합니다.`);
+          current.box -= boxQty;
         }
-      } else if (record.unitType === 'individual') {
-        const qty = Math.abs(normalizeNumber(record.individualQty));
+      }
+
+      if (indQty > 0) {
         if (mode === 'in') {
-          current.individual += qty;
+          current.individual += indQty;
         } else {
-          while (current.individual < qty && current.box > 0) {
+          while (current.individual < indQty && current.box > 0) {
             if (current.boxContent <= 0) throw new Error(`[${current.name}] 박스당 낱개 수량을 확인하세요.`);
             current.box -= 1;
             current.individual += current.boxContent;
           }
-          if (current.individual < qty) throw new Error(`[${current.name}] 낱개 재고가 부족합니다.`);
-          current.individual -= qty;
+          if (current.individual < indQty) throw new Error(`[${current.name}] 낱개 재고가 부족합니다.`);
+          current.individual -= indQty;
         }
       }
     });
@@ -1442,15 +1448,18 @@ Rules:
      - Color empty/blank (e.g. [modelo] , , [qty] OR [modelo] .. [qty]): return {"modelo": "...", "color": "", "no_de_bultos": qty}
      - Model empty/blank (Option 1: [empty] , [color] , [qty] OR Option 2: [color] , [qty]):
        If the row starts with empty delimiter or only has a color word and quantity, return {"modelo": "", "color": "color_name", "no_de_bultos": qty}
-   - Form A (Grid table rows):
-     - "modelo": Text written in the 'modelo' column. If empty on that row line, return "".
-     - "color": Text written in the 'color' column. If empty on that row line, return "".
-     - "no_de_bultos": The integer quantity in the 'cant oder' column for that row line.
+   - Form A (Grid table rows, e.g. CANTIDAD / DESCRIPCION or modelo / color / cant):
+     - "modelo": Text written in the description or 'modelo' column. If empty on that row line, return "".
+     - "color": Text written in the 'color' column, or color word in description (e.g. "negro", "blanco"). If empty on that row line, return "".
+     - "raw_qty": The EXACT expression written in the quantity column (e.g. "1 x 60", "3 x 72", "2 x 1000", "1 x 400", "1 x 33", "10P", "5"). NEVER drop the multiplication or letters!
+     - "boxes": The number of boxes. For "A x B" expression (e.g. "3 x 72"), boxes is A (3). For single number without 'x', boxes is that number.
+     - "pack_qty": The pieces per box. For "A x B" expression (e.g. "3 x 72"), pack_qty is B (72). If no 'x', pack_qty is 0.
+     - "no_de_bultos": The number of boxes (same as boxes) for backward compatibility.
      - "contenedor": Remarks if written, else "".
 
 4. IMPORTANT:
-   - Do NOT merge different rows!
-   - For quantities: If 'P' or 'pz' (meaning piezas/낱개, e.g. "10P", "5p", "12 pz") is written after or with the number, preserve 'P' with the number (e.g. "10P"). Otherwise extract the positive integer number (e.g. "./ 1" or ". 1" is 1).
+   - Do NOT merge different rows during image extraction; extract each row faithfully!
+   - For quantities: If 'P' or 'pz' (meaning piezas/낱개, e.g. "10P", "5p", "12 pz") is written after or with the number, preserve 'P' with the number in raw_qty.
 
 5. Orientation & Fast Extraction Guard:
    - The order sheet photo may be tilted, taken at an angle, or rotated.
@@ -1461,12 +1470,12 @@ Return ONLY valid JSON:
   "branch": "...",
   "requester": "...",
   "results": [
-    {"modelo": "P-D60", "color": "Blanco", "no_de_bultos": 2},
-    {"modelo": "", "color": "Beige", "no_de_bultos": 1}
+    {"modelo": "P-D60", "color": "Blanco", "raw_qty": "2", "boxes": 2, "pack_qty": 0, "no_de_bultos": 2},
+    {"modelo": "Mr 999", "color": "", "raw_qty": "3 x 72", "boxes": 3, "pack_qty": 72, "no_de_bultos": 3}
   ]
 }`;
 
-  const models = ['gemini-3.7-flash', 'gemini-3.8-flash', 'gemini-3.6-flash'];
+  const models = ['gemini-3.6-flash', 'gemini-3.7-flash', 'gemini-3.8-flash'];
   let rawResponse = '';
   let lastError = '';
   let usageMetadata = null;

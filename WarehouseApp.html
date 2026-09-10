@@ -2718,14 +2718,23 @@ function updateTable() {
         if (currentType === 'out') {
           const reqBox = Math.abs(rec.boxQty || 0);
           const reqIndiv = Math.abs(rec.individualQty || 0);
-          const isShort = (rec.unitType === 'box' && reqBox > curBox) ||
-                          (rec.unitType === 'individual' && reqIndiv > (curBox * (rec.boxContent || 0) + curIndiv));
+          const bContent = rec.boxContent || 0;
+          const totalReqPieces = (reqBox * bContent) + reqIndiv;
+          const totalCurPieces = (curBox * bContent) + curIndiv;
+          const isShort = (bContent > 0)
+            ? (totalReqPieces > totalCurPieces)
+            : (reqBox > curBox || reqIndiv > curIndiv);
+
           if (isShort) {
             shortageRowStyle = 'background-color: #fff1f2;';
             stockDisplay = `<span class="no-print stock-avail-tag" style="color: #dc2626;">(${curBox}+${curIndiv})</span>`;
+            const shortPieces = Math.max(0, totalReqPieces - totalCurPieces);
+            const shortText = (bContent > 0 && reqBox > 0 && shortPieces >= bContent)
+              ? `재고부족(${curBox}상자)`
+              : `재고부족(${shortPieces}개 부족)`;
             shortageBadge = `
               <div style="margin-top: 2px; display: flex; align-items: center; gap: 4px;">
-                <span style="font-size: 7.2pt; background: #fee2e2; color: #b91c1c; padding: 1px 5px; border-radius: 3px; font-weight: 700;">재고부족(${curBox}상자)</span>
+                <span style="font-size: 7.2pt; background: #fee2e2; color: #b91c1c; padding: 1px 5px; border-radius: 3px; font-weight: 700;">${shortText}</span>
                 <button type="button" class="btn-quick-adj no-print" onclick="openQuickAdjustModal('${rec.itemName}', '${rec.color}', ${rec.boxContent || 0}, ${curBox}, ${curIndiv}, ${reqBox || 1})" title="실재고 반영을 위한 퀵 재고조정">⚡ 퀵재고</button>
               </div>
             `;
@@ -5183,9 +5192,12 @@ function selectDisambiguatedLocation(selectedLoc) {
     msg += `\n요청자(관리자): [${detectedAdmin}] 자동 선택됨`;
   }
 
-  msg += '\n\n📋 [인식된 품목 상세]:\n' + pendingRecs.map((rec, i) => 
-    ` ${i + 1}. ${rec.itemName} | 컬러: ${rec.color} | ${rec.unitType === 'individual' ? Math.abs(rec.individualQty) + '개' : Math.abs(rec.boxQty) + '상자'}`
-  ).join('\n');
+  msg += '\n\n📋 [인식된 품목 상세]:\n' + pendingRecs.map((rec, i) => {
+    const b = Math.abs(rec.boxQty || 0);
+    const ind = Math.abs(rec.individualQty || 0);
+    let qStr = (b > 0 && ind > 0) ? `${b}상자 + ${ind}개` : (b > 0 ? `${b}상자` : `${ind}개`);
+    return ` ${i + 1}. ${rec.itemName} | 컬러: ${rec.color} | ${qStr} (규격: ${rec.boxContent}개/박스)`;
+  }).join('\n');
 
   if (usageMetadata) {
     const meta = usageMetadata;
@@ -5339,6 +5351,7 @@ function onHandwrittenExtracted(data) {
   let lastItemInfo = null;
   let addedCount = 0;
   const newRecords = [];
+  const consolidatedMap = new Map();
 
   data.results.forEach(r => {
     let rawModel = String(r.modelo || '').trim().replace(/[.,;:_\-\s]+$/, '');
@@ -5368,11 +5381,6 @@ function onHandwrittenExtracted(data) {
         rawColor = ext.color;
       }
     }
-
-    let rawQtyStr = String(r.no_de_bultos || r.cant_oder || r.cantidad || '').trim();
-    let isIndividualUnit = /[pP]$/i.test(rawQtyStr) || /pz/i.test(rawQtyStr) || String(r.unidad || '').toUpperCase().includes('P');
-    let qty = parseInt(rawQtyStr.replace(/[^\d]/g, ''), 10) || 0;
-    if (isNaN(qty) || qty <= 0) return;
 
     let finalItemName = '';
     let finalColor = '';
@@ -5498,14 +5506,86 @@ function onHandwrittenExtracted(data) {
       }
     }
 
+    // 4. 수량 파싱 ("A x B" 수식 또는 단일 수량 지원)
+    const rawQtyExpr = String(r.raw_qty || r.no_de_bultos || r.cant_oder || r.cantidad || '').trim();
+    const isIndividualExplicit = /[pP]$/i.test(rawQtyExpr) || /pz/i.test(rawQtyExpr) || String(r.unidad || '').toUpperCase().includes('P') || !!r.is_pieces;
+
+    let parsedBoxes = 0;
+    let parsedPackQty = parseInt(r.pack_qty, 10) || 0;
+
+    const mulMatch = rawQtyExpr.match(/(\d+)\s*[xX*]\s*(\d+)/);
+    if (mulMatch) {
+      parsedBoxes = parseInt(mulMatch[1], 10) || 1;
+      parsedPackQty = parseInt(mulMatch[2], 10) || 0;
+    } else if (r.boxes !== undefined && r.boxes !== null && !isNaN(parseInt(r.boxes, 10))) {
+      parsedBoxes = parseInt(r.boxes, 10) || 0;
+    } else {
+      parsedBoxes = parseInt(rawQtyExpr.replace(/[^\d]/g, ''), 10) || 0;
+    }
+
+    let rowBoxQty = 0;
+    let rowIndivQty = 0;
+
+    if (parsedPackQty > 0) {
+      // "A x B" 형식 (예: 1 x 60, 3 x 72, 2 x 1000)
+      if (finalBoxContent > 0 && parsedPackQty === finalBoxContent) {
+        // 정규 표준 박스 포장 규격과 일치 -> 정규 상자(bulto)
+        rowBoxQty = parsedBoxes;
+        rowIndivQty = 0;
+      } else {
+        // 표준 규격과 불일치 (뜯어진 상자를 임의 재포장한 비정규 수량) -> 낱개(PZS)로 환산
+        rowBoxQty = 0;
+        rowIndivQty = parsedBoxes * parsedPackQty;
+      }
+    } else if (isIndividualExplicit) {
+      // 명시적 낱개 표기 (10P, 5pz 등)
+      rowBoxQty = 0;
+      rowIndivQty = parsedBoxes;
+    } else {
+      // 단일 정수 표기 -> 기본 상자
+      rowBoxQty = parsedBoxes;
+      rowIndivQty = 0;
+    }
+
+    if (rowBoxQty === 0 && rowIndivQty === 0) return;
+
+    // 5. 1줄 통합용 맵에 누적 (동일 품명 + 색상 기준)
+    const itemKey = `${finalItemName.replace(/[\s_\-]/g, '').toUpperCase()}__${finalColor.replace(/[\s_\-]/g, '').toUpperCase()}`;
+
+    if (!consolidatedMap.has(itemKey)) {
+      consolidatedMap.set(itemKey, {
+        itemName: finalItemName,
+        color: finalColor,
+        boxContent: finalBoxContent,
+        boxQty: 0,
+        individualQty: 0,
+        location: activeLocation || '',
+        rawSources: []
+      });
+    }
+
+    const group = consolidatedMap.get(itemKey);
+    group.boxQty += rowBoxQty;
+    group.individualQty += rowIndivQty;
+    group.rawSources.push({
+      rawModel,
+      rawQty: rawQtyExpr,
+      boxes: rowBoxQty,
+      indiv: rowIndivQty
+    });
+  });
+
+  // 1줄로 통합된 레코드 목록 생성
+  consolidatedMap.forEach(group => {
     newRecords.push({
-      itemName: finalItemName,
-      color: finalColor,
-      boxQty: isIndividualUnit ? 0 : (currentType === 'out' ? -Math.abs(qty) : Math.abs(qty)),
-      individualQty: isIndividualUnit ? (currentType === 'out' ? -Math.abs(qty) : Math.abs(qty)) : 0,
-      boxContent: finalBoxContent,
+      itemName: group.itemName,
+      color: group.color,
+      boxQty: currentType === 'out' ? -Math.abs(group.boxQty) : Math.abs(group.boxQty),
+      individualQty: currentType === 'out' ? -Math.abs(group.individualQty) : Math.abs(group.individualQty),
+      boxContent: group.boxContent,
       location: activeLocation || '',
-      unitType: isIndividualUnit ? 'individual' : 'box'
+      unitType: (group.boxQty > 0 && group.individualQty === 0) ? 'box' : 'individual',
+      rawSourcesCount: group.rawSources.length
     });
     addedCount++;
   });
@@ -5528,13 +5608,43 @@ function onHandwrittenExtracted(data) {
     return;
   }
 
-  // 단일 배송지이거나 기존 장바구니에 누적 추가되는 경우:
-  records.push(...newRecords);
+  // 🚨 [사장님 업무 규칙] 기존 장바구니 품목과의 1줄 통합 (Cross-Page 누적 합산)
+  let mergedIntoExistingCount = 0;
+  if (hasExistingRecords) {
+    newRecords.forEach(newRec => {
+      const matchKey = `${newRec.itemName.replace(/[\s_\-]/g, '').toUpperCase()}__${newRec.color.replace(/[\s_\-]/g, '').toUpperCase()}`;
+      const existingRec = records.find(r => 
+        `${r.itemName.replace(/[\s_\-]/g, '').toUpperCase()}__${(r.color || 'SURTIDO').replace(/[\s_\-]/g, '').toUpperCase()}` === matchKey
+      );
+
+      if (existingRec) {
+        if (currentType === 'out') {
+          existingRec.boxQty = - (Math.abs(existingRec.boxQty || 0) + Math.abs(newRec.boxQty || 0));
+          existingRec.individualQty = - (Math.abs(existingRec.individualQty || 0) + Math.abs(newRec.individualQty || 0));
+        } else {
+          existingRec.boxQty = (existingRec.boxQty || 0) + (newRec.boxQty || 0);
+          existingRec.individualQty = (existingRec.individualQty || 0) + (newRec.individualQty || 0);
+        }
+        if (!existingRec.boxContent && newRec.boxContent) {
+          existingRec.boxContent = newRec.boxContent;
+        }
+        mergedIntoExistingCount++;
+      } else {
+        records.push(newRec);
+      }
+    });
+  } else {
+    records.push(...newRecords);
+  }
+
   saveTableData();
   updateTable();
   updateTotals();
   
-  let msg = `🎉 손글씨 주문서 인식 성공!\n\n총 ${addedCount}개 품목이 장바구니에 추가되었습니다.`;
+  let msg = `🎉 손글씨 주문서 1줄 통합 인식 성공!\n\n총 ${data.results.length}개 원본 행이 ${newRecords.length}개 대표 품목으로 통합되어 장바구니에 적재되었습니다.`;
+  if (mergedIntoExistingCount > 0) {
+    msg += `\n(기존 장바구니에 있던 ${mergedIntoExistingCount}개 동일 품목 라인에 자동 합산되었습니다.)`;
+  }
   if (!hasExistingRecords) {
     if (detectedLoc) {
       msg += `\n출고처: [${detectedLoc}] 자동 선택됨`;
@@ -5546,9 +5656,15 @@ function onHandwrittenExtracted(data) {
     msg += `\n(기존 [${currentLocValue}] 주문서에 이어서 누적 추가됨)`;
   }
 
-  msg += '\n\n📋 [인식된 품목 상세]:\n' + newRecords.map((rec, i) => 
-    ` ${i + 1}. ${rec.itemName} | 컬러: ${rec.color} | ${rec.unitType === 'individual' ? Math.abs(rec.individualQty) + '개' : Math.abs(rec.boxQty) + '상자'}`
-  ).join('\n');
+  msg += '\n\n📋 [1줄 통합 적재 내역]:\n' + newRecords.map((rec, i) => {
+    let qtyDesc = '';
+    const b = Math.abs(rec.boxQty);
+    const ind = Math.abs(rec.individualQty);
+    if (b > 0 && ind > 0) qtyDesc = `${b}상자 + ${ind}개`;
+    else if (b > 0) qtyDesc = `${b}상자`;
+    else qtyDesc = `${ind}개 (PZS)`;
+    return ` ${i + 1}. ${rec.itemName} | 컬러: ${rec.color} | ${qtyDesc} (규격: ${rec.boxContent}개/박스)`;
+  }).join('\n');
 
   if (data.usageMetadata) {
     const meta = data.usageMetadata;
