@@ -166,9 +166,7 @@ function getAdminList() {
 // -------------------------------------------------------------------
 
 function getStockData() {
-  const lock = LockService.getScriptLock();
   try {
-    lock.waitLock(15000);
     const sheet = getSheet(SHEETS.STOCK);
     ensureSheetColumns(sheet, 9);
     const lastRow = sheet.getLastRow();
@@ -198,8 +196,6 @@ function getStockData() {
   } catch (e) {
     console.error(`getStockData error: ${e.message}`);
     throw e;
-  } finally {
-    lock.releaseLock();
   }
 }
 
