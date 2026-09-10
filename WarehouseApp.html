@@ -1371,7 +1371,7 @@
         <div class="table-section">
           <div class="table-top-bar">
             <div class="action-buttons">
-              <button type="button" class="action-btn btn-ocr" onclick="triggerHandwrittenImageUpload()" title="손글씨 주문서 사진 붙여넣기 (Ctrl+V) 또는 파일 선택">📷 주문서 (Ctrl+V)</button>
+              <button type="button" class="action-btn btn-ocr" id="btnOcrUpload" onclick="triggerHandwrittenImageUpload()" title="손글씨 주문서/송장 사진 붙여넣기 (Ctrl+V) 또는 파일 선택">📷 주문서 (Ctrl+V)</button>
               <input type="file" id="orderImageFileInput" accept="image/*" style="display:none;" onchange="handleImageFileSelect(event)">
               <button type="button" class="action-btn btn-add" onclick="addRecord()" tabindex="7">➕ 추가</button>
               <button type="button" class="action-btn btn-delete" onclick="deleteRecord()" tabindex="8">🗑️ 삭제</button>
@@ -1822,7 +1822,10 @@
       <div style="display: flex; justify-content: space-between; align-items: center;">
         <button type="button" onclick="clearAllOrderDraftItems()" style="padding: 5px 12px; background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; border-radius: 5px; font-weight: 600; cursor: pointer; font-size: 8.2pt;">전체 비우기</button>
         <div style="display: flex; gap: 8px;">
-          <button type="button" onclick="closeOrderDraftModal()" style="padding: 6px 16px; background: #0d9488; color: #ffffff; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 8.8pt;">확인 (닫기)</button>
+          <button type="button" id="btnSubmitDraftToPending" onclick="submitOrderDraftToPending()" style="padding: 6px 16px; background: #0f766e; color: #ffffff; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 8.8pt; display: flex; align-items: center; gap: 6px; box-shadow: 0 2px 6px rgba(15,118,110,0.3);">
+            <span>🚀 입고 보류로 발주 등록 (외부창고 전송)</span>
+          </button>
+          <button type="button" onclick="closeOrderDraftModal()" style="padding: 6px 14px; background: #64748b; color: #ffffff; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 8.8pt;">닫기</button>
         </div>
       </div>
     </div>
@@ -2222,6 +2225,21 @@ function setPage(page, initialData = null) {
     const locTabLabel = document.getElementById('locationTabLabel');
     if (locTabLabel) {
       locTabLabel.textContent = currentType === 'in' ? '입고처' : '출고처';
+    }
+
+    const btnOcr = document.getElementById('btnOcrUpload');
+    if (btnOcr) {
+      if (currentType === 'in') {
+        btnOcr.textContent = '📄 송장스캔 (Ctrl+V)';
+        btnOcr.title = '서브창고 화물운송장(Carta de Porte) 송장 사진 붙여넣기(Ctrl+V) 또는 파일 선택 -> 발주분과 실물 대조(델타 반영)';
+        btnOcr.style.background = '#0f766e';
+        btnOcr.style.color = '#ffffff';
+      } else {
+        btnOcr.textContent = '📷 주문서 (Ctrl+V)';
+        btnOcr.title = '손글씨 주문서 사진 붙여넣기 (Ctrl+V) 또는 파일 선택';
+        btnOcr.style.background = '';
+        btnOcr.style.color = '';
+      }
     }
 
     document.querySelectorAll('.menu button').forEach(btn => btn.classList.remove('active'));
@@ -5401,12 +5419,199 @@ function processHandwrittenImageFile(fileOrBlob) {
   reader.onload = function(evt) {
     const base64Data = evt.target.result;
     showOcrLoadingModal(true, base64Data);
-    google.script.run
-      .withSuccessHandler(onHandwrittenExtracted)
-      .withFailureHandler(onHandwrittenError)
-      .analyzeHandwrittenOrder(base64Data);
+    if (currentType === 'in') {
+      // 📄 입고 모드: 서브창고 화물운송장 (Carta de Porte) 파싱 & 실물 델타 엔진
+      google.script.run
+        .withSuccessHandler(onCartaDePorteExtracted)
+        .withFailureHandler(onHandwrittenError)
+        .analyzeCartaDePorte(base64Data);
+    } else {
+      // 📷 출고 모드: 고객 손글씨 주문서 파싱
+      google.script.run
+        .withSuccessHandler(onHandwrittenExtracted)
+        .withFailureHandler(onHandwrittenError)
+        .analyzeHandwrittenOrder(base64Data);
+    }
   };
   reader.readAsDataURL(fileOrBlob);
+}
+
+/**
+ * 📄 서브창고 송장(Carta de Porte) 파싱 결과 수신 처리
+ */
+function onCartaDePorteExtracted(res) {
+  showOcrLoadingModal(false);
+  if (!res || !res.items || res.items.length === 0) {
+    alert('⚠️ 송장(Carta de Porte)에서 품목 데이터를 읽지 못했습니다.\n선명한 이미지를 다시 시도해 주세요.');
+    return;
+  }
+
+  // 1. 출발 창고 드롭다운 자동 지정
+  const originWh = (res.origin_warehouse || 'PANTACO').toUpperCase().trim();
+  const locSelect = document.getElementById('location');
+  if (locSelect) {
+    const exists = Array.from(locSelect.options).some(opt => opt.value.toUpperCase() === originWh);
+    if (exists) {
+      locSelect.value = originWh;
+    } else {
+      const newOpt = document.createElement('option');
+      newOpt.value = originWh;
+      newOpt.textContent = originWh;
+      locSelect.appendChild(newOpt);
+      locSelect.value = originWh;
+    }
+    saveMetadata();
+  }
+
+  // 2. 현재 테이블(records)에 품목이 이미 로드되어 있는지 확인 (보류에서 불러온 상태)
+  const hasExistingRecords = records && records.length > 0;
+
+  if (hasExistingRecords) {
+    // 🔍 델타(Delta) 분석 모드: 발주서 vs 송장 실물 대조 및 테이블 자동 보정
+    applyCartaDePorteDelta(res);
+  } else {
+    // 📥 직접 적재 모드: 보류를 안 불러왔더라도 송장 품목들을 바로 테이블에 적재
+    loadCartaDePorteDirectly(res);
+  }
+}
+
+/**
+ * ⚖️ 송장 실물 vs 기존 테이블 발주 품목 델타(Delta) 분석 및 자동 보정
+ */
+function applyCartaDePorteDelta(res) {
+  const invoiceItems = res.items || [];
+  let exactMatchCount = 0;
+  let qtyModifiedCount = 0;
+  let newAddedCount = 0;
+  const missingRecords = [];
+  const matchedInvoiceIndexes = new Set();
+
+  const getFuzzyKey = (name, color) => `${(name || '').replace(/[\s_\-]/g, '').toUpperCase()}__${(color || 'SURTIDO').replace(/[\s_\-]/g, '').toUpperCase()}`;
+
+  // 1. 기존 테이블 행들을 돌며 송장 실물과 대조 및 수량/색상 보정
+  records.forEach(rec => {
+    const recKey = getFuzzyKey(rec.itemName, rec.color);
+    let foundIdx = -1;
+
+    for (let i = 0; i < invoiceItems.length; i++) {
+      if (matchedInvoiceIndexes.has(i)) continue;
+      const inv = invoiceItems[i];
+      const invKey = getFuzzyKey(inv.modelo, inv.color);
+      if (recKey === invKey || recKey.includes(invKey) || invKey.includes(recKey)) {
+        foundIdx = i;
+        break;
+      }
+    }
+
+    if (foundIdx !== -1) {
+      matchedInvoiceIndexes.add(foundIdx);
+      const matchedInv = invoiceItems[foundIdx];
+      const oldQty = Math.abs(rec.boxQty);
+      const newQty = matchedInv.boxes;
+
+      if (oldQty === newQty) {
+        exactMatchCount++;
+      } else {
+        // 수량 변동(델타) 발생 -> 송장 실물 수량으로 즉시 보정!
+        rec.boxQty = newQty;
+        rec._isQtyModified = true;
+        rec._oldBoxQty = oldQty;
+        qtyModifiedCount++;
+      }
+    } else {
+      // 테이블에는 있는데 송장에는 없는 품목 (미출고)
+      missingRecords.push(rec);
+    }
+  });
+
+  // 2. 송장에는 있는데 기존 테이블에 없던 신규/대체 품목 추가
+  invoiceItems.forEach((inv, i) => {
+    if (!matchedInvoiceIndexes.has(i)) {
+      const matchMaster = findBestCatalogMatch(inv.modelo, stockDataCache, 0.6);
+      const itemName = matchMaster ? matchMaster.item.name : inv.modelo;
+      const boxContent = matchMaster ? matchMaster.item.boxContent : 0;
+      const color = inv.color || (matchMaster ? matchMaster.item.color : 'SURTIDO');
+
+      records.push({
+        itemName: itemName,
+        color: color,
+        boxQty: inv.boxes,
+        individualQty: 0,
+        boxContent: boxContent,
+        location: res.origin_warehouse || 'PANTACO',
+        unitType: 'box',
+        _isNewAdded: true
+      });
+      newAddedCount++;
+    }
+  });
+
+  // 3. 미출고 품목(송장에 없는 품목)에 대한 사용자 확인 처리
+  let missingRemovedCount = 0;
+  if (missingRecords.length > 0) {
+    const missingDesc = missingRecords.map(r => ` • ${r.itemName} (${r.color}) : ${r.boxQty}상자`).join('\n');
+    const removeMissing = confirm(
+      `⚠️ [송장 미출고 품목 감지]\n\n원래 발주했으나 이번 송장에 실려오지 않은 품목이 ${missingRecords.length}건 있습니다:\n${missingDesc}\n\n이 품목들을 이번 입고 테이블에서 제외하시겠습니까?\n\n[확인]: 테이블에서 제외하여 실제 도착분만 입고\n[취소]: 그대로 유지`
+    );
+    if (removeMissing) {
+      const missingKeys = new Set(missingRecords.map(r => getFuzzyKey(r.itemName, r.color)));
+      records = records.filter(r => !missingKeys.has(getFuzzyKey(r.itemName, r.color)));
+      missingRemovedCount = missingRecords.length;
+    }
+  }
+
+  // 4. 화면 갱신
+  saveTableData();
+  updateTable();
+  updateTotals();
+
+  // 5. 델타 반영 결과 리포트 알림
+  const currentTotalBoxes = records.reduce((s, r) => s + (r.boxQty || 0), 0);
+  let summaryMsg = `📄 [서브창고 송장 델타 분석 및 테이블 자동 보정 완료]`;
+  summaryMsg += `\n• 출발창고: [${res.origin_warehouse || 'PANTACO'}]`;
+  summaryMsg += `\n• 송장 일자: ${res.date || '-'}`;
+  if (res.transport) summaryMsg += `\n• 차량/기사: ${res.transport}`;
+  summaryMsg += `\n• 현재 테이블 총 수량: ${currentTotalBoxes}상자`;
+  summaryMsg += `\n\n📊 [대사 상세 결과]`;
+  summaryMsg += `\n • 🟢 일치 품목: ${exactMatchCount}건`;
+  if (qtyModifiedCount > 0) summaryMsg += `\n • 🟠 수량 변동(송장실물로 보정): ${qtyModifiedCount}건`;
+  if (newAddedCount > 0) summaryMsg += `\n • 🔵 신규 추가(대체출고): ${newAddedCount}건`;
+  if (missingRemovedCount > 0) summaryMsg += `\n • 🔴 미출고 제외: ${missingRemovedCount}건`;
+  summaryMsg += `\n\n📌 테이블의 수량을 눈으로 최종 확인하신 후 [🚀 제출] 버튼을 눌러주세요.`;
+
+  alert(summaryMsg);
+}
+
+/**
+ * 📥 송장 품목을 입고 테이블로 직접 적재 (보류 데이터 없이 송장만 스캔한 경우)
+ */
+function loadCartaDePorteDirectly(res) {
+  const invoiceItems = res.items || [];
+  const originWh = (res.origin_warehouse || 'PANTACO').toUpperCase().trim();
+
+  invoiceItems.forEach(inv => {
+    const matchMaster = findBestCatalogMatch(inv.modelo, stockDataCache, 0.6);
+    const itemName = matchMaster ? matchMaster.item.name : inv.modelo;
+    const boxContent = matchMaster ? matchMaster.item.boxContent : 0;
+    const color = inv.color || (matchMaster ? matchMaster.item.color : 'SURTIDO');
+
+    records.push({
+      itemName: itemName,
+      color: color,
+      boxQty: inv.boxes,
+      individualQty: 0,
+      boxContent: boxContent,
+      location: originWh,
+      unitType: 'box'
+    });
+  });
+
+  saveTableData();
+  updateTable();
+  updateTotals();
+
+  const totalLoaded = records.reduce((s, r) => s + (r.boxQty || 0), 0);
+  alert(`📄 서브창고 송장(${originWh})이 인식되어 총 ${totalLoaded}상자가 입고 테이블에 로드되었습니다.\n\n수량을 확인하시고 [🚀 제출]을 눌러주세요.`);
 }
 
 function showOcrLoadingModal(show, previewSrc) {
@@ -6421,6 +6626,97 @@ function clearAllOrderDraftItems() {
   renderOrderDraftTable();
   updateTruckGauges();
   filterSubWarehouseTable();
+}
+
+/**
+ * 🚀 외부창고 주문서 작성 목록을 WMS [입고 보류]로 일괄 등록 및 외부창고 시트 PENDIENTE 전송
+ */
+function submitOrderDraftToPending() {
+  const draftItems = getOrderDraftItems();
+  if (!draftItems || draftItems.length === 0) {
+    alert('발주할 품목이 없습니다.');
+    return;
+  }
+
+  // 출고 창고별로 그룹화
+  const byWarehouse = {};
+  draftItems.forEach(item => {
+    const wh = (item.warehouse || 'PANTACO').toUpperCase().trim();
+    if (!byWarehouse[wh]) byWarehouse[wh] = [];
+    byWarehouse[wh].push(item);
+  });
+
+  const whNames = Object.keys(byWarehouse);
+  const totalBoxes = draftItems.reduce((s, item) => s + (item.boxQty || 0), 0);
+
+  if (!confirm(`외부창고 발주 [${whNames.join(', ')}] 총 ${totalBoxes}상자를 WMS [입고 보류]로 등록하고 외부창고 시트로 전송하시겠습니까?`)) {
+    return;
+  }
+
+  const datetimeInput = document.getElementById('datetime');
+  const adminSelect = document.getElementById('adminSelect');
+  const dateStr = datetimeInput ? datetimeInput.value : new Date().toLocaleString();
+  const admin = adminSelect ? adminSelect.value : 'ADMIN';
+
+  // 1. WMS pending_in 에 창고별로 등록
+  let pendingInList = [];
+  try {
+    const saved = localStorage.getItem('pending_in');
+    if (saved) pendingInList = JSON.parse(saved);
+  } catch (e) {}
+
+  whNames.forEach(wh => {
+    const whItems = byWarehouse[wh];
+    const recs = whItems.map(item => ({
+      itemName: item.itemName,
+      color: item.color || 'SURTIDO',
+      boxQty: item.boxQty,
+      individualQty: 0,
+      boxContent: item.boxContent || 0,
+      location: wh,
+      unitType: 'box'
+    }));
+
+    pendingInList.push({
+      records: recs,
+      location: wh,
+      admin: admin,
+      date: dateStr,
+      createdAt: new Date().toLocaleString(),
+      isSubWarehouseOrder: true,
+      sourceWarehouse: wh
+    });
+  });
+
+  try {
+    localStorage.setItem('pending_in', JSON.stringify(pendingInList));
+  } catch (e) {
+    console.error('pending_in save error: ' + e.message);
+  }
+
+  const btn = document.getElementById('btnSubmitDraftToPending');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ 전송 중...'; }
+
+  // 2. 외부창고 시트 백엔드로 일괄 전송
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<span>🚀 입고 보류로 발주 등록 (외부창고 전송)</span>'; }
+      saveOrderDraftItems([]);
+      renderOrderDraftTable();
+      updateTruckGauges();
+      filterSubWarehouseTable();
+      closeOrderDraftModal();
+      closeSubWarehouseMatrixModal();
+      updatePendingCount();
+
+      alert(`🎉 [외부창고 발주 등록 완료]\n\n• 발주 창고: ${whNames.join(', ')}\n• 총 수량: ${totalBoxes}상자\n\nWMS [입고입력] > [🔍 보류]에 정상 등록되었으며 외부창고 시트에도 PENDIENTE로 전송되었습니다.\n\n트럭 도착 시 [🔍 보류]에서 불러와 송장 사진을 붙여넣으세요!`);
+    })
+    .withFailureHandler(function(err) {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<span>🚀 입고 보류로 발주 등록 (외부창고 전송)</span>'; }
+      updatePendingCount();
+      alert(`⚠️ 외부 시트 전송 중 경고: ${err.message || err}\n(WMS 로컬 입고 보류에는 안전하게 등록되었습니다.)`);
+    })
+    .submitSubWarehouseOrderDrafts(byWarehouse, admin);
 }
 
 // -------------------------------------------------------------------

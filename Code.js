@@ -547,6 +547,18 @@ function processForm(tableData, mode, admin) {
     pendingSheet.getRange(pendingLastRow + 1, 1, pendingRows.length, 11).setValues(pendingRows);
     SpreadsheetApp.flush();
 
+    // 7. 서브창고 입고인 경우 외부창고 재고 차감 및 주문내역 LISTO 동기화
+    if (mode === 'in' && tableData.length > 0) {
+      const targetWh = normalizeText(tableData[0].location).toUpperCase();
+      if (SUB_WAREHOUSE_CONFIG.TARGET_WAREHOUSES.includes(targetWh)) {
+        try {
+          syncSubWarehouseInboundDeduction(targetWh, tableData);
+        } catch (subErr) {
+          console.error(`서브창고 [${targetWh}] 동기화 경고: ${subErr.message}`);
+        }
+      }
+    }
+
     console.log(`processForm 완료: ${invoiceNumber} (${typeKorean} ${pendingRows.length}건)`);
     return seq;
   } catch (e) {
@@ -1017,10 +1029,10 @@ function getSubWarehouseStockMatrix(forceRefresh) {
           const row = orderData[r];
           row.forEach((h, idx) => {
             const ch = normalizeText(h).toUpperCase();
-            if (ch.indexOf('품명') !== -1 || ch.indexOf('제품명') !== -1) pNameCol = idx;
-            else if (ch.indexOf('색상') !== -1 || ch.indexOf('컬러') !== -1) pColorCol = idx;
-            else if (ch.indexOf('개수') !== -1 || ch.indexOf('수량') !== -1) pQtyCol = idx;
-            else if (ch.indexOf('처리상태') !== -1 || ch.indexOf('상태') !== -1) pStatusCol = idx;
+            if (ch.indexOf('품명') !== -1 || ch.indexOf('제품명') !== -1 || ch === 'CODIGO') pNameCol = idx;
+            else if (ch.indexOf('색상') !== -1 || ch.indexOf('컬러') !== -1 || ch === 'COLOR') pColorCol = idx;
+            else if (ch.indexOf('개수') !== -1 || ch.indexOf('수량') !== -1 || ch === 'CANTIDAD') pQtyCol = idx;
+            else if (ch.indexOf('처리상태') !== -1 || ch.indexOf('상태') !== -1 || ch === 'ESTADO') pStatusCol = idx;
           });
           if (pNameCol !== -1 && pQtyCol !== -1) {
             orderHeaderIdx = r;
@@ -1029,14 +1041,14 @@ function getSubWarehouseStockMatrix(forceRefresh) {
         }
 
         if (pNameCol === -1) pNameCol = 4;
-        if (pColorCol === -1) pColorCol = 5;
-        if (pQtyCol === -1) pQtyCol = 6;
-        if (pStatusCol === -1) pStatusCol = 9;
+        if (pColorCol === -1) pColorCol = 6;
+        if (pQtyCol === -1) pQtyCol = 7;
+        if (pStatusCol === -1) pStatusCol = 10;
 
         for (let r = orderHeaderIdx + 1; r < orderData.length; r++) {
           const row = orderData[r];
           const status = normalizeText(row[pStatusCol]).toUpperCase();
-          if (status === 'PENDING') {
+          if (status === 'PENDING' || status === 'PENDIENTE' || status.indexOf('PEND') !== -1) {
             const item = normalizeText(row[pNameCol]);
             const color = normalizeText(row[pColorCol]) || DEFAULTS.COLOR;
             const qty = normalizeNumber(row[pQtyCol]);
@@ -1136,6 +1148,350 @@ function getSubWarehouseStockMatrix(forceRefresh) {
     console.error('getSubWarehouseStockMatrix error: ' + err.message);
     throw new Error(`서브창고 재고 데이터 로드 실패: ${err.message}`);
   }
+}
+
+/**
+ * 📝 WMS 발주서 목록을 외부창고 [주문내역] 시트에 PENDIENTE 상태로 일괄 등록
+ */
+function submitSubWarehouseOrderDrafts(byWarehouse, admin) {
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(30000);
+    const subSS = SpreadsheetApp.openById(SUB_WAREHOUSE_CONFIG.SPREADSHEET_ID);
+    const allSheets = subSS.getSheets();
+    let orderSheet = subSS.getSheetByName('주문내역') || subSS.getSheetByName('주문사항');
+    if (!orderSheet) {
+      orderSheet = allSheets.find(s => s.getName().trim().indexOf('주문') !== -1) ||
+                   allSheets.find(s => s.getSheetId() === 1459767519);
+    }
+    if (!orderSheet) {
+      throw new Error('외부창고 주문내역 시트를 찾을 수 없습니다.');
+    }
+
+    const today = new Date();
+    const dateStr = `${today.getMonth() + 1}-${today.getDate()}`;
+    const newRows = [];
+
+    Object.keys(byWarehouse).forEach(wh => {
+      const items = byWarehouse[wh];
+      items.forEach(it => {
+        newRows.push([
+          dateStr,
+          1,
+          wh,
+          'ALARCON',
+          it.itemName,
+          '',
+          it.color || DEFAULTS.COLOR,
+          Math.abs(normalizeNumber(it.boxQty)),
+          '',
+          '',
+          'PENDIENTE'
+        ]);
+      });
+    });
+
+    if (newRows.length > 0) {
+      const lastRow = orderSheet.getLastRow();
+      ensureSheetCapacity(orderSheet, lastRow + newRows.length + 5);
+      orderSheet.getRange(lastRow + 1, 1, newRows.length, newRows[0].length).setValues(newRows);
+      SpreadsheetApp.flush();
+    }
+
+    CacheService.getScriptCache().remove('SUB_WH_MATRIX_V3');
+    return { success: true, count: newRows.length };
+  } catch (err) {
+    console.error('submitSubWarehouseOrderDrafts error: ' + err.message);
+    throw err;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * 📄 서브창고 화물운송장 (Carta de Porte) Gemini 3.8/3.7 비전 AI 파싱
+ */
+function analyzeCartaDePorte(imageBase64) {
+  if (!imageBase64) {
+    throw new Error('전달된 송장 이미지 데이터가 없습니다.');
+  }
+
+  let cleanB64 = imageBase64;
+  if (cleanB64.indexOf(',') > -1) {
+    cleanB64 = cleanB64.split(',')[1];
+  }
+
+  const apiKey = getGeminiApiKey();
+  const promptText = `Analyze this Mexican freight delivery document ("Carta de Porte" / "Nota de Remisión" / transport invoice).
+
+Extract the following information:
+1. "document_type": Document title, e.g. "Carta de Porte".
+2. "date": Date of loading or receipt (e.g. "9/9/26", "2026-09-09").
+3. "origin_raw": Text in "Lugar de Expedicion" or origin address.
+4. "origin_warehouse": Identify which warehouse name appears in the origin (one of: 'PANTACO', 'IKEA', 'LERMA', 'PINO', 'YARE', 'ALMINTER', 'TLANE', 'STAR'). If PICAL PANTACO -> "PANTACO".
+5. "destination_raw": Text in "Cliente y Lugar de Entrega" (e.g. "Alarcon Zona Centro CDMX").
+6. "destination_warehouse": "ALARCON" if Alarcon, or warehouse name.
+7. "transport": Carrier or transport info (e.g. "Rabón Bco.", "LG 60 953").
+8. "items": Array of items listed in the table (Modelo/Color, No. De Bultos / Cantidad de piezas):
+   - "modelo": Clean model/item name (e.g. "CECI 999", "LTP - 75"). Do not combine color into modelo if color is separate.
+   - "color": Extracted color if written with the model or in color column (e.g. "C", "F", "D", "K", "SURTIDO", "NEGRO", etc.). If single letter like C, F, D, K, extract it as color!
+   - "boxes": Integer number of bultos / boxes (from "No. De Bultos" column).
+   - "piezas": Integer number of pieces if any in "Cantidad de piezas", else 0.
+9. "total_boxes": Total boxes/bultos (written at the bottom, e.g. 100).
+
+Directly extract visible text without excessive deliberation or orientation loops.
+Return ONLY valid JSON matching this schema:
+{
+  "document_type": "Carta de Porte",
+  "date": "...",
+  "origin_raw": "...",
+  "origin_warehouse": "PANTACO",
+  "destination_raw": "...",
+  "destination_warehouse": "ALARCON",
+  "transport": "...",
+  "items": [
+    {
+      "modelo": "CECI 999",
+      "color": "C",
+      "boxes": 30,
+      "piezas": 0
+    }
+  ],
+  "total_boxes": 100
+}`;
+
+  const models = ['gemini-3.7-flash', 'gemini-3.8-flash', 'gemini-3.6-flash'];
+  let rawResponse = '';
+  let lastError = '';
+  let usageMetadata = null;
+  let usedModel = '';
+
+  for (let i = 0; i < models.length; i++) {
+    const model = models[i];
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    const payload = {
+      contents: [{
+        parts: [
+          { text: promptText },
+          { inline_data: { mime_type: 'image/jpeg', data: cleanB64 } }
+        ]
+      }],
+      generationConfig: {
+        response_mime_type: 'application/json',
+        temperature: 0.1,
+        thinking_config: {
+          thinking_budget: 1024
+        }
+      }
+    };
+
+    const options = {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    };
+
+    try {
+      const resp = UrlFetchApp.fetch(url, options);
+      const code = resp.getResponseCode();
+      if (code === 200) {
+        const json = JSON.parse(resp.getContentText());
+        const candidates = json.candidates || [];
+        if (candidates.length > 0) {
+          const parts = candidates[0].content ? candidates[0].content.parts || [] : [];
+          rawResponse = parts.map(p => p.text || '').join('');
+          usageMetadata = json.usageMetadata || null;
+          usedModel = model;
+          break;
+        }
+      } else {
+        lastError = `${model} (${code}): ${resp.getContentText().slice(0, 200)}`;
+      }
+    } catch (e) {
+      lastError = `${model} fetch error: ${e.message}`;
+    }
+  }
+
+  if (!rawResponse) {
+    throw new Error(`송장 AI 분석 실패: ${lastError}`);
+  }
+
+  let parsed = null;
+  try {
+    const jsonStr = rawResponse.replace(/```json/gi, '').replace(/```/g, '').trim();
+    parsed = JSON.parse(jsonStr);
+  } catch (e) {
+    throw new Error(`송장 JSON 파싱 실패: ${e.message}`);
+  }
+
+  parsed.usageMetadata = usageMetadata;
+  parsed.usedModel = usedModel;
+  return parsed;
+}
+
+/**
+ * 🚚 서브창고 입고 확정 시 외부창고 재고 차감 및 주문내역 LISTO 일괄 동기화
+ * (추후 컨테이너 직입고 확장 지원 고려)
+ */
+function syncSubWarehouseInboundDeduction(targetWh, tableData) {
+  if (!targetWh || !tableData || tableData.length === 0) return;
+  const subSS = SpreadsheetApp.openById(SUB_WAREHOUSE_CONFIG.SPREADSHEET_ID);
+  const allSheets = subSS.getSheets();
+
+  // 1. 재고현황 시트
+  let stockSheet = subSS.getSheetByName('재고현황');
+  if (!stockSheet) {
+    stockSheet = allSheets.find(s => s.getName().trim().indexOf('재고현황') !== -1) ||
+                 allSheets.find(s => s.getSheetId() === 543678626) ||
+                 allSheets[0];
+  }
+
+  // 2. 주문내역 시트
+  let orderSheet = subSS.getSheetByName('주문내역') || subSS.getSheetByName('주문사항');
+  if (!orderSheet) {
+    orderSheet = allSheets.find(s => s.getName().trim().indexOf('주문') !== -1) ||
+                 allSheets.find(s => s.getSheetId() === 1459767519);
+  }
+
+  // A. 재고현황에서 targetWh 컬럼 및 품목 행 찾기
+  const stockData = stockSheet.getDataRange().getValues();
+  let headerRowIdx = -1;
+  let codigoCol = 1;
+  let colorCol = 2;
+  let whCol = -1;
+
+  for (let r = 0; r < Math.min(stockData.length, 10); r++) {
+    const row = stockData[r];
+    for (let c = 0; c < row.length; c++) {
+      const cleanVal = normalizeText(row[c]).toUpperCase();
+      if (cleanVal === 'CODIGO' || cleanVal.indexOf('품명') !== -1) {
+        headerRowIdx = r;
+        codigoCol = c;
+      } else if (cleanVal === 'COLOR' || cleanVal.indexOf('색상') !== -1) {
+        colorCol = c;
+      } else if (cleanVal === targetWh || cleanVal.indexOf(targetWh) !== -1) {
+        whCol = c;
+      }
+    }
+    if (headerRowIdx !== -1 && whCol !== -1) break;
+  }
+
+  if (headerRowIdx === -1) headerRowIdx = 0;
+  if (whCol === -1) {
+    console.warn(`외부창고 시트에서 [${targetWh}] 열을 찾지 못했습니다.`);
+    return;
+  }
+
+  const stockItemRowMap = new Map();
+  for (let r = headerRowIdx + 1; r < stockData.length; r++) {
+    const row = stockData[r];
+    const cod = normalizeText(row[codigoCol]).replace(/[\s_\-]/g, '').toUpperCase();
+    const col = (normalizeText(row[colorCol]) || DEFAULTS.COLOR).replace(/[\s_\-]/g, '').toUpperCase();
+    if (cod) {
+      stockItemRowMap.set(`${cod}__${col}`, r);
+    }
+  }
+
+  // 각 품목별 차감 전/후 재고 기록 맵
+  const prePostStockMap = new Map();
+
+  tableData.forEach(item => {
+    const boxQty = Math.abs(normalizeNumber(item.boxQty));
+    if (boxQty <= 0) return;
+
+    const cod = normalizeText(item.itemName).replace(/[\s_\-]/g, '').toUpperCase();
+    const col = (normalizeText(item.color) || DEFAULTS.COLOR).replace(/[\s_\-]/g, '').toUpperCase();
+    const key = `${cod}__${col}`;
+
+    if (stockItemRowMap.has(key)) {
+      const r = stockItemRowMap.get(key);
+      const pre = normalizeNumber(stockData[r][whCol]);
+      const post = pre - boxQty;
+      stockData[r][whCol] = post; // 차감
+      prePostStockMap.set(key, { pre, post, boxQty, origName: item.itemName, origColor: item.color });
+    }
+  });
+
+  // B. 재고현황 시트에 수정된 재고 일괄 반영
+  stockSheet.getRange(1, 1, stockData.length, stockData[0].length).setValues(stockData);
+
+  // C. 주문내역 시트 동기화 (PENDIENTE -> LISTO 및 실물 수량/전후수량 반영)
+  if (orderSheet && orderSheet.getLastRow() >= 2) {
+    const orderData = orderSheet.getDataRange().getValues();
+    let oHeaderIdx = 0;
+    let oWhCol = 2, oNameCol = 4, oColorCol = 6, oQtyCol = 7, oPreCol = 8, oPostCol = 9, oStatusCol = 10;
+
+    for (let r = 0; r < Math.min(orderData.length, 5); r++) {
+      const row = orderData[r];
+      row.forEach((h, idx) => {
+        const ch = normalizeText(h).toUpperCase();
+        if (ch.indexOf('창고') !== -1 || ch === 'ALMACEN') oWhCol = idx;
+        else if (ch.indexOf('품명') !== -1 || ch === 'CODIGO') oNameCol = idx;
+        else if (ch.indexOf('색상') !== -1 || ch === 'COLOR') oColorCol = idx;
+        else if (ch.indexOf('개수') !== -1 || ch.indexOf('수량') !== -1) oQtyCol = idx;
+        else if (ch.indexOf('입고전') !== -1) oPreCol = idx;
+        else if (ch.indexOf('입고후') !== -1) oPostCol = idx;
+        else if (ch.indexOf('처리상태') !== -1 || ch.indexOf('상태') !== -1) oStatusCol = idx;
+      });
+    }
+
+    const matchedKeys = new Set();
+
+    for (let r = oHeaderIdx + 1; r < orderData.length; r++) {
+      const row = orderData[r];
+      const rWh = normalizeText(row[oWhCol]).toUpperCase();
+      const rStatus = normalizeText(row[oStatusCol]).toUpperCase();
+
+      if ((rWh === targetWh || rWh.indexOf(targetWh) !== -1) && (rStatus.indexOf('PEND') !== -1 || rStatus === '')) {
+        const rName = normalizeText(row[oNameCol]).replace(/[\s_\-]/g, '').toUpperCase();
+        const rColor = (normalizeText(row[oColorCol]) || DEFAULTS.COLOR).replace(/[\s_\-]/g, '').toUpperCase();
+        const rKey = `${rName}__${rColor}`;
+
+        if (prePostStockMap.has(rKey)) {
+          const info = prePostStockMap.get(rKey);
+          row[oQtyCol] = info.boxQty; // 실물 수량으로 보정
+          row[oPreCol] = info.pre;
+          row[oPostCol] = info.post;
+          row[oStatusCol] = 'LISTO';
+          matchedKeys.add(rKey);
+        }
+      }
+    }
+
+    // 신규 추가 품목(원래 주문내역에 없었는데 실려온 품목)은 새 행 추가
+    const today = new Date();
+    const dateStr = `${today.getMonth() + 1}-${today.getDate()}`;
+    const newOrderRows = [];
+
+    prePostStockMap.forEach((info, key) => {
+      if (!matchedKeys.has(key)) {
+        const newRow = new Array(orderData[0].length).fill('');
+        newRow[0] = dateStr;
+        newRow[1] = 1;
+        newRow[oWhCol] = targetWh;
+        newRow[3] = 'ALARCON';
+        newRow[oNameCol] = info.origName;
+        newRow[oColorCol] = info.origColor || 'SURTIDO';
+        newRow[oQtyCol] = info.boxQty;
+        newRow[oPreCol] = info.pre;
+        newRow[oPostCol] = info.post;
+        newRow[oStatusCol] = 'LISTO';
+        newOrderRows.push(newRow);
+      }
+    });
+
+    // 주문내역 시트에 일괄 쓰기
+    orderSheet.getRange(1, 1, orderData.length, orderData[0].length).setValues(orderData);
+    if (newOrderRows.length > 0) {
+      ensureSheetCapacity(orderSheet, orderSheet.getLastRow() + newOrderRows.length + 5);
+      orderSheet.getRange(orderSheet.getLastRow() + 1, 1, newOrderRows.length, newOrderRows[0].length).setValues(newOrderRows);
+    }
+  }
+
+  SpreadsheetApp.flush();
+  CacheService.getScriptCache().remove('SUB_WH_MATRIX_V3');
+  console.log(`[서브창고 동기화 완료] ${targetWh} 재고 차감 및 주문내역 LISTO 완료`);
 }
 
 // -------------------------------------------------------------------
