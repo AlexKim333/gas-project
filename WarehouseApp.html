@@ -5688,6 +5688,16 @@ function onHandwrittenExtracted(data) {
     let rawModel = String(r.modelo || '').trim().replace(/[.,;:_\-\s]+$/, '');
     let rawColor = String(r.color || '').trim().replace(/^[.,;:_\-\s]+/, '').replace(/[.,;:_\-\s]+$/, '');
 
+    // 0. 영수증 상단/섹션 카테고리 헤더(Termico niños, Termico dama, Blusa, Faja 등) 접두사 정규화
+    // 모델명 앞에 카테고리 단어가 붙어있고 뒤에 모델 코드/숫자가 있는 경우 (예: "Termico niños BL 50" -> "BL 50", "Termico niños 60" -> "60", "Termico 150" -> "150")
+    const categoryPrefixRegex = /^(?:termico\s*ni[ñn]os|termico\s*dama|termico\s*caballero|termico|blusa|faja|ropa\s*interior)\s+/i;
+    if (categoryPrefixRegex.test(rawModel)) {
+      const stripped = rawModel.replace(categoryPrefixRegex, '').trim();
+      if (stripped) {
+        rawModel = stripped;
+      }
+    }
+
     // 1. 단독 알파벳(D, E, G, H...) 또는 2~4자리 숫자(960...)가 color 필드로 잘못 들어온 경우 모델명으로 자동 복구
     if (!rawModel && (/^[A-Za-z]$/.test(rawColor) || /^\d{2,4}$/.test(rawColor))) {
       rawModel = rawColor;

@@ -1432,36 +1432,45 @@ function analyzeHandwrittenOrder(imageBase64) {
 
 Rules:
 1. Header Information:
-   - "branch": Customer, client, or branch/store name written at the top header (e.g. "william", "Fernando", "Aztecas", "CARMEN", "TIENDA", "CHINCONCUAC", "Abelardo", customer name, store name). Any standalone name or store written at the top header (like 'william.', 'carmen', 'sr. kim') is the primary customer/branch! ALWAYS return this in "branch"! If not found, return "".
+   - "branch": Customer, client, or branch/store name written at the top header (e.g. "william", "Fernando", "Aztecas", "CARMEN", "TIENDA", "CHINCONCUAC", "Abelardo", "Sr. 김선교사", customer name, store name). Any standalone name or store written at the top header (like 'william.', 'carmen', 'sr. kim') is the primary customer/branch! ALWAYS return this in "branch"! If not found, return "".
    - "requester": Order requester/admin name ONLY if explicitly underlined (e.g. text with an underline '___' like 'Sr. Kim___') or clearly labeled as the internal salesperson/admin. If not explicitly an admin/salesperson, put any name written at the top into "branch"! If not found, return "".
 
-2. Delimiters (for Form B free-form):
+2. Category / Section Headers vs Models (CRITICAL):
+   - Category or section titles (e.g. "Termico niños", "Termico dama", "Termico", "Blusa", "Faja", "Ropa interior") written as a section header above a table or item group are NOT model codes.
+   - Do NOT prepend category titles to the model name! (e.g. write "BL 50", NOT "Termico niños BL 50").
+   - If a row line has only a number or abbreviated code (e.g. "60", "70", "80"), extract ONLY that exact number or code ("60", "70", "80") into "modelo"! NEVER attach the category header!
+
+3. Delimiters (for Form B free-form):
    - Field delimiters are commas (',') and dots ('.').
    - Spaces/whitespace are NEVER delimiters (preserve spaces in multi-word colors like "Palo Rosa", "Azul Marino" or models).
    - If consecutive punctuation marks appear together (e.g. ". ,", ".,", ",.", "..", ",,"), treat them as a SINGLE delimiter between fields!
      For example: "P-D60 . , blanco , 1" -> modelo: "P-D60", color: "blanco", no_de_bultos: 1.
-   - A field is blank/empty ONLY when there is NO text word between delimiters before the next delimiter or quantity (e.g. "Cecik 24, , 1" -> color is empty; "25, , 1" -> color is empty). But if a color word like "blanco" or "negro" is present, ALWAYS capture it as "color"!
+   - A field is blank/empty ONLY when there is NO text word between delimiters before the next delimiter or quantity. But if a color word like "blanco" or "negro" is present, ALWAYS capture it as "color"!
 
-3. Row Parsing Rules:
+4. Row Parsing Rules:
    - Each row line containing a quantity is a separate entry:
      - 3 fields format: [modelo] ,/. [color] ,/. [quantity]
+     - When a line lists multiple colors/quantities (e.g. "BL 50 - 5 Negro / 4 Surtido" or "60 - 5 Negro / 4 Surtido"):
+       Split into separate entries with the same model:
+       e.g. {"modelo": "BL 50", "color": "Negro", "raw_qty": "5", "boxes": 5},
+            {"modelo": "BL 50", "color": "Surtido", "raw_qty": "4", "boxes": 4}
      - Color empty/blank (e.g. [modelo] , , [qty] OR [modelo] .. [qty]): return {"modelo": "...", "color": "", "no_de_bultos": qty}
      - Model empty/blank (Option 1: [empty] , [color] , [qty] OR Option 2: [color] , [qty]):
        If the row starts with empty delimiter or only has a color word and quantity, return {"modelo": "", "color": "color_name", "no_de_bultos": qty}
    - Form A (Grid table rows, e.g. CANTIDAD / DESCRIPCION or modelo / color / cant):
-     - "modelo": Text written in the description or 'modelo' column. If empty on that row line, return "".
-     - "color": Text written in the 'color' column, or color word in description (e.g. "negro", "blanco"). If empty on that row line, return "".
-     - "raw_qty": The EXACT expression written in the quantity column (e.g. "1 x 60", "3 x 72", "2 x 1000", "1 x 400", "1 x 33", "10P", "5"). NEVER drop the multiplication or letters!
+     - "modelo": Text written in the 'modelo' or product code column. If empty on that row line, return "".
+     - "color": Text written in the 'color' column, or color word (e.g. "negro", "blanco", "surtido"). If empty, return "".
+     - "raw_qty": The EXACT expression written in the quantity column (e.g. "1 x 60", "3 x 72", "2 x 1000", "400", "10P", "5"). NEVER drop the multiplication or letters!
      - "boxes": The number of boxes. For "A x B" expression (e.g. "3 x 72"), boxes is A (3). For single number without 'x', boxes is that number.
      - "pack_qty": The pieces per box. For "A x B" expression (e.g. "3 x 72"), pack_qty is B (72). If no 'x', pack_qty is 0.
      - "no_de_bultos": The number of boxes (same as boxes) for backward compatibility.
      - "contenedor": Remarks if written, else "".
 
-4. IMPORTANT:
+5. IMPORTANT:
    - Do NOT merge different rows during image extraction; extract each row faithfully!
    - For quantities: If 'P' or 'pz' (meaning piezas/낱개, e.g. "10P", "5p", "12 pz") is written after or with the number, preserve 'P' with the number in raw_qty.
 
-5. Orientation & Fast Extraction Guard:
+6. Orientation & Fast Extraction Guard:
    - The order sheet photo may be tilted, taken at an angle, or rotated.
    - Infer the baseline grid or line orientation directly and read along that axis without excessive internal deliberation.
 
@@ -1470,6 +1479,8 @@ Return ONLY valid JSON:
   "branch": "...",
   "requester": "...",
   "results": [
+    {"modelo": "BL 50", "color": "Negro", "raw_qty": "5", "boxes": 5, "pack_qty": 0, "no_de_bultos": 5},
+    {"modelo": "60", "color": "Negro", "raw_qty": "5", "boxes": 5, "pack_qty": 0, "no_de_bultos": 5},
     {"modelo": "P-D60", "color": "Blanco", "raw_qty": "2", "boxes": 2, "pack_qty": 0, "no_de_bultos": 2},
     {"modelo": "Mr 999", "color": "", "raw_qty": "3 x 72", "boxes": 3, "pack_qty": 72, "no_de_bultos": 3}
   ]
