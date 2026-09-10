@@ -1776,6 +1776,7 @@ let currentInvoiceNumber = '';
 let unitType = 'box';
 let pendingRecord = <?!= pendingRecord ?>;
 let selectedPendingIndex = -1;
+let isPendingOperating = false;
 let stockDataCache = [];
 let recentQuickAdjustments = {};
 try {
@@ -2809,7 +2810,28 @@ function cancelSubmit() {
   if (confirmModalDiv) confirmModalDiv.style.display = 'none';
 }
 
+function setPendingModalButtonsState(disabled, text = null) {
+  const modal = document.getElementById('pendingModal');
+  if (!modal) return;
+  const buttons = modal.querySelectorAll('.detail-grid .buttons button');
+  buttons.forEach(btn => {
+    btn.disabled = disabled;
+    btn.style.opacity = disabled ? '0.6' : '1';
+    btn.style.cursor = disabled ? 'not-allowed' : 'pointer';
+  });
+  const loadBtn = modal.querySelector('.detail-grid .buttons button:nth-child(3)');
+  if (loadBtn) {
+    if (disabled && text) {
+      if (!loadBtn.dataset.originalText) loadBtn.dataset.originalText = loadBtn.textContent;
+      loadBtn.textContent = text;
+    } else if (!disabled && loadBtn.dataset.originalText) {
+      loadBtn.textContent = loadBtn.dataset.originalText;
+    }
+  }
+}
+
 function savePending() {
+  if (isPendingOperating) return;
   if (!records.length) {
     alert('보류할 레코드가 없습니다.');
     return;
@@ -2821,8 +2843,10 @@ function savePending() {
     alert('필수 요소를 찾을 수 없습니다.');
     return;
   }
+
+  const clonedRecords = JSON.parse(JSON.stringify(records));
   const pendingData = {
-    records: records,
+    records: clonedRecords,
     location: locationSelect.value,
     admin: adminSelect.value,
     date: datetimeInput.value,
@@ -2842,9 +2866,23 @@ function savePending() {
     alert('보류 데이터를 저장하는 데 실패했습니다.');
     return;
   }
+
   if (currentType === 'out') {
+    isPendingOperating = true;
+    const pendingBtn = document.querySelector('.btn-pending');
+    if (pendingBtn) {
+      pendingBtn.disabled = true;
+      pendingBtn.dataset.origText = pendingBtn.textContent;
+      pendingBtn.textContent = '⏳ 보류저장중...';
+    }
+
     google.script.run
       .withSuccessHandler(() => {
+        isPendingOperating = false;
+        if (pendingBtn) {
+          pendingBtn.disabled = false;
+          if (pendingBtn.dataset.origText) pendingBtn.textContent = pendingBtn.dataset.origText;
+        }
         records = [];
         localStorage.removeItem(typeConfig[currentType].sessionStorageKey);
         localStorage.removeItem(typeConfig[currentType].metadataStorageKey);
@@ -2857,11 +2895,17 @@ function savePending() {
         alert('보류가 저장되었습니다.');
       })
       .withFailureHandler(err => {
+        isPendingOperating = false;
+        if (pendingBtn) {
+          pendingBtn.disabled = false;
+          if (pendingBtn.dataset.origText) pendingBtn.textContent = pendingBtn.dataset.origText;
+        }
         alert('재고 차감 중 오류가 발생했습니다: ' + err.message);
         pendingList.pop();
         localStorage.setItem(storageKey, JSON.stringify(pendingList));
+        updatePendingCount();
       })
-      .updateStockSheet(records, 'out');
+      .updateStockSheet(clonedRecords, 'out');
   } else {
     records = [];
     localStorage.removeItem(typeConfig[currentType].sessionStorageKey);
@@ -2889,6 +2933,7 @@ function updatePendingCount() {
 }
 
 function showPendingModal() {
+  if (isPendingOperating) return;
   const storageKey = typeConfig[currentType].pendingStorageKey;
   let pendingList = [];
   try {
@@ -2902,6 +2947,8 @@ function showPendingModal() {
   const detailBody = document.getElementById('pendingDetailBody');
   const modal = document.getElementById('pendingModal');
   if (!totalCountSpan || !summaryBody || !detailHeader || !detailBody || !modal) return;
+
+  setPendingModalButtonsState(false);
   totalCountSpan.textContent = pendingList.length;
   let summaryHtml = '';
   pendingList.forEach((pending, idx) => {
@@ -2910,8 +2957,8 @@ function showPendingModal() {
       <tr onclick="selectPending(${idx})" id="pendingRow${idx}">
         <td>${idx + 1}</td>
         <td>${pending.createdAt}</td>
-        <td>${pending.location}</td>
-        <td>${pending.admin}</td>
+        <td>${pending.location || '-'}</td>
+        <td>${pending.admin || '-'}</td>
         <td>${itemCount}</td>
       </tr>
     `;
@@ -2927,7 +2974,7 @@ function showPendingModal() {
 }
 
 function selectPending(index) {
-  if (index < 0) return;
+  if (isPendingOperating || index < 0) return;
   const storageKey = typeConfig[currentType].pendingStorageKey;
   let pendingList = [];
   try {
@@ -2947,12 +2994,12 @@ function selectPending(index) {
   pendingList[index].records.forEach(rec => {
     html += `
       <tr>
-        <td>${rec.itemName}</td>
-        <td>${rec.color}</td>
-        <td>${currentType === 'in' ? rec.boxQty : Math.abs(rec.boxQty)}</td>
-        <td>${currentType === 'in' ? rec.individualQty : Math.abs(rec.individualQty)}</td>
-        <td>${rec.boxContent}</td>
-        <td>${rec.location}</td>
+        <td>${rec.itemName || ''}</td>
+        <td>${rec.color || ''}</td>
+        <td>${currentType === 'in' ? rec.boxQty : Math.abs(rec.boxQty || 0)}</td>
+        <td>${currentType === 'in' ? rec.individualQty : Math.abs(rec.individualQty || 0)}</td>
+        <td>${rec.boxContent || ''}</td>
+        <td>${rec.location || ''}</td>
       </tr>
     `;
   });
@@ -2960,6 +3007,7 @@ function selectPending(index) {
 }
 
 function navigatePending(direction) {
+  if (isPendingOperating) return;
   const storageKey = typeConfig[currentType].pendingStorageKey;
   let pendingList = [];
   try {
@@ -2979,6 +3027,7 @@ function navigatePending(direction) {
 }
 
 function loadPending() {
+  if (isPendingOperating) return;
   if (selectedPendingIndex < 0) {
     alert('선택된 보류 데이터가 없습니다.');
     return;
@@ -2992,27 +3041,99 @@ function loadPending() {
     return;
   }
   if (selectedPendingIndex >= pendingList.length) return;
-  const pendingData = pendingList[selectedPendingIndex];
-  records = pendingData.records;
+
+  const targetIndex = selectedPendingIndex;
+  const pendingData = pendingList[targetIndex];
+  if (!pendingData || !pendingData.records || pendingData.records.length === 0) {
+    alert('유효한 보류 품목이 없습니다.');
+    return;
+  }
+
+  // 1. 기존 장바구니 품목 보호 분기
+  let modeChoice = 'replace';
+  if (records && records.length > 0) {
+    const confirmProceed = confirm(
+      `⚠️ 현재 장바구니에 ${records.length}개의 품목이 입력되어 있습니다.\n\n` +
+      `보류 데이터를 불러오시겠습니까?`
+    );
+    if (!confirmProceed) return;
+
+    const shouldAppend = confirm(
+      `기존 장바구니 품목 뒤에 이어서 추가(병합)하시겠습니까?\n\n` +
+      `[확인]: 기존 품목 유지 + 보류 품목 추가 (병합)\n` +
+      `[취소]: 기존 품목 비우기 + 보류 품목으로 새로 교체 (덮어쓰기)`
+    );
+    modeChoice = shouldAppend ? 'append' : 'replace';
+  }
+
+  // 2. 동시 클릭 방지 락 & UI 비활성화
+  isPendingOperating = true;
+  setPendingModalButtonsState(true, '⏳ 로드중...');
+
+  // 3. 깊은 복사로 데이터 준비
+  const clonedRecords = JSON.parse(JSON.stringify(pendingData.records));
+
+  // 4. 출고처/관리자 안전 주입 (리부팅 직후 드롭다운 미로딩 대비)
   const locationSelect = document.getElementById('location');
   const adminSelect = document.getElementById('adminSelect');
-  if (locationSelect) locationSelect.value = pendingData.location;
-  if (adminSelect) adminSelect.value = pendingData.admin;
-  pendingList.splice(selectedPendingIndex, 1);
+
+  if (locationSelect && pendingData.location) {
+    const hasOpt = Array.from(locationSelect.options).some(opt => opt.value === pendingData.location);
+    if (!hasOpt) {
+      const newOpt = document.createElement('option');
+      newOpt.value = pendingData.location;
+      newOpt.textContent = pendingData.location;
+      locationSelect.appendChild(newOpt);
+    }
+    locationSelect.value = pendingData.location;
+    if (typeof locationCache !== 'undefined' && !locationCache.includes(pendingData.location)) {
+      locationCache.push(pendingData.location);
+    }
+  }
+
+  if (adminSelect && pendingData.admin) {
+    const hasAdminOpt = Array.from(adminSelect.options).some(opt => opt.value === pendingData.admin);
+    if (!hasAdminOpt) {
+      const newAdminOpt = document.createElement('option');
+      newAdminOpt.value = pendingData.admin;
+      newAdminOpt.textContent = pendingData.admin;
+      adminSelect.appendChild(newAdminOpt);
+    }
+    adminSelect.value = pendingData.admin;
+  }
+
+  // 5. 보류 목록에서 해당 항목 제거
+  pendingList.splice(targetIndex, 1);
   try {
     localStorage.setItem(storageKey, JSON.stringify(pendingList));
   } catch (e) {
+    isPendingOperating = false;
+    setPendingModalButtonsState(false);
     alert('보류 데이터 업데이트에 실패했습니다.');
     return;
   }
+
+  // 6. 장바구니에 반영
+  const previousRecords = JSON.parse(JSON.stringify(records));
+  if (modeChoice === 'append') {
+    records = records.concat(clonedRecords);
+  } else {
+    records = clonedRecords;
+  }
+
+  // 7. 출고('out')일 경우 재고 복원 비동기 처리
   if (currentType === 'out') {
-    const restoreRecords = pendingData.records.map(rec => ({
+    const restoreRecords = clonedRecords.map(rec => ({
       ...rec,
-      boxQty: -Math.abs(rec.boxQty),
-      individualQty: -Math.abs(rec.individualQty)
+      boxQty: -Math.abs(rec.boxQty || 0),
+      individualQty: -Math.abs(rec.individualQty || 0)
     }));
+
     google.script.run
       .withSuccessHandler(() => {
+        isPendingOperating = false;
+        setPendingModalButtonsState(false);
+        selectedPendingIndex = -1;
         updateTable();
         toggleScroll();
         updateTotals();
@@ -3023,12 +3144,25 @@ function loadPending() {
         alert('보류 데이터가 로드되었습니다.');
       })
       .withFailureHandler(err => {
+        isPendingOperating = false;
+        setPendingModalButtonsState(false);
         alert('재고 복원 중 오류가 발생했습니다: ' + err.message);
-        pendingList.splice(selectedPendingIndex, 0, pendingData);
-        localStorage.setItem(storageKey, JSON.stringify(pendingList));
+        // 실패 시 롤백
+        pendingList.splice(targetIndex, 0, pendingData);
+        try {
+          localStorage.setItem(storageKey, JSON.stringify(pendingList));
+        } catch (e) {}
+        records = previousRecords;
+        updateTable();
+        toggleScroll();
+        updateTotals();
+        updatePendingCount();
       })
       .updateStockSheet(restoreRecords, 'in');
   } else {
+    isPendingOperating = false;
+    setPendingModalButtonsState(false);
+    selectedPendingIndex = -1;
     updateTable();
     toggleScroll();
     updateTotals();
@@ -3041,6 +3175,7 @@ function loadPending() {
 }
 
 function deletePending() {
+  if (isPendingOperating) return;
   if (selectedPendingIndex < 0) {
     alert('선택된 보류 데이터가 없습니다.');
     return;
@@ -3054,57 +3189,28 @@ function deletePending() {
     return;
   }
   if (selectedPendingIndex >= pendingList.length) return;
-  const pendingData = pendingList[selectedPendingIndex];
-  pendingList.splice(selectedPendingIndex, 1);
+
+  if (!confirm('선택된 보류 데이터를 정말 삭제하시겠습니까?')) {
+    return;
+  }
+
+  const targetIndex = selectedPendingIndex;
+  const pendingData = pendingList[targetIndex];
+
+  isPendingOperating = true;
+  setPendingModalButtonsState(true, '⏳ 삭제중...');
+
+  pendingList.splice(targetIndex, 1);
   try {
     localStorage.setItem(storageKey, JSON.stringify(pendingList));
   } catch (e) {
+    isPendingOperating = false;
+    setPendingModalButtonsState(false);
     alert('보류 데이터 삭제에 실패했습니다.');
     return;
   }
-  if (currentType === 'out') {
-    const restoreRecords = pendingData.records.map(rec => ({
-      ...rec,
-      boxQty: -Math.abs(rec.boxQty),
-      individualQty: -Math.abs(rec.individualQty)
-    }));
-    google.script.run
-      .withSuccessHandler(() => {
-        const totalCountSpan = document.getElementById('totalPendingCount');
-        const summaryBody = document.getElementById('pendingSummaryBody');
-        const detailBody = document.getElementById('pendingDetailBody');
-        if (totalCountSpan) totalCountSpan.textContent = pendingList.length;
-        let summaryHtml = '';
-        pendingList.forEach((pending, idx) => {
-          const itemCount = new Set(pending.records.map(r => `${r.itemName}_${r.color}`)).size;
-          summaryHtml += `
-            <tr onclick="selectPending(${idx})" id="pendingRow${idx}">
-              <td>${idx + 1}</td>
-              <td>${pending.createdAt}</td>
-              <td>${pending.location}</td>
-              <td>${pending.admin}</td>
-              <td>${itemCount}</td>
-            </tr>
-          `;
-        });
-        if (summaryBody) summaryBody.innerHTML = summaryHtml;
-        if (detailBody) detailBody.innerHTML = '';
-        selectedPendingIndex = -1;
-        if (pendingList.length > 0) {
-          selectPending(0);
-        } else {
-          cancelPendingModal();
-        }
-        updatePendingCount();
-        alert('보류 데이터가 삭제되었습니다.');
-      })
-      .withFailureHandler(err => {
-        alert('재고 복원 중 오류가 발생했습니다: ' + err.message);
-        pendingList.splice(selectedPendingIndex, 0, pendingData);
-        localStorage.setItem(storageKey, JSON.stringify(pendingList));
-      })
-      .updateStockSheet(restoreRecords, 'in');
-  } else {
+
+  const refreshModalList = () => {
     const totalCountSpan = document.getElementById('totalPendingCount');
     const summaryBody = document.getElementById('pendingSummaryBody');
     const detailBody = document.getElementById('pendingDetailBody');
@@ -3116,8 +3222,8 @@ function deletePending() {
         <tr onclick="selectPending(${idx})" id="pendingRow${idx}">
           <td>${idx + 1}</td>
           <td>${pending.createdAt}</td>
-          <td>${pending.location}</td>
-          <td>${pending.admin}</td>
+          <td>${pending.location || '-'}</td>
+          <td>${pending.admin || '-'}</td>
           <td>${itemCount}</td>
         </tr>
       `;
@@ -3131,14 +3237,46 @@ function deletePending() {
       cancelPendingModal();
     }
     updatePendingCount();
+  };
+
+  if (currentType === 'out') {
+    const restoreRecords = pendingData.records.map(rec => ({
+      ...rec,
+      boxQty: -Math.abs(rec.boxQty || 0),
+      individualQty: -Math.abs(rec.individualQty || 0)
+    }));
+    google.script.run
+      .withSuccessHandler(() => {
+        isPendingOperating = false;
+        setPendingModalButtonsState(false);
+        refreshModalList();
+        alert('보류 데이터가 삭제되었습니다.');
+      })
+      .withFailureHandler(err => {
+        isPendingOperating = false;
+        setPendingModalButtonsState(false);
+        alert('재고 복원 중 오류가 발생했습니다: ' + err.message);
+        pendingList.splice(targetIndex, 0, pendingData);
+        try {
+          localStorage.setItem(storageKey, JSON.stringify(pendingList));
+        } catch (e) {}
+        refreshModalList();
+      })
+      .updateStockSheet(restoreRecords, 'in');
+  } else {
+    isPendingOperating = false;
+    setPendingModalButtonsState(false);
+    refreshModalList();
     alert('보류 데이터가 삭제되었습니다.');
   }
 }
 
 function cancelPendingModal() {
+  if (isPendingOperating) return;
   const modal = document.getElementById('pendingModal');
   if (modal) modal.style.display = 'none';
   selectedPendingIndex = -1;
+  setPendingModalButtonsState(false);
 }
 
 function toggleScroll() {
