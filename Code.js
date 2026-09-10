@@ -1696,3 +1696,128 @@ function processQuickStockAdjustment(adjustments, admin) {
   }
 }
 
+// -------------------------------------------------------------------
+// 재고 정합성 자동 검사기 (전표 장부 vs 원장 현재고 전수 대사)
+// -------------------------------------------------------------------
+
+function verifyStockIntegrity() {
+  const stockSheet = getSheet(SHEETS.STOCK);
+  const pendingSheet = getSheet(SHEETS.PENDING);
+
+  ensureSheetColumns(stockSheet, 9);
+  const stockLastRow = stockSheet.getLastRow();
+  if (stockLastRow < 2) {
+    return { success: true, checkedCount: 0, discrepancyCount: 0, discrepancies: [] };
+  }
+
+  // 1. 재고시트 로드
+  const stockData = stockSheet.getRange(2, 1, stockLastRow - 1, 9).getValues();
+  const stockMap = Object.create(null);
+
+  stockData.forEach(row => {
+    const name = normalizeText(row[0]);
+    if (!name) return;
+    const color = normalizeText(row[1]) || DEFAULTS.COLOR;
+    const boxContent = normalizeNumber(row[5]);
+    const key = makeKey(name, color, boxContent);
+    const box = normalizeNumber(row[2]);
+    const ind = normalizeNumber(row[3]);
+    const initStock = normalizeNumber(row[6]);
+
+    stockMap[key] = {
+      name: name,
+      color: color,
+      boxContent: boxContent,
+      currentBox: box,
+      currentIndividual: ind,
+      initialStock: initStock,
+      currentTotalIndiv: (box * boxContent) + ind,
+      calculatedTotalIndiv: (initStock * boxContent),
+      inBoxTotal: 0,
+      inIndivTotal: 0,
+      outBoxTotal: 0,
+      outIndivTotal: 0
+    };
+  });
+
+  // 2. PendingSheet 전표 내역 로드 및 누적
+  const pendingLastRow = pendingSheet.getLastRow();
+  if (pendingLastRow >= 2) {
+    const pendingData = pendingSheet.getRange(2, 1, pendingLastRow - 1, 11).getValues();
+    pendingData.forEach(row => {
+      const type = normalizeText(row[1]); // '입고', '출고'
+      const name = normalizeText(row[3]);
+      if (!name) return;
+      const color = normalizeText(row[4]) || DEFAULTS.COLOR;
+      const boxQty = normalizeNumber(row[5]);
+      const indivQty = normalizeNumber(row[6]);
+      const boxContent = normalizeNumber(row[7]);
+      const key = makeKey(name, color, boxContent);
+
+      if (!stockMap[key]) {
+        stockMap[key] = {
+          name: name,
+          color: color,
+          boxContent: boxContent,
+          currentBox: 0,
+          currentIndividual: 0,
+          initialStock: 0,
+          currentTotalIndiv: 0,
+          calculatedTotalIndiv: 0,
+          inBoxTotal: 0,
+          inIndivTotal: 0,
+          outBoxTotal: 0,
+          outIndivTotal: 0
+        };
+      }
+
+      const item = stockMap[key];
+      const indivDelta = (boxQty * (boxContent || item.boxContent || 1)) + indivQty;
+
+      if (type === '입고') {
+        item.calculatedTotalIndiv += indivDelta;
+        item.inBoxTotal += boxQty;
+        item.inIndivTotal += indivQty;
+      } else if (type === '출고') {
+        item.calculatedTotalIndiv -= indivDelta;
+        item.outBoxTotal += boxQty;
+        item.outIndivTotal += indivQty;
+      }
+    });
+  }
+
+  // 3. 오차 분석
+  const discrepancies = [];
+  let checkedCount = 0;
+
+  Object.values(stockMap).forEach(item => {
+    checkedCount++;
+    const diff = item.currentTotalIndiv - item.calculatedTotalIndiv;
+    if (diff !== 0) {
+      const bContent = item.boxContent || 1;
+      discrepancies.push({
+        name: item.name,
+        color: item.color,
+        boxContent: item.boxContent,
+        currentBox: item.currentBox,
+        currentIndividual: item.currentIndividual,
+        currentTotal: item.currentTotalIndiv,
+        expectedTotal: item.calculatedTotalIndiv,
+        diffTotal: diff,
+        diffBoxes: Number((diff / bContent).toFixed(2)),
+        diffIndividuals: diff % bContent,
+        initialStock: item.initialStock,
+        inSummary: `${item.inBoxTotal}박스 + ${item.inIndivTotal}개`,
+        outSummary: `${item.outBoxTotal}박스 + ${item.outIndivTotal}개`
+      });
+    }
+  });
+
+  return {
+    success: true,
+    checkedCount: checkedCount,
+    discrepancyCount: discrepancies.length,
+    discrepancies: discrepancies
+  };
+}
+
