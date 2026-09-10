@@ -1787,16 +1787,17 @@
       </div>
     </div>
 
-    <!-- 🏢 다중 배송지(출고처) 선택 모달 -->
-    <div id="multiLocationSelectModal" class="modal" style="display: none; width: 480px; max-width: 95%; padding: 20px; box-shadow: 0 20px 50px rgba(0,0,0,0.3); border-radius: 12px; z-index: 1080; border: 1.5px solid #cbd5e1;">
+    <!-- 🏢 출고처(배송지) 선택 게이트 모달 -->
+    <div id="multiLocationSelectModal" class="modal" style="display: none; width: 490px; max-width: 95%; padding: 20px; box-shadow: 0 20px 50px rgba(0,0,0,0.3); border-radius: 12px; z-index: 1080; border: 1.5px solid #cbd5e1;">
       <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 12px;">
         <h3 style="margin: 0; color: #b45309; font-size: 12pt; font-weight: bold; display: flex; align-items: center; gap: 8px;">
-          <span style="font-size: 16pt;">🏢</span> <span>배송지(출고처) 선택 필요</span>
+          <span style="font-size: 16pt;">🏢</span> <span id="multiLocModalTitle">출고처(배송지) 선택 필수</span>
         </h3>
         <button type="button" onclick="cancelMultiLocationSelect()" style="border: none; background: none; font-size: 18pt; cursor: pointer; color: #94a3b8; line-height: 1;">&times;</button>
       </div>
 
-      <div style="background: #fffbeb; border: 1.5px solid #fde68a; border-radius: 8px; padding: 10px 14px; margin-bottom: 14px;">
+      <!-- 배너: 다중 배송지 후보 모드 -->
+      <div id="multiLocCandidateBanner" style="background: #fffbeb; border: 1.5px solid #fde68a; border-radius: 8px; padding: 10px 14px; margin-bottom: 12px;">
         <div style="color: #92400e; font-size: 9.5pt; font-weight: bold; margin-bottom: 4px;">
           ⚠️ 고객 <span id="multiLocCustomerName" style="color: #b45309; text-decoration: underline;">고객명</span>에 등록된 배달지가 여러 개 있습니다.
         </div>
@@ -1805,14 +1806,43 @@
         </div>
       </div>
 
-      <!-- 배송지 선택 목록 -->
-      <div id="multiLocationList" style="display: flex; flex-direction: column; gap: 8px; max-height: 300px; overflow-y: auto; margin-bottom: 14px; padding: 2px;">
+      <!-- 배너: 미인식(수동 선택 강제) 모드 -->
+      <div id="multiLocManualBanner" style="display: none; background: #fef2f2; border: 1.5px solid #fecaca; border-radius: 8px; padding: 10px 14px; margin-bottom: 12px;">
+        <div style="color: #991b1b; font-size: 9.5pt; font-weight: bold; margin-bottom: 4px;">
+          ⚠️ 영수증에서 출고처를 감지하지 못했습니다.
+        </div>
+        <div style="color: #7f1d1d; font-size: 8.5pt; line-height: 1.4;">
+          오배송 방지를 위해 <strong>출고처를 반드시 선택</strong>해야 장바구니에 담을 수 있습니다. 아래에서 검색하여 선택해 주세요.
+        </div>
+      </div>
+
+      <!-- 다중 배송지 선택 목록 -->
+      <div id="multiLocationList" style="display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto; margin-bottom: 10px; padding: 2px;">
         <!-- 동적 생성: multi-loc-card 버튼 목록 -->
       </div>
 
+      <!-- 다중 후보 모드에서 다른 출고처 검색 전환 링크 -->
+      <div id="multiLocSwitchToManualBtn" style="text-align: right; margin-bottom: 12px;">
+        <button type="button" onclick="switchToManualLocSearch()" style="background: none; border: none; color: #0d9488; font-size: 8.5pt; font-weight: 700; text-decoration: underline; cursor: pointer;">
+          🔍 다른 출고처 직접 검색하기
+        </button>
+      </div>
+
+      <!-- 수동 검색 및 선택 섹션 -->
+      <div id="multiLocationManualSection" style="display: none; flex-direction: column; gap: 8px; margin-bottom: 14px;">
+        <div style="position: relative;">
+          <input type="text" id="manualLocSearchInput" placeholder="🔍 출고처 검색 (예: WILLIAM, TIENDA, 101...)" 
+            oninput="onManualLocSearchInput(this.value)" 
+            style="width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1.5px solid #0d9488; border-radius: 8px; font-size: 10pt; font-weight: 600; outline: none; box-shadow: 0 0 0 2px rgba(13,148,136,0.15);" />
+        </div>
+        <div id="manualLocationResultsList" style="display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px; background: #f8fafc;">
+          <!-- 검색 결과 동적 렌더링 -->
+        </div>
+      </div>
+
       <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #e2e8f0; padding-top: 12px;">
-        <button type="button" onclick="cancelMultiLocationSelect()" style="padding: 7px 14px; background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 8.5pt;">나중에 직접 선택</button>
-        <span style="font-size: 8pt; color: #64748b;">키보드 숫자키 (1, 2, 3...) 또는 마우스 클릭</span>
+        <button type="button" onclick="cancelMultiLocationSelect()" style="padding: 8px 14px; background: #fef2f2; color: #dc2626; border: 1px solid #fca5a5; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 8.5pt;">스캔 취소</button>
+        <span id="multiLocFooterHint" style="font-size: 8pt; color: #64748b;">키보드 숫자키 (1, 2, 3...) 또는 마우스 클릭</span>
       </div>
     </div>
 
@@ -5108,40 +5138,121 @@ function findMatchingLocations(rawBranch, locationList) {
 }
 
 let currentMultiLocMatches = [];
+let currentMultiLocMode = 'candidates';
 let pendingMultiLocState = null;
 
-function openMultiLocationSelectModal(matches, customerName) {
+function openMultiLocationSelectModal(matches, customerName, mode = 'candidates') {
   currentMultiLocMatches = matches || [];
+  currentMultiLocMode = mode;
   const modal = document.getElementById('multiLocationSelectModal');
   const overlay = document.getElementById('modalOverlay');
+  const titleEl = document.getElementById('multiLocModalTitle');
+  const candidateBanner = document.getElementById('multiLocCandidateBanner');
+  const manualBanner = document.getElementById('multiLocManualBanner');
   const nameEl = document.getElementById('multiLocCustomerName');
   const listEl = document.getElementById('multiLocationList');
-  if (!modal || !listEl) return;
+  const manualSection = document.getElementById('multiLocationManualSection');
+  const switchBtn = document.getElementById('multiLocSwitchToManualBtn');
+  const hintEl = document.getElementById('multiLocFooterHint');
+  if (!modal) return;
 
-  if (nameEl) nameEl.textContent = customerName || '고객';
+  if (mode === 'candidates') {
+    if (titleEl) titleEl.textContent = '배송지(출고처) 선택 필요';
+    if (candidateBanner) candidateBanner.style.display = 'block';
+    if (manualBanner) manualBanner.style.display = 'none';
+    if (nameEl) nameEl.textContent = customerName || '고객';
+    if (listEl) listEl.style.display = 'flex';
+    if (manualSection) manualSection.style.display = 'none';
+    if (switchBtn) switchBtn.style.display = 'block';
+    if (hintEl) hintEl.textContent = '키보드 숫자키 (1, 2, 3...) 또는 마우스 클릭';
 
-  let html = '';
-  currentMultiLocMatches.forEach((m, idx) => {
-    const keyNum = idx + 1;
-    const destTag = m.subDest
-      ? `<span class="multi-loc-badge">📍 ${escapeHtml(m.subDest)}</span>`
-      : '<span class="multi-loc-badge" style="background: #f1f5f9; color: #475569; border-color: #cbd5e1;">기본</span>';
-    const escapedLoc = m.fullLoc.replace(/'/g, "\\'");
+    let html = '';
+    currentMultiLocMatches.forEach((m, idx) => {
+      const keyNum = idx + 1;
+      const destTag = m.subDest
+        ? `<span class="multi-loc-badge">📍 ${escapeHtml(m.subDest)}</span>`
+        : '<span class="multi-loc-badge" style="background: #f1f5f9; color: #475569; border-color: #cbd5e1;">기본</span>';
+      const escapedLoc = m.fullLoc.replace(/'/g, "\\'");
 
-    html += `
-      <button type="button" class="multi-loc-card" onclick="selectDisambiguatedLocation('${escapedLoc}')">
-        <div style="display: flex; align-items: center; gap: 8px;">
-          <span class="multi-loc-key">${keyNum <= 9 ? keyNum : '•'}</span>
-          <span class="multi-loc-name">${escapeHtml(m.baseName)}</span>
-        </div>
-        ${destTag}
-      </button>
-    `;
-  });
-  listEl.innerHTML = html;
+      html += `
+        <button type="button" class="multi-loc-card" onclick="selectDisambiguatedLocation('${escapedLoc}')">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span class="multi-loc-key">${keyNum <= 9 ? keyNum : '•'}</span>
+            <span class="multi-loc-name">${escapeHtml(m.baseName)}</span>
+          </div>
+          ${destTag}
+        </button>
+      `;
+    });
+    if (listEl) listEl.innerHTML = html;
+  } else {
+    // manual 모드: 출고처 미인식 또는 직접 검색 모드
+    if (titleEl) titleEl.textContent = '출고처(배송지) 선택 필수';
+    if (candidateBanner) candidateBanner.style.display = 'none';
+    if (manualBanner) manualBanner.style.display = 'block';
+    if (listEl) listEl.style.display = 'none';
+    if (manualSection) manualSection.style.display = 'flex';
+    if (switchBtn) switchBtn.style.display = 'none';
+    if (hintEl) hintEl.textContent = '원하는 출고처를 검색 후 클릭하세요';
+
+    const searchInput = document.getElementById('manualLocSearchInput');
+    if (searchInput) {
+      searchInput.value = customerName || '';
+    }
+    renderManualLocationResults(customerName || '');
+    setTimeout(() => {
+      if (searchInput) searchInput.focus();
+    }, 100);
+  }
 
   modal.style.display = 'block';
   if (overlay) overlay.style.display = 'block';
+}
+
+function switchToManualLocSearch() {
+  const custName = (pendingMultiLocState && pendingMultiLocState.customerName) || '';
+  openMultiLocationSelectModal([], custName, 'manual');
+}
+
+function onManualLocSearchInput(val) {
+  renderManualLocationResults(val);
+}
+
+function renderManualLocationResults(filterText) {
+  const resultsContainer = document.getElementById('manualLocationResultsList');
+  if (!resultsContainer) return;
+
+  const currentLocEl = document.getElementById('location');
+  const allLocs = (locationCache && locationCache.length > 0)
+    ? locationCache
+    : (currentLocEl ? Array.from(currentLocEl.options).map(o => o.value).filter(Boolean) : []);
+
+  const q = String(filterText || '').trim().toLowerCase();
+  const matched = q
+    ? allLocs.filter(loc => String(loc).toLowerCase().includes(q))
+    : allLocs;
+
+  if (matched.length === 0) {
+    resultsContainer.innerHTML = '<div style="text-align: center; color: #94a3b8; padding: 16px; font-size: 9pt;">일치하는 출고처가 없습니다. 검색어를 확인해 주세요.</div>';
+    return;
+  }
+
+  // 상위 50개 렌더링
+  const displayList = matched.slice(0, 50);
+  let html = '';
+  displayList.forEach(loc => {
+    const escapedLoc = String(loc).replace(/'/g, "\\'");
+    html += `
+      <button type="button" class="multi-loc-card" onclick="selectDisambiguatedLocation('${escapedLoc}')" style="justify-content: space-between; padding: 8px 12px;">
+        <span style="font-weight: 600; color: #1e293b; font-size: 9pt;">🏢 ${escapeHtml(loc)}</span>
+        <span class="multi-loc-badge" style="background: #e0f2fe; color: #0369a1; border-color: #bae6fd;">선택</span>
+      </button>
+    `;
+  });
+  if (matched.length > 50) {
+    html += `<div style="text-align: center; color: #64748b; font-size: 8pt; padding: 6px;">외 ${matched.length - 50}개 결과가 더 있습니다. 검색어를 더 상세히 입력해 주세요.</div>`;
+  }
+  resultsContainer.innerHTML = html;
 }
 
 function closeMultiLocationSelectModal() {
@@ -5178,25 +5289,58 @@ function selectDisambiguatedLocation(selectedLoc) {
     r.location = selectedLoc;
   });
 
-  // 3. 장바구니에 품목 추가
-  records.push(...pendingRecs);
+  // 3. 🚨 장바구니에 품목 추가 (기존 장바구니 품목과의 1줄 통합 지원)
+  let mergedIntoExistingCount = 0;
+  if (records && records.length > 0) {
+    pendingRecs.forEach(newRec => {
+      const matchKey = `${newRec.itemName.replace(/[\s_\-]/g, '').toUpperCase()}__${newRec.color.replace(/[\s_\-]/g, '').toUpperCase()}`;
+      const existingRec = records.find(r => 
+        `${r.itemName.replace(/[\s_\-]/g, '').toUpperCase()}__${(r.color || 'SURTIDO').replace(/[\s_\-]/g, '').toUpperCase()}` === matchKey
+      );
+
+      if (existingRec) {
+        if (currentType === 'out') {
+          existingRec.boxQty = - (Math.abs(existingRec.boxQty || 0) + Math.abs(newRec.boxQty || 0));
+          existingRec.individualQty = - (Math.abs(existingRec.individualQty || 0) + Math.abs(newRec.individualQty || 0));
+        } else {
+          existingRec.boxQty = (existingRec.boxQty || 0) + (newRec.boxQty || 0);
+          existingRec.individualQty = (existingRec.individualQty || 0) + (newRec.individualQty || 0);
+        }
+        if (!existingRec.boxContent && newRec.boxContent) {
+          existingRec.boxContent = newRec.boxContent;
+        }
+        mergedIntoExistingCount++;
+      } else {
+        records.push(newRec);
+      }
+    });
+  } else {
+    records.push(...pendingRecs);
+  }
+
   saveTableData();
   updateTable();
   updateTotals();
 
   // 4. 완료 알림 팝업
   const addedCount = pendingRecs.length;
-  let msg = `🎉 손글씨 주문서 인식 성공!\n\n총 ${addedCount}개 품목이 장바구니에 추가되었습니다.`;
-  msg += `\n출고처: [${selectedLoc}] 선택됨`;
+  let msg = `🎉 손글씨 주문서 1줄 통합 인식 성공!\n\n총 ${addedCount}개 대표 품목이 장바구니에 추가되었습니다.`;
+  msg += `\n출고처: [${selectedLoc}] 선택 완료`;
   if (detectedAdmin) {
     msg += `\n요청자(관리자): [${detectedAdmin}] 자동 선택됨`;
   }
+  if (mergedIntoExistingCount > 0) {
+    msg += `\n(기존 장바구니에 있던 ${mergedIntoExistingCount}개 동일 품목 라인에 자동 합산되었습니다.)`;
+  }
 
-  msg += '\n\n📋 [인식된 품목 상세]:\n' + pendingRecs.map((rec, i) => {
+  msg += '\n\n📋 [1줄 통합 적재 내역]:\n' + pendingRecs.map((rec, i) => {
+    let qtyDesc = '';
     const b = Math.abs(rec.boxQty || 0);
     const ind = Math.abs(rec.individualQty || 0);
-    let qStr = (b > 0 && ind > 0) ? `${b}상자 + ${ind}개` : (b > 0 ? `${b}상자` : `${ind}개`);
-    return ` ${i + 1}. ${rec.itemName} | 컬러: ${rec.color} | ${qStr} (규격: ${rec.boxContent}개/박스)`;
+    if (b > 0 && ind > 0) qtyDesc = `${b}상자 + ${ind}개`;
+    else if (b > 0) qtyDesc = `${b}상자`;
+    else qtyDesc = `${ind}개 (PZS)`;
+    return ` ${i + 1}. ${rec.itemName} | 컬러: ${rec.color} | ${qtyDesc} (규격: ${rec.boxContent}개/박스)`;
   }).join('\n');
 
   if (usageMetadata) {
@@ -5204,8 +5348,9 @@ function selectDisambiguatedLocation(selectedLoc) {
     const totalTokens = (meta.totalTokenCount || 0).toLocaleString();
     const promptTokens = (meta.promptTokenCount || 0).toLocaleString();
     const outputTokens = (meta.candidatesTokenCount || 0).toLocaleString();
-    const modelName = usedModel || 'Gemini 3 Flash';
-    msg += `\n\n⚡ [AI 소비 토큰]: 총 ${totalTokens} 토큰\n(입력: ${promptTokens} / 출력: ${outputTokens} · ${modelName})`;
+    const thoughtsTokens = (meta.thoughtsTokenCount || 0).toLocaleString();
+    const modelName = usedModel || 'gemini-3.7-flash';
+    msg += `\n\n⚡ [AI 소비 토큰]: 총 ${totalTokens} 토큰\n(입력: ${promptTokens} / 출력: ${outputTokens} / 추론: ${thoughtsTokens} · ${modelName})`;
   }
 
   closeMultiLocationSelectModal();
@@ -5220,27 +5365,15 @@ function cancelMultiLocationSelect() {
     return;
   }
 
-  const { records: pendingRecs, detectedAdmin } = pendingMultiLocState;
-  const currentAdminEl = document.getElementById('adminSelect');
-  if (detectedAdmin && currentAdminEl) {
-    currentAdminEl.value = detectedAdmin;
-    saveMetadata();
+  // 🚨 [사장님 핵심 원칙] 출고처 없는 유령 데이터 장바구니 유입 원천 차단
+  const ok = confirm('⚠️ 출고처를 선택하지 않으면 장바구니에 담을 수 없습니다.\n\n정말 이번 영수증 스캔을 취소하시겠습니까?');
+  if (!ok) {
+    return; // 사용자가 취소하지 않고 계속 선택을 이어감
   }
 
-  // 출고처 미지정 상태로 장바구니에 담아 데이터 유실 방지
-  pendingRecs.forEach(r => {
-    r.location = '';
-  });
-  records.push(...pendingRecs);
-  saveTableData();
-  updateTable();
-  updateTotals();
-
-  const count = pendingRecs.length;
+  // 사용자가 취소를 확정한 경우: 장바구니에 담지 않고 대기 상태 파기
   closeMultiLocationSelectModal();
   pendingMultiLocState = null;
-
-  alert(`ℹ️ 총 ${count}개 품목이 장바구니에 추가되었습니다.\n\n⚠️ 출고처가 미지정 상태입니다. 상단 [출고처] 목록에서 알맞은 배송지를 직접 선택해 주세요.`);
 }
 
 function onHandwrittenExtracted(data) {
@@ -5595,17 +5728,33 @@ function onHandwrittenExtracted(data) {
     return;
   }
 
-  // 🚨 [사장님 업무 규칙] 동일 고객 다중 배송지 감지 시 선택 모달 분기
-  if (!hasExistingRecords && candidateLocations.length >= 2) {
-    pendingMultiLocState = {
-      records: newRecords,
-      detectedAdmin: detectedAdmin,
-      usageMetadata: data.usageMetadata,
-      usedModel: data.usedModel,
-      customerName: candidateLocations[0].baseName || rawBranchCandidate
-    };
-    openMultiLocationSelectModal(candidateLocations, candidateLocations[0].baseName || rawBranchCandidate);
-    return;
+  // 🚨 [사장님 업무 규칙] 출고 모드에서 출고처 미인식 또는 다중 배송지 감지 시 스마트 선택 게이트 모달 오픈
+  if (!hasExistingRecords && currentType === 'out') {
+    if (candidateLocations.length >= 2) {
+      // 1. 동일 고객 다중 배송지 후보 감지 시 (예: william 지점 2곳 이상)
+      pendingMultiLocState = {
+        records: newRecords,
+        detectedAdmin: detectedAdmin,
+        usageMetadata: data.usageMetadata,
+        usedModel: data.usedModel,
+        customerName: candidateLocations[0].baseName || rawBranchCandidate,
+        mode: 'candidates'
+      };
+      openMultiLocationSelectModal(candidateLocations, candidateLocations[0].baseName || rawBranchCandidate, 'candidates');
+      return;
+    } else if (!detectedLoc) {
+      // 2. 출고처 미인식 또는 매칭 실패 시 -> 출고처 강제 선택 모달 오픈!
+      pendingMultiLocState = {
+        records: newRecords,
+        detectedAdmin: detectedAdmin,
+        usageMetadata: data.usageMetadata,
+        usedModel: data.usedModel,
+        customerName: rawBranchCandidate || '',
+        mode: 'manual'
+      };
+      openMultiLocationSelectModal([], rawBranchCandidate || '', 'manual');
+      return;
+    }
   }
 
   // 🚨 [사장님 업무 규칙] 기존 장바구니 품목과의 1줄 통합 (Cross-Page 누적 합산)
@@ -6317,12 +6466,19 @@ function confirmAddSubWarehouseOrder() {
 
 function setupHotkeyShortcuts() {
   window.addEventListener('keydown', (e) => {
-    // 🏢 다중 배송지(출고처) 선택 모달이 열려 있는 경우 숫자키(1~9) 및 Escape 처리
+    // 🏢 출고처(배송지) 선택 모달이 열려 있는 경우 숫자키(1~9) 및 Escape 처리
     const multiLocModal = document.getElementById('multiLocationSelectModal');
     if (multiLocModal && multiLocModal.style.display === 'block') {
+      if (e.target && e.target.tagName === 'INPUT') {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          cancelMultiLocationSelect();
+        }
+        return;
+      }
       if (!e.altKey && !e.shiftKey && !e.ctrlKey && e.key >= '1' && e.key <= '9') {
         const idx = parseInt(e.key, 10) - 1;
-        if (currentMultiLocMatches && idx >= 0 && idx < currentMultiLocMatches.length) {
+        if (currentMultiLocMode === 'candidates' && currentMultiLocMatches && idx >= 0 && idx < currentMultiLocMatches.length) {
           e.preventDefault();
           selectDisambiguatedLocation(currentMultiLocMatches[idx].fullLoc);
           return;
