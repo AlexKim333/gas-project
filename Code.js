@@ -609,6 +609,14 @@ function updateStockSheet(tableData, mode) {
       const key = makeKey(name, color, boxContent);
       let current = stockMap[key];
 
+      // 🚨 [개선] 출고 시 특정 색상이 마스터에 없고 SURTIDO로 관리되는 경우, SURTIDO 재고에서 안전 차감
+      if (!current && mode === 'out') {
+        const surtidoKey = makeKey(name, DEFAULTS.COLOR, boxContent);
+        if (stockMap[surtidoKey]) {
+          current = stockMap[surtidoKey];
+        }
+      }
+
       if (!current) {
         current = {
           name: name,
@@ -2626,6 +2634,326 @@ function promptNormalizeStockData() {
 }
 
 /**
+ * 🎨 마스터 테이블 컬러 정합성 보정 사전 분석 (Dry-Run)
+ */
+function analyzeColorNormalization() {
+  const stockSheet = getSheet(SHEETS.STOCK);
+  ensureSheetColumns(stockSheet, 9);
+  const lastRow = stockSheet.getLastRow();
+
+  if (lastRow < 2) {
+    return {
+      success: true,
+      originalRowCount: 0,
+      modifiedRowCount: 0,
+      finalRowCount: 0,
+      reducedRowsCount: 0,
+      beforeTotalPieces: 0,
+      afterTotalPieces: 0,
+      modifiedItems: []
+    };
+  }
+
+  const rawData = stockSheet.getRange(2, 1, lastRow - 1, 9).getValues();
+  const PURE_COLORS = new Set([
+    'SURTIDO', 'NEGRO', 'BLANCO', 'AZUL', 'MARINO', 'MEZCLILLA', 'ROJO', 'GRIS',
+    'ROSA', 'AMARILLO', 'VERDE', 'BEIGE', 'CAFE', 'VINO', 'PALOROSA', 'PALO ROSA',
+    'TURQUEZA', 'TURQUESA', 'MOSTAZA', 'UVA', 'CORAL', 'FIUSHA', 'LILA', 'NARANJA',
+    'KAKI', 'CHEDRON', 'JASPE', 'OXFORD', 'REY', 'CIELO', 'PETROLEO', 'VERDE MILITAR',
+    'COCO', 'VERDE BOTELLA', 'PISTACHE', 'SHEDRON', 'MILITAR', 'BALCK', 'NAVY',
+    'BURGUNDY', 'CHARCOAL', 'OLIVE', 'PINK(ROSA PASTEL)', 'IPLUM', 'JADE',
+    'AZUL(TURQUEZA)', 'PURPLISH RED', 'COCOA', 'MARINO(AZUL OSCURO)', 'PIEL(NUDE)',
+    'PURPURA', 'ROJO GRAND', 'VERDE CLARO', 'ARMY GREEN', 'BLUE', 'ROJO CIRUELA',
+    'AZULCELE', 'PETROLEO / JADE'
+  ]);
+
+  function normalizeItemNameAndColor(name, rawColor) {
+    const colorStr = normalizeText(rawColor);
+    const colorUpper = colorStr.toUpperCase();
+
+    if (PURE_COLORS.has(colorUpper)) {
+      return { name, color: colorUpper, isModified: false };
+    }
+
+    if (/^\d{2,3}\s*CM$/i.test(colorStr)) {
+      const cm = colorUpper.replace(/\s+/g, '');
+      let newName = name;
+      if (!newName.toUpperCase().includes(cm)) {
+        newName = `${name}/${cm}`;
+      }
+      return { name: newName, color: 'SURTIDO', isModified: true, reason: 'CM_LENGTH' };
+    }
+
+    if (name.includes('3678') || /^(?:BIKE|ARCO|MANCH|MALLA)/i.test(colorStr)) {
+      const newName = `${name} ${colorStr}`;
+      return { name: newName, color: 'SURTIDO', isModified: true, reason: 'PATTERN_CODE' };
+    }
+
+    if (/^[A-Za-z]$/.test(colorStr)) {
+      const curUpper = colorUpper;
+      if (name === 'NSTP' && (curUpper === 'M' || curUpper === 'L')) {
+        return { name: `${name}-${curUpper}`, color: 'SURTIDO', isModified: true, reason: 'SIZE_CODE' };
+      }
+      const newName = `${name}${curUpper}`;
+      return { name: newName, color: 'SURTIDO', isModified: true, reason: 'LETTER_VARIANT' };
+    }
+
+    if (/\d/.test(colorStr)) {
+      return { name: `${name} ${colorStr}`, color: 'SURTIDO', isModified: true, reason: 'NUMERIC_CODE' };
+    }
+
+    return { name, color: colorUpper || DEFAULTS.COLOR, isModified: false };
+  }
+
+  let beforeTotalPieces = 0;
+  const modifiedItems = [];
+  const mergedMap = new Map();
+
+  rawData.forEach((row, idx) => {
+    const originalName = normalizeText(row[0]);
+    if (!originalName) return;
+
+    const originalColor = normalizeText(row[1]) || DEFAULTS.COLOR;
+    const stockBox = normalizeNumber(row[2]);
+    const stockIndividual = normalizeNumber(row[3]);
+    const safeStock = normalizeNumber(row[4]);
+    const boxContent = normalizeNumber(row[5]);
+    const initialStock = normalizeNumber(row[6]);
+    const manufacturer = normalizeText(row[7]);
+    const deltaVal = normalizeText(row[8]).toUpperCase();
+    const isDelta = row[8] === true || deltaVal === 'Y' || deltaVal === 'TRUE';
+
+    const bContent = boxContent || 1;
+    beforeTotalPieces += (stockBox * bContent) + stockIndividual;
+
+    const norm = normalizeItemNameAndColor(originalName, originalColor);
+    if (norm.isModified) {
+      modifiedItems.push({
+        rowIndex: idx + 2,
+        oldName: originalName,
+        oldColor: originalColor,
+        newName: norm.name,
+        newColor: norm.color,
+        reason: norm.reason,
+        stockBox: stockBox,
+        stockIndividual: stockIndividual,
+        boxContent: boxContent
+      });
+    }
+
+    const cleanName = norm.name.replace(/[\s_\-]/g, '').toUpperCase();
+    const cleanColor = norm.color.replace(/[\s_\-]/g, '').toUpperCase();
+    const groupKey = `${cleanName}__${cleanColor}`;
+
+    if (!mergedMap.has(groupKey)) {
+      mergedMap.set(groupKey, {
+        name: norm.name,
+        color: norm.color,
+        stockBox: stockBox,
+        stockIndividual: stockIndividual,
+        safeStock: safeStock,
+        boxContent: boxContent,
+        initialStock: initialStock,
+        manufacturer: manufacturer,
+        isDelta: isDelta,
+        mergedRows: [idx + 2]
+      });
+    } else {
+      const existing = mergedMap.get(groupKey);
+      existing.stockBox += stockBox;
+      existing.stockIndividual += stockIndividual;
+      existing.safeStock = Math.max(existing.safeStock, safeStock);
+      existing.initialStock += initialStock;
+      existing.mergedRows.push(idx + 2);
+      if (norm.name.includes('/')) {
+        existing.name = norm.name;
+      }
+    }
+  });
+
+  let afterTotalPieces = 0;
+  mergedMap.forEach(rec => {
+    const bContent = rec.boxContent || 1;
+    afterTotalPieces += (rec.stockBox * bContent) + rec.stockIndividual;
+  });
+
+  return {
+    success: true,
+    originalRowCount: rawData.length,
+    modifiedRowCount: modifiedItems.length,
+    finalRowCount: mergedMap.size,
+    reducedRowsCount: rawData.length - mergedMap.size,
+    beforeTotalPieces,
+    afterTotalPieces,
+    pieceDifference: afterTotalPieces - beforeTotalPieces,
+    modifiedItems
+  };
+}
+
+/**
+ * 🎨 마스터 테이블 컬러 정합성 보정 실제 실행 (Zero Data Loss)
+ */
+function executeColorNormalization() {
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(30000);
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const stockSheet = getSheet(SHEETS.STOCK);
+    ensureSheetColumns(stockSheet, 9);
+    const lastRow = stockSheet.getLastRow();
+
+    if (lastRow < 2) {
+      return { success: false, message: '재고시트에 데이터가 없습니다.' };
+    }
+
+    const analysis = analyzeColorNormalization();
+    if (analysis.pieceDifference !== 0) {
+      throw new Error(`재고 수량 불일치 감지: 전(${analysis.beforeTotalPieces}) vs 후(${analysis.afterTotalPieces}). 안전을 위해 작업을 중단합니다.`);
+    }
+
+    if (analysis.modifiedRowCount === 0) {
+      return {
+        success: true,
+        message: '보정할 비정상 컬러 항목이 없습니다. 이미 모든 컬러가 정규화되어 있습니다.',
+        backupSheetName: null,
+        analysis
+      };
+    }
+
+    const tz = Session.getScriptTimeZone() || 'GMT';
+    const timeStamp = Utilities.formatDate(new Date(), tz, 'yyyyMMdd_HHmmss');
+    const backupSheetName = `${SHEETS.STOCK}_백업_컬러정리_${timeStamp}`;
+
+    const backupSheet = stockSheet.copyTo(ss);
+    backupSheet.setName(backupSheetName);
+    console.log(`[백업완료] ${backupSheetName} 시트가 자동 생성되었습니다.`);
+
+    const rawData = stockSheet.getRange(2, 1, lastRow - 1, 9).getValues();
+    const PURE_COLORS = new Set([
+      'SURTIDO', 'NEGRO', 'BLANCO', 'AZUL', 'MARINO', 'MEZCLILLA', 'ROJO', 'GRIS',
+      'ROSA', 'AMARILLO', 'VERDE', 'BEIGE', 'CAFE', 'VINO', 'PALOROSA', 'PALO ROSA',
+      'TURQUEZA', 'TURQUESA', 'MOSTAZA', 'UVA', 'CORAL', 'FIUSHA', 'LILA', 'NARANJA',
+      'KAKI', 'CHEDRON', 'JASPE', 'OXFORD', 'REY', 'CIELO', 'PETROLEO', 'VERDE MILITAR',
+      'COCO', 'VERDE BOTELLA', 'PISTACHE', 'SHEDRON', 'MILITAR', 'BALCK', 'NAVY',
+      'BURGUNDY', 'CHARCOAL', 'OLIVE', 'PINK(ROSA PASTEL)', 'IPLUM', 'JADE',
+      'AZUL(TURQUEZA)', 'PURPLISH RED', 'COCOA', 'MARINO(AZUL OSCURO)', 'PIEL(NUDE)',
+      'PURPURA', 'ROJO GRAND', 'VERDE CLARO', 'ARMY GREEN', 'BLUE', 'ROJO CIRUELA',
+      'AZULCELE', 'PETROLEO / JADE'
+    ]);
+
+    function normalizeItemNameAndColor(name, rawColor) {
+      const colorStr = normalizeText(rawColor);
+      const colorUpper = colorStr.toUpperCase();
+      if (PURE_COLORS.has(colorUpper)) {
+        return { name, color: colorUpper };
+      }
+      if (/^\d{2,3}\s*CM$/i.test(colorStr)) {
+        const cm = colorUpper.replace(/\s+/g, '');
+        let newName = name;
+        if (!newName.toUpperCase().includes(cm)) {
+          newName = `${name}/${cm}`;
+        }
+        return { name: newName, color: 'SURTIDO' };
+      }
+      if (name.includes('3678') || /^(?:BIKE|ARCO|MANCH|MALLA)/i.test(colorStr)) {
+        return { name: `${name} ${colorStr}`, color: 'SURTIDO' };
+      }
+      if (/^[A-Za-z]$/.test(colorStr)) {
+        const curUpper = colorUpper;
+        if (name === 'NSTP' && (curUpper === 'M' || curUpper === 'L')) {
+          return { name: `${name}-${curUpper}`, color: 'SURTIDO' };
+        }
+        return { name: `${name}${curUpper}`, color: 'SURTIDO' };
+      }
+      if (/\d/.test(colorStr)) {
+        return { name: `${name} ${colorStr}`, color: 'SURTIDO' };
+      }
+      return { name, color: colorUpper || DEFAULTS.COLOR };
+    }
+
+    const mergedMap = new Map();
+    rawData.forEach((row) => {
+      const originalName = normalizeText(row[0]);
+      if (!originalName) return;
+
+      const originalColor = normalizeText(row[1]) || DEFAULTS.COLOR;
+      const stockBox = normalizeNumber(row[2]);
+      const stockIndividual = normalizeNumber(row[3]);
+      const safeStock = normalizeNumber(row[4]);
+      const boxContent = normalizeNumber(row[5]);
+      const initialStock = normalizeNumber(row[6]);
+      const manufacturer = normalizeText(row[7]);
+      const deltaVal = normalizeText(row[8]).toUpperCase();
+      const isDelta = row[8] === true || deltaVal === 'Y' || deltaVal === 'TRUE';
+
+      const norm = normalizeItemNameAndColor(originalName, originalColor);
+      const cleanName = norm.name.replace(/[\s_\-]/g, '').toUpperCase();
+      const cleanColor = norm.color.replace(/[\s_\-]/g, '').toUpperCase();
+      const groupKey = `${cleanName}__${cleanColor}`;
+
+      if (!mergedMap.has(groupKey)) {
+        mergedMap.set(groupKey, {
+          name: norm.name,
+          color: norm.color,
+          stockBox: stockBox,
+          stockIndividual: stockIndividual,
+          safeStock: safeStock,
+          boxContent: boxContent,
+          initialStock: initialStock,
+          manufacturer: manufacturer,
+          isDelta: isDelta
+        });
+      } else {
+        const existing = mergedMap.get(groupKey);
+        existing.stockBox += stockBox;
+        existing.stockIndividual += stockIndividual;
+        existing.safeStock = Math.max(existing.safeStock, safeStock);
+        existing.initialStock += initialStock;
+        if (norm.name.includes('/')) {
+          existing.name = norm.name;
+        }
+      }
+    });
+
+    const newRows = [];
+    mergedMap.forEach(rec => {
+      newRows.push([
+        rec.name,
+        rec.color,
+        rec.stockBox,
+        rec.stockIndividual,
+        rec.safeStock,
+        rec.boxContent,
+        rec.initialStock,
+        rec.manufacturer,
+        rec.isDelta ? 'Y' : ''
+      ]);
+    });
+
+    stockSheet.getRange(2, 1, lastRow - 1, 9).clearContent();
+    if (newRows.length > 0) {
+      stockSheet.getRange(2, 1, newRows.length, 9).setValues(newRows);
+    }
+
+    console.log(`[컬러정규화완료] ${rawData.length}행 -> ${newRows.length}행 (${rawData.length - newRows.length}개 중복 정리, 백업: ${backupSheetName})`);
+
+    return {
+      success: true,
+      backupSheetName,
+      originalRowCount: rawData.length,
+      finalRowCount: newRows.length,
+      reducedRowsCount: rawData.length - newRows.length,
+      analysis
+    };
+  } catch (err) {
+    console.error(`executeColorNormalization error: ${err.message}`);
+    throw err;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
  * Web App 엔드포인트
  */
 function doGet(e) {
@@ -2641,8 +2969,23 @@ function doGet(e) {
       return ContentService.createTextOutput(JSON.stringify(result))
         .setMimeType(ContentService.MimeType.JSON);
     }
+    if (action === 'analyzeColorNormalization') {
+      const result = analyzeColorNormalization();
+      return ContentService.createTextOutput(JSON.stringify(result))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    if (action === 'executeColorNormalization') {
+      const result = executeColorNormalization();
+      return ContentService.createTextOutput(JSON.stringify(result))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
     if (action === 'verifyStockIntegrity') {
       const result = verifyStockIntegrity();
+      return ContentService.createTextOutput(JSON.stringify(result))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    if (action === 'getStockData') {
+      const result = getStockData();
       return ContentService.createTextOutput(JSON.stringify(result))
         .setMimeType(ContentService.MimeType.JSON);
     }

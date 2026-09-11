@@ -2625,13 +2625,28 @@ function checkItemAndStock(itemName, color, boxContent, qty, unitType) {
   const normBoxContent = Number(boxContent) || 0;
   const targetClean = (itemName || '').replace(/[\s_\-]/g, '').toLowerCase();
 
-  const item = stockDataCache.find(it => {
+  let item = stockDataCache.find(it => {
     const itClean = (it.name || '').replace(/[\s_\-]/g, '').toLowerCase();
     const itColor = (it.color || 'SURTIDO').trim().toLowerCase();
     const itBoxContent = Number(it.boxContent) || 0;
     return (itClean === targetClean && itColor === normColor && (normBoxContent <= 0 || itBoxContent === normBoxContent)) ||
            (itClean === targetClean && itColor === normColor);
   });
+
+  // 🚨 [개선] 1순위: 품명+색상 일치 -> 2순위 Fallback: 마스터의 SURTIDO 재고 매칭
+  if (!item) {
+    item = stockDataCache.find(it => {
+      const itClean = (it.name || '').replace(/[\s_\-]/g, '').toLowerCase();
+      const itColor = (it.color || 'SURTIDO').trim().toLowerCase();
+      return itClean === targetClean && itColor === 'surtido';
+    });
+  }
+  if (!item) {
+    item = stockDataCache.find(it => {
+      const itClean = (it.name || '').replace(/[\s_\-]/g, '').toLowerCase();
+      return itClean === targetClean;
+    });
+  }
 
   if (!item) {
     return { isRegistered: false };
@@ -2840,11 +2855,25 @@ function updateTable() {
       if (stockDataCache && stockDataCache.length > 0) {
         const recCleanName = (rec.itemName || '').replace(/[\s_\-]/g, '').toLowerCase();
         const recCleanColor = (rec.color || 'SURTIDO').trim().toLowerCase();
-        const sInfo = stockDataCache.find(s => {
+        let sInfo = stockDataCache.find(s => {
           const sCleanName = (s.name || '').replace(/[\s_\-]/g, '').toLowerCase();
           const sCleanColor = (s.color || 'SURTIDO').trim().toLowerCase();
           return sCleanName === recCleanName && sCleanColor === recCleanColor;
         });
+        // 🚨 [개선] 1순위: 품명+색상 일치 -> 2순위 Fallback: 마스터의 SURTIDO 재고 매칭
+        if (!sInfo) {
+          sInfo = stockDataCache.find(s => {
+            const sCleanName = (s.name || '').replace(/[\s_\-]/g, '').toLowerCase();
+            const sCleanColor = (s.color || 'SURTIDO').trim().toLowerCase();
+            return sCleanName === recCleanName && sCleanColor === 'surtido';
+          });
+        }
+        if (!sInfo) {
+          sInfo = stockDataCache.find(s => {
+            const sCleanName = (s.name || '').replace(/[\s_\-]/g, '').toLowerCase();
+            return sCleanName === recCleanName;
+          });
+        }
         const curBox = sInfo ? (sInfo.stockBox || 0) : 0;
         const curIndiv = sInfo ? (sInfo.stockIndividual || 0) : 0;
 
@@ -6258,7 +6287,9 @@ function onHandwrittenExtracted(data) {
 
       if (exactMaster) {
         finalItemName = exactMaster.name;
-        finalColor = (rawColor && rawColor !== 'SURTIDO') ? normalizeColor(rawColor) : (exactMaster.color || 'SURTIDO');
+        // 품명 끝자리 알파벳과 색상이 동일하면 (예: CK928K & K), 색상은 품명에 흡수된 것이므로 exactMaster의 색상(SURTIDO) 적용
+        const endsWithLetter = rawColor && rawColor.length === 1 && exactMaster.name.toUpperCase().endsWith(rawColor.toUpperCase());
+        finalColor = endsWithLetter ? (exactMaster.color || 'SURTIDO') : ((rawColor && rawColor !== 'SURTIDO') ? normalizeColor(rawColor) : (exactMaster.color || 'SURTIDO'));
         finalBoxContent = exactMaster.boxContent;
         lastItemInfo = exactMaster;
       } else if (isSingleAlpha) {
@@ -6345,8 +6376,12 @@ function onHandwrittenExtracted(data) {
         finalBoxContent = exactVariant.boxContent;
         lastItemInfo = exactVariant;
       } else if (isExplicitColor) {
-        // 2) 마스터에 해당 색상이 아직 등록 안 되어 있더라도, 사용자가 명시한 색상(예: BLANCO)을 절대 SURTIDO로 덮어쓰지 않고 100% 보존!
-        finalColor = normTargetColor;
+        // 단일 알파벳이 모델명 끝자리와 일치하는 경우 (예: 품명 CK928K & 색상 K), 마스터의 색상(SURTIDO) 적용
+        if (normTargetColor.length === 1 && cleanMatchedName.endsWith(normTargetColor)) {
+          finalColor = (matchRes && matchRes.item && matchRes.item.color) ? matchRes.item.color : 'SURTIDO';
+        } else {
+          finalColor = normTargetColor;
+        }
         finalBoxContent = matchRes ? matchRes.item.boxContent : 0;
         lastItemInfo = matchRes ? matchRes.item : null;
       } else {
