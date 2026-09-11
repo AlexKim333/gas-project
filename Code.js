@@ -1843,12 +1843,12 @@ Rules:
 
 8. Known Model Aliases / Nicknames (TRADE TERMS):
    - "LICRA LARGA" / "LICRA LARG" / "LICRA LARGO" / "LICRA #70" / "LICRA 70" -> Recognized as "P-4D70".
-   - "LICRA CORTA" / "LICRA CORTO" / "LICRA #60" / "LICRA 60" -> Recognized as "P-D60".
+   - "LICRA CORTA" / "LICRA CORTO" / "LICRA #60" / "LICRA 60" / "SHOR LICRA" / "SHORT LICRA" / "SHOR LICRA #60" / "SHORT LICRA #60" -> Recognized as "P-D60".
    - "MALLON NIÑO #50" / "MALLON NIÑO 50" / "MALLON 50" -> Recognized as "BL-50".
    - "MALLON NIÑO #60" / "MALLON NIÑO 60" / "MALLON 60" -> Recognized as "BL-60".
    - "MALLON NIÑO #70" / "MALLON NIÑO 70" / "MALLON 70" -> Recognized as "BL-70".
    - "MALLON NIÑO #80" / "MALLON NIÑO 80" / "MALLON 80" -> Recognized as "BL-80".
-   - "FAJA" / "MAYON FAJA" / "FAJA MAYON" / "MALLON #160" / "MALLON 160" -> Recognized as "P-160".
+   - "FAJA" / "MAYON FAJA" / "FAJA MAYON" / "MALLON #160" / "MALLON 160" / "FAJA #160" / "FAJA 160" / "FAJA#160" -> Recognized as "P-160".
    - "MAYON TERMICO" / "TERMICO MAYON" / "TERMICO 150" / "MALLON #150" / "MALLON 150" -> Recognized as "P-150".
    - "TIRANTE" / "BULUSA TIRANTE" / "BLUSA TIRANTE" -> Recognized as "L-TP75".
    - "OLIMPICA" / "BULUSA OLIMPICA" / "BLUSA OLIMPICA" -> Recognized as "L-OP80".
