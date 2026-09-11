@@ -1381,6 +1381,10 @@
               <button type="button" class="action-btn btn-pending-search" onclick="showPendingModal()" tabindex="12" id="pendingSearchButton">🔍 보류 (<span id="pendingCount">0</span>)</button>
             </div>
             <div class="totals-pill-bar">
+              <span class="total-pill" id="cartLocationPill" onclick="openLocationPickerForCurrentCart()" style="cursor: pointer; background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;" title="클릭하여 출고처/입고처 일괄 변경">
+                📍 <span id="cartLocationLabel">출고처: 미지정</span> <span style="font-size: 8pt; opacity: 0.7;">✏️</span>
+              </span>
+              <span class="total-divider" id="cartLocationDivider">|</span>
               <span class="total-pill">품목: <strong id="totalItems">0</strong></span>
               <span class="total-divider">|</span>
               <span class="total-pill"><span id="totalBoxesLabel">상자: 0</span></span>
@@ -2015,7 +2019,7 @@ const typeConfig = {
     locationsFunction: 'getInLocations', invoiceFunction: 'getInitialInvoiceNumber',
     locationLabel: '입고처:', qtyLabel: '입고수량:', invoiceLabel: '입고증번호:',
     totalBoxesLabel: '상자: ', totalIndividualsLabel: '낱개: ',
-    tableHeaders: ['품명', '컬러', '상자입고', '낱개입고', '박스당수량', '입고처'],
+    tableHeaders: ['품명', '컬러', '상자입고', '낱개입고', '박스당수량', '일치율'],
     confirmTitle: '입고사항 확인',
     pendingStorageKey: 'pendingInRecordsList',
     sessionStorageKey: 'pendingInRecords',
@@ -2037,7 +2041,7 @@ const typeConfig = {
     locationsFunction: 'getOutLocations', invoiceFunction: 'getInitialOutInvoiceNumber',
     locationLabel: '출고처:', qtyLabel: '출고수량:', invoiceLabel: '출고증번호:',
     totalBoxesLabel: '상자: ', totalIndividualsLabel: '낱개: ',
-    tableHeaders: ['품명', '컬러', '상자출고', '낱개출고', '박스당수량', '출고처'],
+    tableHeaders: ['품명', '컬러', '상자출고', '낱개출고', '박스당수량', '일치율'],
     confirmTitle: '출고사항 확인',
     pendingStorageKey: 'pendingOutRecordsList',
     sessionStorageKey: 'pendingOutRecords',
@@ -2203,6 +2207,7 @@ function onMainLocationChanged() {
       updateTable();
     }
   }
+  updateTotals();
 }
 
 function openLocationPickerForCurrentCart() {
@@ -2315,7 +2320,15 @@ function setPage(page, initialData = null) {
         }
         if (confirmTitle) confirmTitle.innerText = config.confirmTitle;
         if (tableHeader) tableHeader.innerHTML = `<tr><th><input type="checkbox" id="selectAll" onclick="toggleSelectAll()"></th>${config.tableHeaders.map(h => `<th>${h}</th>`).join('')}</tr>`;
-        if (confirmHeader) confirmHeader.innerHTML = `<tr>${config.tableHeaders.map(h => `<th>${h}</th>`).join('')}</tr>`;
+        if (confirmHeader) {
+          if (currentType === 'product') {
+            confirmHeader.innerHTML = `<tr>${config.tableHeaders.map(h => `<th>${h}</th>`).join('')}</tr>`;
+          } else {
+            const qtyLabelText = currentType === 'in' ? '입고' : '출고';
+            const locLabelText = currentType === 'in' ? '입고처' : '출고처';
+            confirmHeader.innerHTML = `<tr><th>품명</th><th>컬러</th><th>상자${qtyLabelText}</th><th>낱개${qtyLabelText}</th><th>박스당수량</th><th>${locLabelText}</th><th>일치율</th></tr>`;
+          }
+        }
         if (currentType !== 'product') {
           loadDropdowns();
           getInitialInvoice();
@@ -2802,7 +2815,8 @@ function addRecord() {
     individualQty: unitType === 'individual' ? (currentType === 'in' ? qty : -qty) : 0,
     boxContent,
     location,
-    unitType
+    unitType,
+    matchRate: 100
   };
 
   if (currentType === 'out' && unitType === 'individual') {
@@ -2912,6 +2926,38 @@ function updateTable() {
         }
       }
 
+      const rate = (rec.matchRate !== undefined && rec.matchRate !== null) ? rec.matchRate : 100;
+      let badgeBg = '#dcfce7';
+      let badgeColor = '#15803d';
+      let badgeBorder = '#86efac';
+      let badgeText = `${rate}%`;
+
+      if (rate >= 95) {
+        badgeBg = '#dcfce7';
+        badgeColor = '#15803d';
+        badgeBorder = '#86efac';
+        badgeText = `${rate}%`;
+      } else if (rate >= 80) {
+        badgeBg = '#e0f2fe';
+        badgeColor = '#0369a1';
+        badgeBorder = '#7dd3fc';
+        badgeText = `${rate}%`;
+      } else if (rate > 0) {
+        badgeBg = '#fef3c7';
+        badgeColor = '#b45309';
+        badgeBorder = '#fde68a';
+        badgeText = `⚠️ ${rate}%`;
+      } else {
+        badgeBg = '#fee2e2';
+        badgeColor = '#b91c1c';
+        badgeBorder = '#fca5a5';
+        badgeText = `❓ 미등록`;
+      }
+
+      const matchTooltip = rec.rawModel
+        ? `[AI 매칭 분석]\n• OCR 원문: ${rec.rawModel}${rec.rawColor ? ' (' + rec.rawColor + ')' : ''}\n• 매칭 품목: ${rec.itemName} (${rec.color})\n• AI 일치율: ${rate}%\n(출고처: ${rec.location || '미지정'})`
+        : `일치율: ${rate}% (직접 입력 / 확정)\n(출고처: ${rec.location || '미지정'})`;
+
       html += `
         <tr style="${shortageRowStyle}">
           <td><input type="checkbox" class="rowCheckbox" data-index="${idx}"></td>
@@ -2924,7 +2970,11 @@ function updateTable() {
           <td contenteditable="true" class="editable" onblur="updateRecord(${idx}, 'boxQty', this.textContent)">${currentType === 'in' ? rec.boxQty : Math.abs(rec.boxQty)}</td>
           <td contenteditable="true" class="editable" onblur="updateRecord(${idx}, 'individualQty', this.textContent)">${currentType === 'in' ? rec.individualQty : Math.abs(rec.individualQty)}</td>
           <td contenteditable="true" class="editable" onblur="updateRecord(${idx}, 'boxContent', this.textContent)">${rec.boxContent}</td>
-          <td onclick="openLocationPickerForCurrentCart()" title="클릭하여 출고처/입고처 일괄 변경" style="cursor: pointer; font-weight: 600; color: #0f766e;"><span style="border-bottom: 1px dashed #0d9488;">${rec.location}</span> <span style="font-size: 8pt; opacity: 0.7;">✏️</span></td>
+          <td style="text-align: center; vertical-align: middle;">
+            <span style="font-weight: 700; font-size: 7.8pt; padding: 2px 7px; border-radius: 9999px; display: inline-flex; align-items: center; justify-content: center; background: ${badgeBg}; color: ${badgeColor}; border: 1px solid ${badgeBorder}; cursor: help;" title="${matchTooltip}">
+              ${badgeText}
+            </span>
+          </td>
         </tr>
       `;
     }
@@ -3034,6 +3084,7 @@ function showConfirmModal() {
         <td>${currentType === 'in' ? rec.individualQty : Math.abs(rec.individualQty)}</td>
         <td>${rec.boxContent}</td>
         <td>${rec.location}</td>
+        <td style="text-align: center; font-weight: 700; color: ${(rec.matchRate || 100) >= 80 ? '#15803d' : '#b45309'};">${rec.matchRate !== undefined ? rec.matchRate + '%' : '100%'}</td>
       </tr>
     `;
   });
@@ -3275,7 +3326,7 @@ function selectPending(index) {
         <td>${currentType === 'in' ? rec.boxQty : Math.abs(rec.boxQty || 0)}</td>
         <td>${currentType === 'in' ? rec.individualQty : Math.abs(rec.individualQty || 0)}</td>
         <td>${rec.boxContent || ''}</td>
-        <td>${rec.location || ''}</td>
+        <td style="text-align: center;">${(rec.matchRate !== undefined && rec.matchRate !== null) ? rec.matchRate + '%' : '100%'}</td>
       </tr>
     `;
   });
@@ -3951,6 +4002,25 @@ function updateTotals() {
   const totalItemsSpan = document.getElementById('totalItems');
   const totalBoxesLabelSpan = document.getElementById('totalBoxesLabel');
   const totalIndividualsLabelSpan = document.getElementById('totalIndividualsLabel');
+  const cartLocationPill = document.getElementById('cartLocationPill');
+  const cartLocationLabel = document.getElementById('cartLocationLabel');
+  const cartLocationDivider = document.getElementById('cartLocationDivider');
+
+  if (cartLocationPill && cartLocationLabel) {
+    if (currentType === 'product') {
+      cartLocationPill.style.display = 'none';
+      if (cartLocationDivider) cartLocationDivider.style.display = 'none';
+    } else {
+      cartLocationPill.style.display = 'inline-flex';
+      if (cartLocationDivider) cartLocationDivider.style.display = 'inline';
+      const locName = (records && records.length > 0 && records[0].location && records[0].location.trim())
+        ? records[0].location.trim()
+        : (document.getElementById('location')?.value?.trim() || '미지정');
+      const prefix = currentType === 'in' ? '입고처' : '출고처';
+      cartLocationLabel.textContent = `${prefix}: ${locName}`;
+    }
+  }
+
   if (!totalItemsSpan || !totalBoxesLabelSpan || !totalIndividualsLabelSpan) return;
   if (currentType === 'product') {
     totalItemsSpan.textContent = records.length;
@@ -5614,6 +5684,7 @@ function applyCartaDePorteDelta(res) {
       const boxContent = matchMaster ? matchMaster.item.boxContent : 0;
       const color = inv.color || (matchMaster ? matchMaster.item.color : 'SURTIDO');
 
+      const matchScore = matchMaster ? Math.round((matchMaster.score || 0.9) * 100) : 70;
       records.push({
         itemName: itemName,
         color: color,
@@ -5622,7 +5693,10 @@ function applyCartaDePorteDelta(res) {
         boxContent: boxContent,
         location: res.origin_warehouse || 'PANTACO',
         unitType: 'box',
-        _isNewAdded: true
+        _isNewAdded: true,
+        matchRate: matchScore,
+        rawModel: inv.modelo || '',
+        rawColor: inv.color || ''
       });
       newAddedCount++;
     }
@@ -5677,6 +5751,7 @@ function loadCartaDePorteDirectly(res) {
     const boxContent = matchMaster ? matchMaster.item.boxContent : 0;
     const color = inv.color || (matchMaster ? matchMaster.item.color : 'SURTIDO');
 
+    const matchScore = matchMaster ? Math.round((matchMaster.score || 0.9) * 100) : 70;
     records.push({
       itemName: itemName,
       color: color,
@@ -5684,7 +5759,10 @@ function loadCartaDePorteDirectly(res) {
       individualQty: 0,
       boxContent: boxContent,
       location: originWh,
-      unitType: 'box'
+      unitType: 'box',
+      matchRate: matchScore,
+      rawModel: inv.modelo || '',
+      rawColor: inv.color || ''
     });
   });
 
@@ -6006,6 +6084,7 @@ function selectDisambiguatedLocation(selectedLoc) {
     saveMetadata();
     saveTableData();
     updateTable();
+    updateTotals();
     closeMultiLocationSelectModal();
     pendingMultiLocState = null;
     alert(`✅ 출고처가 [${selectedLoc}]로 일괄 변경되었습니다.`);
@@ -6049,6 +6128,12 @@ function selectDisambiguatedLocation(selectedLoc) {
         }
         if (!existingRec.boxContent && newRec.boxContent) {
           existingRec.boxContent = newRec.boxContent;
+        }
+        if (newRec.matchRate !== undefined) {
+          existingRec.matchRate = Math.min(existingRec.matchRate || 100, newRec.matchRate);
+        }
+        if (newRec.rawModel && !existingRec.rawModel?.includes(newRec.rawModel)) {
+          existingRec.rawModel = [existingRec.rawModel, newRec.rawModel].filter(Boolean).join(', ');
         }
         mergedIntoExistingCount++;
       } else {
@@ -6274,6 +6359,7 @@ function onHandwrittenExtracted(data) {
     let finalItemName = '';
     let finalColor = '';
     let finalBoxContent = 0;
+    let rowMatchScore = 1.0;
 
     const isSingleAlpha = /^[A-Za-z]$/.test(rawModel);
     const isNumericSuffix = /^\d{2,4}$/.test(rawModel);
@@ -6297,11 +6383,13 @@ function onHandwrittenExtracted(data) {
         finalColor = endsWithLetter ? (exactMaster.color || 'SURTIDO') : ((rawColor && rawColor !== 'SURTIDO') ? normalizeColor(rawColor) : (exactMaster.color || 'SURTIDO'));
         finalBoxContent = exactMaster.boxContent;
         lastItemInfo = exactMaster;
+        rowMatchScore = 1.0;
       } else if (isSingleAlpha) {
         // 단일 알파벳 접미사(D, E, G...)는 신규 미등록 파생 모델로 인정하여 품명 보존
         finalItemName = derivedModel;
         finalColor = rawColor ? normalizeColor(rawColor) : 'SURTIDO';
         finalBoxContent = lastItemInfo ? lastItemInfo.boxContent : 0;
+        rowMatchScore = 0.85;
       } else {
         // 🚨 [핵심 개선] 숫자 접미사(5007 등)를 앞 접두사(AD)와 합성했으나 마스터에 없는 경우:
         // 유령 품목(AD5007)을 임의 생성하지 않고, 마스터 카탈로그 전체에서 스마트 숫자 역검색 실행!
@@ -6311,12 +6399,14 @@ function onHandwrittenExtracted(data) {
           finalColor = (rawColor && rawColor !== 'SURTIDO') ? normalizeColor(rawColor) : (smartMatch.color || 'SURTIDO');
           finalBoxContent = smartMatch.boxContent;
           lastItemInfo = smartMatch;
+          rowMatchScore = 0.90;
         } else {
           // 스마트 역검색에도 전혀 없으면: 엉뚱한 접두사(AD)를 붙이지 않고, 사용자가 쓴 원문 숫자 그대로 독립 품목으로 보존!
           finalItemName = rawModel;
           finalColor = rawColor ? normalizeColor(rawColor) : 'SURTIDO';
           finalBoxContent = 0;
           lastItemInfo = null;
+          rowMatchScore = 0.50;
         }
       }
       lastBaseModel = finalItemName;
@@ -6335,10 +6425,12 @@ function onHandwrittenExtracted(data) {
         finalColor = exactMaster.color || targetColor;
         finalBoxContent = exactMaster.boxContent;
         lastItemInfo = exactMaster;
+        rowMatchScore = 0.98;
       } else {
         finalItemName = lastBaseModel;
         finalColor = targetColor;
         finalBoxContent = lastItemInfo ? lastItemInfo.boxContent : 0;
+        rowMatchScore = 0.80;
       }
     } else {
       // 🏭 새로운 독립 모델인 경우: 일반 추출 및 마스터 유사도 매칭
@@ -6369,6 +6461,19 @@ function onHandwrittenExtracted(data) {
       finalItemName = matchRes ? matchRes.item.name : queryBase;
       const cleanMatchedName = finalItemName.replace(/[\s_\-]/g, '').toUpperCase();
       const normTargetColor = (color || 'SURTIDO').toUpperCase();
+
+      // 일치율 정밀 계산
+      if (matchRes) {
+        const qClean = (queryBase || '').replace(/[\s_\-]/g, '').toUpperCase();
+        const mClean = (matchRes.item.name || '').replace(/[\s_\-]/g, '').toUpperCase();
+        if (qClean === mClean) {
+          rowMatchScore = 1.0;
+        } else {
+          rowMatchScore = Math.min(0.99, Math.max(0.60, matchRes.score || 0.85));
+        }
+      } else {
+        rowMatchScore = 0.40;
+      }
 
       // 1) 마스터 카탈로그에서 매칭된 품명 + 사용자가 지정한 색상에 일치하는 특정 변형(Variant) 탐색
       const exactVariant = (stockDataCache || []).find(it => 
@@ -6464,14 +6569,21 @@ function onHandwrittenExtracted(data) {
     group.individualQty += rowIndivQty;
     group.rawSources.push({
       rawModel,
+      rawColor,
       rawQty: rawQtyExpr,
       boxes: rowBoxQty,
-      indiv: rowIndivQty
+      indiv: rowIndivQty,
+      score: rowMatchScore
     });
   });
 
   // 1줄로 통합된 레코드 목록 생성
   consolidatedMap.forEach(group => {
+    let totalScore = 0;
+    group.rawSources.forEach(s => totalScore += (s.score !== undefined ? s.score : 1.0));
+    const avgScore = group.rawSources.length > 0 ? (totalScore / group.rawSources.length) : 1.0;
+    const matchRate = Math.round(avgScore * 100);
+
     newRecords.push({
       itemName: group.itemName,
       color: group.color,
@@ -6480,7 +6592,10 @@ function onHandwrittenExtracted(data) {
       boxContent: group.boxContent,
       location: activeLocation || '',
       unitType: (group.boxQty > 0 && group.individualQty === 0) ? 'box' : 'individual',
-      rawSourcesCount: group.rawSources.length
+      rawSourcesCount: group.rawSources.length,
+      matchRate: matchRate,
+      rawModel: group.rawSources.map(s => s.rawModel).filter(Boolean).join(', '),
+      rawColor: group.rawSources.map(s => s.rawColor).filter(Boolean).join(', ')
     });
     addedCount++;
   });
@@ -6530,6 +6645,12 @@ function onHandwrittenExtracted(data) {
         }
         if (!existingRec.boxContent && newRec.boxContent) {
           existingRec.boxContent = newRec.boxContent;
+        }
+        if (newRec.matchRate !== undefined) {
+          existingRec.matchRate = Math.min(existingRec.matchRate || 100, newRec.matchRate);
+        }
+        if (newRec.rawModel && !existingRec.rawModel?.includes(newRec.rawModel)) {
+          existingRec.rawModel = [existingRec.rawModel, newRec.rawModel].filter(Boolean).join(', ');
         }
         mergedIntoExistingCount++;
       } else {
