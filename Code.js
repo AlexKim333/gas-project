@@ -1841,6 +1841,26 @@ Rules:
    - If single letters like A, B, C, D, K, O appear with a model (e.g. "CK 928" with letters "O", "K" or "CECI 999" with letters "C", "J", "K"):
      Combine the letter into the model code (e.g. "CK928O", "CK928K", "CECIK999C") and set color to "SURTIDO" unless an actual color word like "Negro" or "Blanco" is written!
 
+8. Known Model Aliases / Nicknames (TRADE TERMS):
+   - "LICRA LARGA" / "LICRA LARG" / "LICRA LARGO" -> Recognized as "P-4D70" (can return "Licra larga" or "P-4D70").
+   - "LICRA CORTA" / "LICRA CORTO" -> Recognized as "P-D60".
+   - "FAJA" / "MAYON FAJA" / "FAJA MAYON" -> Recognized as "P-160".
+   - "MAYON TERMICO" / "TERMICO MAYON" / "TERMICO 150" -> Recognized as "P-150".
+   - "TIRANTE" / "BULUSA TIRANTE" / "BLUSA TIRANTE" -> Recognized as "L-TP75".
+   - "OLIMPICA" / "BULUSA OLIMPICA" / "BLUSA OLIMPICA" -> Recognized as "L-OP80".
+   - "BULUSA TERMICA REDONDO" / "BLUSA TERMICA REDONDO" / "TERMICA REDONDO" -> Recognized as "L-PL160".
+   - "BULUSA TERMICA ALTO" / "BLUSA TERMICA ALTO" / "TERMICA ALTO" -> Recognized as "L-AL165".
+
+9. Multi-Color Bracket / Fork Grouping ('x color' / 'c/u'):
+   - When multiple colors are grouped together by a bracket '}' or fork/list followed by '1 Bulto x color' or 'x bulto c/u':
+     MUST expand into separate row entries for EACH listed color with that quantity!
+     For example:
+     Model "Licra larg" with colors "Marino", "Cafe", "Blanco" grouped to "> 1 Bulto x color"
+     -> MUST extract 3 separate rows:
+        {"modelo": "Licra larg", "color": "Marino", "raw_qty": "1", "boxes": 1},
+        {"modelo": "Licra larg", "color": "Cafe", "raw_qty": "1", "boxes": 1},
+        {"modelo": "Licra larg", "color": "Blanco", "raw_qty": "1", "boxes": 1}
+
 Return ONLY valid JSON:
 {
   "branch": "...",
@@ -1918,6 +1938,14 @@ Return ONLY valid JSON:
     const parsed = JSON.parse(cleanJson.trim());
     parsed.usageMetadata = usageMetadata;
     parsed.usedModel = usedModel;
+
+    // 0. 스키마 키 호환성 정규화 (items -> results, destination_raw -> branch)
+    if (!parsed.results && parsed.items && Array.isArray(parsed.items)) {
+      parsed.results = parsed.items;
+    }
+    if (!parsed.branch && parsed.destination_raw) {
+      parsed.branch = parsed.destination_raw;
+    }
 
     // 1. Fallback: branch가 비어있고 requester에 고객명이 추출된 경우 branch로 자동 승격
     if (!parsed.branch && parsed.requester) {
@@ -3011,7 +3039,7 @@ function doGet(e) {
     template.pendingRecord = 'null';
     return template.evaluate()
       .setTitle('창고 관리 시스템')
-      .addMetaTag('viewport', 'width=device-width, initial-scale=1.0');
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1.0, maximum-scale=3.0, user-scalable=yes');
   } catch (err) {
     return ContentService.createTextOutput(JSON.stringify({ success: false, error: err.message, stack: err.stack }))
       .setMimeType(ContentService.MimeType.JSON);
