@@ -1836,6 +1836,11 @@ Rules:
    - The order sheet photo may be tilted, taken at an angle, or rotated.
    - Infer the baseline grid or line orientation directly and read along that axis without excessive internal deliberation.
 
+7. Model Variant Letters vs Colors:
+   - Standard colors in this warehouse are real color words (e.g. Negro, Blanco, Azul, Rojo, Surtido, Beige, Vino, etc.).
+   - If single letters like A, B, C, D, K, O appear with a model (e.g. "CK 928" with letters "O", "K" or "CECI 999" with letters "C", "J", "K"):
+     Combine the letter into the model code (e.g. "CK928O", "CK928K", "CECIK999C") and set color to "SURTIDO" unless an actual color word like "Negro" or "Blanco" is written!
+
 Return ONLY valid JSON:
 {
   "branch": "...",

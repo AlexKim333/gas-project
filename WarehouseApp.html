@@ -2539,13 +2539,18 @@ function autoFillColor() {
   const itemNameInput = document.getElementById('itemName');
   if (!itemNameInput) return;
   const val = itemNameInput.value.trim();
-  const matched = stockDataCache.find(item => item.name === val || item.key === val);
+  if (!val) return;
+  const valClean = val.replace(/[\s_\-]/g, '').toLowerCase();
+  const matched = (stockDataCache || []).find(item => {
+    const itemClean = (item.name || '').replace(/[\s_\-]/g, '').toLowerCase();
+    return item.name === val || item.key === val || itemClean === valClean;
+  });
   if (matched) {
     itemNameInput.value = matched.name;
     const colorInput = document.getElementById('color');
     const boxContentInput = document.getElementById('boxContent');
-    if (colorInput) colorInput.value = matched.color || 'SURTIDO';
-    if (boxContentInput) boxContentInput.value = matched.boxContent || '';
+    if (colorInput && (!colorInput.value || colorInput.value === 'SURTIDO')) colorInput.value = matched.color || 'SURTIDO';
+    if (boxContentInput && !boxContentInput.value) boxContentInput.value = matched.boxContent || '';
   }
 }
 
