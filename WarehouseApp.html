@@ -305,6 +305,10 @@
       transform: translateY(-1px);
     }
     .btn-add { background-color: #2e7d32; color: white; }
+    .btn-add.btn-edit-mode { background: linear-gradient(135deg, #2563eb, #1d4ed8) !important; color: white !important; font-weight: 700; box-shadow: 0 0 0 2px #bfdbfe; }
+    .btn-edit { background-color: #2563eb; color: white; }
+    .btn-cancel-edit { background-color: #64748b; color: white; }
+    tr.editing-row { background-color: #eff6ff !important; outline: 2px solid #3b82f6 !important; outline-offset: -2px; }
     .btn-delete { background-color: #dc2626; color: white; }
     .btn-submit { background-color: #0284c7; color: white; }
     .btn-pending { background-color: #ea580c; color: white; }
@@ -1373,7 +1377,9 @@
             <div class="action-buttons">
               <button type="button" class="action-btn btn-ocr" id="btnOcrUpload" onclick="triggerHandwrittenImageUpload()" title="손글씨 주문서/송장 사진 붙여넣기 (Ctrl+V) 또는 파일 선택">📷 주문서 (Ctrl+V)</button>
               <input type="file" id="orderImageFileInput" accept="image/*" style="display:none;" onchange="handleImageFileSelect(event)">
-              <button type="button" class="action-btn btn-add" onclick="addRecord()" tabindex="7">➕ 추가</button>
+              <button type="button" class="action-btn btn-add" id="btnAddRecord" onclick="addRecord()" tabindex="7">➕ 추가</button>
+              <button type="button" class="action-btn btn-edit" id="btnEditRecord" onclick="startEditSelectedRecord()" tabindex="7" title="선택한 항목 수정 모드로 전환 (더블클릭으로도 가능)">✏️ 수정</button>
+              <button type="button" class="action-btn btn-cancel-edit" id="btnCancelEdit" onclick="cancelEditRecord()" style="display: none;" title="수정 취소">❌ 취소</button>
               <button type="button" class="action-btn btn-delete" onclick="deleteRecord()" tabindex="8">🗑️ 삭제</button>
               <button type="button" class="action-btn btn-print-order" onclick="printWorkOrder()" tabindex="9" title="현재 장바구니 품목을 스페인어 작업지시서(ORDEN DE TRABAJO)로 인쇄">🖨️ 작업지시서</button>
               <button type="button" class="action-btn btn-submit" onclick="submitForm()" tabindex="10">🚀 제출</button>
@@ -2034,6 +2040,15 @@ const typeConfig = {
         <label><input type="radio" name="unitType" value="box" checked onchange="updateUnitType()"> 상자</label>
         <label><input type="radio" name="unitType" value="individual" onchange="updateUnitType()"> 낱개</label>
       </div>
+      <div id="editModeNotice" style="display: none; margin-bottom: 8px; padding: 7px 10px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-weight: 700; color: #1d4ed8; font-size: 8.5pt;">✏️ 레코드 수정 모드 (<span id="editRowNumber">#1행</span>)</span>
+          <button type="button" onclick="cancelEditRecord()" style="background: none; border: none; color: #64748b; font-size: 8.5pt; cursor: pointer; font-weight: 700; padding: 0 4px;" title="수정 취소">✕ 취소</button>
+        </div>
+        <div id="editOcrOriginalContainer" style="font-size: 8pt; color: #334155; margin-top: 4px; line-height: 1.4; word-break: break-all;">
+          📷 OCR 원문: <strong id="editRawModelText" style="color: #1e293b; background: #dbeafe; padding: 1px 4px; border-radius: 3px;">-</strong>
+        </div>
+      </div>
       <div class="input-row"><label for="itemName">품명:</label><input type="text" id="itemName" name="itemName" autocomplete="off" oninput="filterItems(this.value)" onchange="autoFillColor()" tabindex="2"><div id="customDropdown" class="dropdown-container" style="display: none;"><ul id="itemSuggestionsList"></ul></div></div>
       <div class="input-row"><label for="color">색상:</label><input type="text" id="color" name="color" value="SURTIDO" tabindex="3"></div>
       <div class="input-row"><label id="qtyLabel"></label><input type="text" id="qty" name="qty" tabindex="4" placeholder="수량 (예: 1 또는 10P)" oninput="handleQtyInput(this)"></div>
@@ -2055,6 +2070,15 @@ const typeConfig = {
       <div class="unit-options">
         <label><input type="radio" name="unitType" value="box" checked onchange="updateUnitType()"> 상자</label>
         <label><input type="radio" name="unitType" value="individual" onchange="updateUnitType()"> 낱개</label>
+      </div>
+      <div id="editModeNotice" style="display: none; margin-bottom: 8px; padding: 7px 10px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-weight: 700; color: #1d4ed8; font-size: 8.5pt;">✏️ 레코드 수정 모드 (<span id="editRowNumber">#1행</span>)</span>
+          <button type="button" onclick="cancelEditRecord()" style="background: none; border: none; color: #64748b; font-size: 8.5pt; cursor: pointer; font-weight: 700; padding: 0 4px;" title="수정 취소">✕ 취소</button>
+        </div>
+        <div id="editOcrOriginalContainer" style="font-size: 8pt; color: #334155; margin-top: 4px; line-height: 1.4; word-break: break-all;">
+          📷 OCR 원문: <strong id="editRawModelText" style="color: #1e293b; background: #dbeafe; padding: 1px 4px; border-radius: 3px;">-</strong>
+        </div>
       </div>
       <div class="input-row"><label for="itemName">품명:</label><input type="text" id="itemName" name="itemName" autocomplete="off" oninput="filterItems(this.value)" onchange="autoFillColor()" tabindex="2"><div id="customDropdown" class="dropdown-container" style="display: none;"><ul id="itemSuggestionsList"></ul></div></div>
       <div class="input-row"><label for="color">색상:</label><input type="text" id="color" name="color" value="SURTIDO" tabindex="3"></div>
@@ -2252,6 +2276,7 @@ function restoreMetadata() {
 }
 
 function setPage(page, initialData = null) {
+  if (typeof exitEditMode === 'function') exitEditMode();
   currentType = page === '입고입력' ? 'in' : page === '출고입력' ? 'out' : 'product';
   const config = typeConfig[currentType];
   if (!config) {
@@ -2749,7 +2774,12 @@ function addRecord() {
     const formData = {
       itemName, color, boxContent, safeStock, initialStock, manufacturer
     };
-    records.push(formData);
+    if (editingRecordIndex !== -1 && editingRecordIndex < records.length) {
+      records[editingRecordIndex] = formData;
+      exitEditMode();
+    } else {
+      records.push(formData);
+    }
     updateTable();
     clearForm();
     toggleScroll();
@@ -2829,7 +2859,24 @@ function addRecord() {
       return;
     }
   }
-  records.push(formData);
+
+  if (editingRecordIndex !== -1 && editingRecordIndex < records.length) {
+    const origRec = records[editingRecordIndex];
+    if (origRec.rawModel) {
+      formData.rawModel = origRec.rawModel;
+      formData.rawColor = origRec.rawColor || '';
+    }
+    if (origRec.isDelta !== undefined) {
+      formData.isDelta = origRec.isDelta;
+    }
+    formData.matchRate = 100;
+    formData.isManualEdited = true;
+    records[editingRecordIndex] = formData;
+    exitEditMode();
+  } else {
+    records.push(formData);
+  }
+
   saveTableData();
   updateTable();
   clearForm();
@@ -2853,15 +2900,137 @@ function closeStockWarningModal() {
   if (stockWarningModalDiv) stockWarningModalDiv.style.display = 'none';
 }
 
+let editingRecordIndex = -1;
+
+function startEditSelectedRecord() {
+  const checkboxes = document.querySelectorAll('.rowCheckbox:checked');
+  if (!checkboxes || checkboxes.length === 0) {
+    alert('수정할 항목 1개를 왼쪽 체크박스(☑️)로 선택해주세요.\n(또는 장바구니 테이블의 행을 더블클릭해도 즉시 수정할 수 있습니다.)');
+    return;
+  }
+  if (checkboxes.length > 1) {
+    alert('수정은 한 번에 1개 항목씩 가능합니다.\n수정할 1개 항목만 선택해주세요.');
+    return;
+  }
+  const idx = parseInt(checkboxes[0].getAttribute('data-index'), 10);
+  if (isNaN(idx) || idx < 0 || idx >= records.length) return;
+  enterEditMode(idx);
+}
+
+function enterEditMode(idx) {
+  if (idx < 0 || idx >= records.length) return;
+  editingRecordIndex = idx;
+  const rec = records[idx];
+
+  const itemNameInput = document.getElementById('itemName');
+  const colorInput = document.getElementById('color');
+  const qtyInput = document.getElementById('qty');
+  const boxContentInput = document.getElementById('boxContent');
+  const locationSelect = document.getElementById('location');
+
+  if (itemNameInput) itemNameInput.value = rec.itemName || '';
+  if (colorInput) colorInput.value = rec.color || 'SURTIDO';
+  if (boxContentInput) boxContentInput.value = (rec.boxContent !== undefined && rec.boxContent !== null) ? rec.boxContent : '';
+
+  const isIndiv = (rec.unitType === 'individual') || (Math.abs(rec.individualQty || 0) > 0);
+  const indivRadio = document.querySelector('input[name="unitType"][value="individual"]');
+  const boxRadio = document.querySelector('input[name="unitType"][value="box"]');
+  if (isIndiv && indivRadio) {
+    indivRadio.checked = true;
+  } else if (boxRadio) {
+    boxRadio.checked = true;
+  }
+  if (typeof updateUnitType === 'function') updateUnitType();
+
+  if (qtyInput) {
+    const qtyVal = isIndiv ? Math.abs(rec.individualQty || 0) : Math.abs(rec.boxQty || 0);
+    qtyInput.value = qtyVal || '';
+  }
+
+  if (locationSelect && rec.location) {
+    locationSelect.value = rec.location;
+  }
+
+  if (currentType === 'product') {
+    const safeStockInput = document.getElementById('safeStock');
+    const initialStockInput = document.getElementById('initialStock');
+    const manufacturerInput = document.getElementById('manufacturer');
+    if (safeStockInput) safeStockInput.value = rec.safeStock || '';
+    if (initialStockInput) initialStockInput.value = rec.initialStock || '';
+    if (manufacturerInput) manufacturerInput.value = rec.manufacturer || '';
+  }
+
+  const noticeEl = document.getElementById('editModeNotice');
+  const rowNumEl = document.getElementById('editRowNumber');
+  const ocrContainer = document.getElementById('editOcrOriginalContainer');
+  const rawModelEl = document.getElementById('editRawModelText');
+
+  if (noticeEl) noticeEl.style.display = 'block';
+  if (rowNumEl) rowNumEl.textContent = `#${idx + 1}행`;
+  if (rawModelEl) {
+    if (rec.rawModel) {
+      rawModelEl.textContent = `${rec.rawModel}${rec.rawColor ? ' (' + rec.rawColor + ')' : ''}`;
+      if (ocrContainer) ocrContainer.style.display = 'block';
+    } else {
+      rawModelEl.textContent = `${rec.itemName} (${rec.color || 'SURTIDO'}) [수동 입력]`;
+      if (ocrContainer) ocrContainer.style.display = 'block';
+    }
+  }
+
+  const btnAdd = document.getElementById('btnAddRecord');
+  const btnEdit = document.getElementById('btnEditRecord');
+  const btnCancel = document.getElementById('btnCancelEdit');
+
+  if (btnAdd) {
+    btnAdd.innerHTML = '💾 수정완료';
+    btnAdd.classList.add('btn-edit-mode');
+  }
+  if (btnEdit) btnEdit.style.display = 'none';
+  if (btnCancel) btnCancel.style.display = 'inline-flex';
+
+  updateTable();
+
+  if (itemNameInput) {
+    itemNameInput.focus();
+    itemNameInput.select();
+  }
+}
+
+function cancelEditRecord() {
+  exitEditMode();
+  clearForm();
+  updateTable();
+}
+
+function exitEditMode() {
+  editingRecordIndex = -1;
+  const noticeEl = document.getElementById('editModeNotice');
+  if (noticeEl) noticeEl.style.display = 'none';
+
+  const btnAdd = document.getElementById('btnAddRecord');
+  const btnEdit = document.getElementById('btnEditRecord');
+  const btnCancel = document.getElementById('btnCancelEdit');
+
+  if (btnAdd) {
+    btnAdd.innerHTML = '➕ 추가';
+    btnAdd.classList.remove('btn-edit-mode');
+  }
+  if (btnEdit) btnEdit.style.display = 'inline-flex';
+  if (btnCancel) btnCancel.style.display = 'none';
+}
+
 function updateTable() {
   const tbody = document.getElementById('tableBody');
   if (!tbody) return;
   let html = '';
   records.forEach((rec, idx) => {
+    const isEditingThisRow = (editingRecordIndex === idx);
+    const editingClass = isEditingThisRow ? 'editing-row' : '';
+
     if (currentType === 'product') {
       html += `
-        <tr>
-          <td><input type="checkbox" class="rowCheckbox" data-index="${idx}"></td>
+        <tr class="${editingClass}" ondblclick="enterEditMode(${idx})" title="더블클릭하여 품목 수정">
+          <td><input type="checkbox" class="rowCheckbox" data-index="${idx}" ${isEditingThisRow ? 'checked' : ''}></td>
           <td>${rec.itemName}</td>
           <td contenteditable="true" class="editable" onblur="updateRecord(${idx}, 'color', this.textContent)">${rec.color}</td>
           <td contenteditable="true" class="editable" onblur="updateRecord(${idx}, 'boxContent', this.textContent)">${rec.boxContent}</td>
@@ -2930,13 +3099,20 @@ function updateTable() {
         }
       }
 
+      const finalRowStyle = isEditingThisRow ? 'background-color: #eff6ff;' : shortageRowStyle;
+
       const rate = (rec.matchRate !== undefined && rec.matchRate !== null) ? rec.matchRate : 100;
       let badgeBg = '#dcfce7';
       let badgeColor = '#15803d';
       let badgeBorder = '#86efac';
       let badgeText = `${rate}%`;
 
-      if (rate >= 95) {
+      if (rec.isManualEdited) {
+        badgeBg = '#dcfce7';
+        badgeColor = '#15803d';
+        badgeBorder = '#86efac';
+        badgeText = '✏️ 100%';
+      } else if (rate >= 95) {
         badgeBg = '#dcfce7';
         badgeColor = '#15803d';
         badgeBorder = '#86efac';
@@ -2958,13 +3134,18 @@ function updateTable() {
         badgeText = `❓ 미등록`;
       }
 
-      const matchTooltip = rec.rawModel
-        ? `[AI 매칭 분석]\n• OCR 원문: ${rec.rawModel}${rec.rawColor ? ' (' + rec.rawColor + ')' : ''}\n• 매칭 품목: ${rec.itemName} (${rec.color})\n• AI 일치율: ${rate}%\n(출고처: ${rec.location || '미지정'})`
-        : `일치율: ${rate}% (직접 입력 / 확정)\n(출고처: ${rec.location || '미지정'})`;
+      let matchTooltip = '';
+      if (rec.isManualEdited) {
+        matchTooltip = `[수정 완료 (사용자 직접 확인)]\n• ${rec.rawModel ? 'OCR 원문: ' + rec.rawModel + (rec.rawColor ? ' (' + rec.rawColor + ')' : '') + '\n• ' : ''}확정 품목: ${rec.itemName} (${rec.color})\n• 일치율: 100%\n(출고처: ${rec.location || '미지정'})`;
+      } else if (rec.rawModel) {
+        matchTooltip = `[AI 매칭 분석]\n• OCR 원문: ${rec.rawModel}${rec.rawColor ? ' (' + rec.rawColor + ')' : ''}\n• 매칭 품목: ${rec.itemName} (${rec.color})\n• AI 일치율: ${rate}%\n(출고처: ${rec.location || '미지정'})`;
+      } else {
+        matchTooltip = `일치율: ${rate}% (직접 입력 / 확정)\n(출고처: ${rec.location || '미지정'})`;
+      }
 
       html += `
-        <tr style="${shortageRowStyle}">
-          <td><input type="checkbox" class="rowCheckbox" data-index="${idx}"></td>
+        <tr class="${editingClass}" style="${finalRowStyle}" ondblclick="enterEditMode(${idx})" title="더블클릭하여 품목 수정">
+          <td><input type="checkbox" class="rowCheckbox" data-index="${idx}" ${isEditingThisRow ? 'checked' : ''}></td>
           <td>
             <span style="font-weight: 600;">${rec.itemName}</span>
             ${stockDisplay}
@@ -3050,6 +3231,14 @@ function toggleSelectAll() {
 
 function deleteRecord() {
   const toDelete = Array.from(document.querySelectorAll('.rowCheckbox:checked')).map(cb => parseInt(cb.dataset.index));
+  if (toDelete.length === 0) {
+    alert('삭제할 항목을 왼쪽 체크박스(☑️)로 선택해주세요.');
+    return;
+  }
+  if (editingRecordIndex !== -1) {
+    exitEditMode();
+    clearForm();
+  }
   records = records.filter((_, idx) => !toDelete.includes(idx));
   saveTableData();
   updateTable();
