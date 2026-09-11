@@ -279,22 +279,25 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
       flex: none;
       white-space: nowrap;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
     }
     .action-buttons {
       display: flex;
       gap: 4px;
       align-items: center;
       flex-wrap: nowrap;
+      flex: none;
     }
     .action-btn {
-      padding: 5px 9px;
-      font-size: 8.5pt;
+      padding: 4px 8px;
+      font-size: 8.2pt;
       font-weight: 700;
       border: none;
-      border-radius: 5px;
+      border-radius: 4px;
       cursor: pointer;
       white-space: nowrap;
       transition: all 0.15s ease;
@@ -423,31 +426,40 @@
     }
     .scrollable-table {
       flex: 1;
-      overflow: auto;
+      overflow-x: auto;
+      overflow-y: auto;
       border: 1px solid #cbd5e1;
       border-radius: 6px;
       background: #ffffff;
+      min-height: 0;
     }
     table {
       width: 100%;
-      min-width: 530px;
+      border-collapse: collapse;
+    }
+    #recordTable {
+      width: 100%;
+      min-width: 480px;
+      table-layout: fixed;
       border-collapse: collapse;
     }
     th {
       background-color: #f1f5f9;
       color: #1e293b;
-      font-size: 8.5pt;
+      font-size: 8pt;
       font-weight: 700;
-      padding: 6px 4px;
+      padding: 6px 2px;
       border: 1px solid #cbd5e1;
       position: sticky;
       top: 0;
       z-index: 1;
       white-space: nowrap;
+      text-align: center;
+      line-height: 1.2;
     }
     td {
       font-size: 8.5pt;
-      padding: 5px 4px;
+      padding: 5px 2px;
       border: 1px solid #e2e8f0;
       text-align: center;
       white-space: nowrap;
@@ -455,13 +467,13 @@
     tr:hover td {
       background-color: #f8fafc;
     }
-    #recordTable th:nth-child(1), #recordTable td:nth-child(1) { width: 32px; min-width: 32px; max-width: 32px; }
-    #recordTable th:nth-child(2), #recordTable td:nth-child(2) { min-width: 120px; text-align: left; }
-    #recordTable th:nth-child(3), #recordTable td:nth-child(3) { width: 75px; min-width: 68px; }
-    #recordTable th:nth-child(4), #recordTable td:nth-child(4) { width: 62px; min-width: 55px; }
-    #recordTable th:nth-child(5), #recordTable td:nth-child(5) { width: 62px; min-width: 55px; }
-    #recordTable th:nth-child(6), #recordTable td:nth-child(6) { width: 68px; min-width: 60px; }
-    #recordTable th:nth-child(7), #recordTable td:nth-child(7) { width: 65px; min-width: 62px; text-align: center; }
+    #recordTable th:nth-child(1), #recordTable td:nth-child(1) { width: 30px; min-width: 30px; max-width: 30px; text-align: center; padding: 4px 1px; }
+    #recordTable th:nth-child(2), #recordTable td:nth-child(2) { width: auto; min-width: 130px; text-align: left; padding: 4px 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #recordTable th:nth-child(3), #recordTable td:nth-child(3) { width: 68px; min-width: 68px; max-width: 68px; text-align: center; padding: 4px 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #recordTable th:nth-child(4), #recordTable td:nth-child(4) { width: 60px; min-width: 60px; max-width: 60px; text-align: center; padding: 4px 2px; }
+    #recordTable th:nth-child(5), #recordTable td:nth-child(5) { width: 60px; min-width: 60px; max-width: 60px; text-align: center; padding: 4px 2px; }
+    #recordTable th:nth-child(6), #recordTable td:nth-child(6) { width: 66px; min-width: 66px; max-width: 66px; text-align: center; padding: 4px 2px; }
+    #recordTable th:nth-child(7), #recordTable td:nth-child(7) { width: 62px; min-width: 62px; max-width: 62px; text-align: center; padding: 4px 2px; }
     .modal {
       display: none;
       position: fixed;
@@ -1545,6 +1557,7 @@
           <button type="button" class="action-btn btn-stock-audit" onclick="runStockAudit()" tabindex="12" id="stockAuditButton" title="구글 시트 전표 장부 대비 현재고 오차 자동 전수 검사" style="padding: 4px 10px; font-size: 8.5pt;">⚖️ 재고검증</button>
           <button type="button" class="action-btn btn-stock-normalize" onclick="openStockNormalizeModal()" tabindex="13" id="stockNormalizeButton" title="재고시트 중복 코드(하이픈) 및 다중 포장규격 대표수량 통합" style="padding: 4px 10px; font-size: 8.5pt;">🧹 재고정규화</button>
           <button type="button" class="action-btn btn-stock-winter" onclick="openWinterSafeStockModal()" tabindex="14" id="winterSafeStockButton" title="과거 11~12월 트랜잭션 전수 분석 및 과학적 안전재고(Safe Stock) 산정" style="padding: 4px 10px; font-size: 8.5pt; background: #0284c7; color: #ffffff; border: 1px solid #0369a1; border-radius: 4px; font-weight: bold; cursor: pointer;">❄️ 성수기안전재고</button>
+          <button type="button" class="action-btn btn-print-order" onclick="printWorkOrder()" tabindex="15" id="printOrderButton" title="현재 장바구니 품목을 스페인어 작업지시서(ORDEN DE TRABAJO)로 즉시 인쇄" style="padding: 4px 10px; font-size: 8.5pt; background: #334155; color: #ffffff; border: 1px solid #1e293b; border-radius: 4px; font-weight: bold; cursor: pointer;">📱 작업지시서</button>
         </div>
       </div>
       <div class="banner-right">
@@ -1620,7 +1633,6 @@
               <button type="button" class="action-btn btn-edit" id="btnEditRecord" onclick="startEditSelectedRecord()" tabindex="7" title="선택한 항목 수정 모드로 전환 (더블클릭으로도 가능)">✏️ 수정</button>
               <button type="button" class="action-btn btn-cancel-edit" id="btnCancelEdit" onclick="cancelEditRecord()" style="display: none;" title="수정 취소">❌ 취소</button>
               <button type="button" class="action-btn btn-delete" onclick="deleteRecord()" tabindex="8">🗑️ 삭제</button>
-              <button type="button" class="action-btn btn-print-order" onclick="printWorkOrder()" tabindex="9" title="현재 장바구니 품목을 스페인어 작업지시서(ORDEN DE TRABAJO)로 인쇄">🖨️ 작업지시서</button>
               <button type="button" class="action-btn btn-submit" onclick="submitForm()" tabindex="10">🚀 제출</button>
               <button type="button" class="action-btn btn-pending" onclick="savePending()" tabindex="11">⏸️ 보류</button>
               <button type="button" class="action-btn btn-pending-search" onclick="showPendingModal()" tabindex="12" id="pendingSearchButton">🔍 보류 (<span id="pendingCount">0</span>)</button>
@@ -1643,6 +1655,15 @@
           </div>
           <div class="scrollable-table" id="scrollableTable">
             <table id="recordTable">
+              <colgroup>
+                <col style="width: 30px;">
+                <col style="width: auto;">
+                <col style="width: 68px;">
+                <col style="width: 60px;">
+                <col style="width: 60px;">
+                <col style="width: 66px;">
+                <col style="width: 62px;">
+              </colgroup>
               <thead id="tableHeader">
                 <tr>
                   <th><input type="checkbox" id="selectAll" onclick="toggleSelectAll()"></th>
