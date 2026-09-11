@@ -1730,46 +1730,45 @@ function findMatchingLocationsServer(rawBranch, locationList) {
     .filter(p => p.fullLoc && p.fullLoc !== '선택');
 
   const normBranchNoParen = normBranch.replace(/[()]/g, ' ').replace(/\s+/g, ' ').trim();
+  const matchMap = new Map();
 
-  // 1. 전체 배송지 명칭과 완전 일치
-  const exactFullMatches = [];
-  for (const p of parsedLocs) {
+  // 1. 전체 배송지 명칭과 완전 일치 (Score 1.0)
+  parsedLocs.forEach(p => {
     const normFull = p.fullLoc.toLowerCase();
     const normFullNoParen = normFull.replace(/[()]/g, ' ').replace(/\s+/g, ' ').trim();
     if (normFull === normBranch || normFullNoParen === normBranchNoParen) {
-      exactFullMatches.push({ ...p, score: 1.0 });
+      matchMap.set(p.fullLoc, { ...p, score: 1.0 });
     }
-  }
-  if (exactFullMatches.length === 1) {
-    return exactFullMatches;
-  }
+  });
 
-  // 2. 고객 기본명(괄호/구분자 앞) 기준 매칭 및 부분일치
-  const matches = [];
-  for (const p of parsedLocs) {
+  // 2. 고객 기본명(괄호/구분자 앞) 기준 매칭, 접두사 및 유사 형제 지점
+  parsedLocs.forEach(p => {
     const normBase = p.baseName.toLowerCase();
     const normFull = p.fullLoc.toLowerCase();
-    let isMatch = false;
+    const normFullNoParen = normFull.replace(/[()]/g, ' ').replace(/\s+/g, ' ').trim();
     let score = 0;
 
-    if (normBase === normBranch) {
-      isMatch = true;
-      score = 1.0;
+    if (normBase === normBranch || normBase === normBranchNoParen) {
+      score = 0.98;
+    } else if (normFull.startsWith(normBranch) || normFullNoParen.startsWith(normBranchNoParen)) {
+      score = 0.95; // 예: ARGENTINA -> ARGENTINA2
     } else if (normBranch.length >= 3 && (normBase.startsWith(normBranch) || normBranch.startsWith(normBase))) {
-      isMatch = true;
-      score = 0.9;
-    } else if (normBranch.length >= 3 && normFull.includes(normBranch)) {
-      isMatch = true;
+      score = 0.90;
+    } else if (normBranch.length >= 3 && (normFull.includes(normBranch) || normFullNoParen.includes(normBranchNoParen))) {
       score = 0.85;
     }
 
-    if (isMatch) {
-      matches.push({ ...p, score });
+    if (score > 0) {
+      const existing = matchMap.get(p.fullLoc);
+      if (!existing || existing.score < score) {
+        matchMap.set(p.fullLoc, { ...p, score });
+      }
     }
-  }
+  });
 
+  const matches = Array.from(matchMap.values());
   matches.sort((a, b) => b.score - a.score);
-  return matches;
+  return matches.slice(0, 10);
 }
 
 function analyzeHandwrittenOrder(imageBase64) {

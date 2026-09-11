@@ -1839,8 +1839,19 @@
         <button type="button" onclick="cancelMultiLocationSelect()" style="border: none; background: none; font-size: 18pt; cursor: pointer; color: #94a3b8; line-height: 1;">&times;</button>
       </div>
 
+      <!-- 배너: AI 감지 출고처 확인 및 변경 모드 -->
+      <div id="multiLocConfirmBanner" style="display: none; background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 8px; padding: 10px 14px; margin-bottom: 12px;">
+        <div style="color: #166534; font-size: 9.5pt; font-weight: bold; margin-bottom: 4px; display: flex; align-items: center; justify-content: space-between;">
+          <span>🎯 AI 감지 출고처: <strong id="multiLocDetectedName" style="color: #15803d; font-size: 10.5pt; text-decoration: underline;">출고처</strong></span>
+          <span style="font-size: 8pt; background: #dcfce7; color: #166534; padding: 2px 6px; border-radius: 4px; font-weight: 700; border: 1px solid #86efac;">Enter 키 즉시 확정</span>
+        </div>
+        <div style="color: #14532d; font-size: 8.5pt; line-height: 1.4;">
+          AI 추천이 맞으면 <strong>Enter</strong> 또는 <strong>1번</strong>을 누르세요. 다른 지점(예: 2번)이면 번호 클릭 또는 아래에서 검색하세요.
+        </div>
+      </div>
+
       <!-- 배너: 다중 배송지 후보 모드 -->
-      <div id="multiLocCandidateBanner" style="background: #fffbeb; border: 1.5px solid #fde68a; border-radius: 8px; padding: 10px 14px; margin-bottom: 12px;">
+      <div id="multiLocCandidateBanner" style="display: none; background: #fffbeb; border: 1.5px solid #fde68a; border-radius: 8px; padding: 10px 14px; margin-bottom: 12px;">
         <div style="color: #92400e; font-size: 9.5pt; font-weight: bold; margin-bottom: 4px;">
           ⚠️ 고객 <span id="multiLocCustomerName" style="color: #b45309; text-decoration: underline;">고객명</span>에 등록된 배달지가 여러 개 있습니다.
         </div>
@@ -1865,7 +1876,7 @@
       </div>
 
       <!-- 다중 후보 모드에서 다른 출고처 검색 전환 링크 -->
-      <div id="multiLocSwitchToManualBtn" style="text-align: right; margin-bottom: 12px;">
+      <div id="multiLocSwitchToManualBtn" style="text-align: right; margin-bottom: 8px;">
         <button type="button" onclick="switchToManualLocSearch()" style="background: none; border: none; color: #0d9488; font-size: 8.5pt; font-weight: 700; text-decoration: underline; cursor: pointer;">
           🔍 다른 출고처 직접 검색하기
         </button>
@@ -2010,7 +2021,7 @@ const typeConfig = {
     sessionStorageKey: 'pendingInRecords',
     metadataStorageKey: 'pendingInMetadata',
     inputs: `
-      <div class="input-row"><label id="locationLabel"></label><select id="location" name="location" tabindex="1" onchange="saveMetadata()"><option value="">선택</option></select></div>
+      <div class="input-row"><label id="locationLabel"></label><div style="display: flex; gap: 4px; flex: 1;"><select id="location" name="location" tabindex="1" onchange="onMainLocationChanged()" style="flex: 1;"><option value="">선택</option></select><button type="button" onclick="openLocationPickerForCurrentCart()" title="입고처 검색 및 변경" style="padding: 0 8px; font-size: 9pt; background: #0d9488; color: white; border: 1px solid #0f766e; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center;">🔍</button></div></div>
       <div class="unit-options">
         <label><input type="radio" name="unitType" value="box" checked onchange="updateUnitType()"> 상자</label>
         <label><input type="radio" name="unitType" value="individual" onchange="updateUnitType()"> 낱개</label>
@@ -2032,7 +2043,7 @@ const typeConfig = {
     sessionStorageKey: 'pendingOutRecords',
     metadataStorageKey: 'pendingOutMetadata',
     inputs: `
-      <div class="input-row"><label id="locationLabel"></label><select id="location" name="location" tabindex="1" onchange="saveMetadata()"><option value="">선택</option></select></div>
+      <div class="input-row"><label id="locationLabel"></label><div style="display: flex; gap: 4px; flex: 1;"><select id="location" name="location" tabindex="1" onchange="onMainLocationChanged()" style="flex: 1;"><option value="">선택</option></select><button type="button" onclick="openLocationPickerForCurrentCart()" title="출고처 검색 및 전체 변경" style="padding: 0 8px; font-size: 9pt; background: #0d9488; color: white; border: 1px solid #0f766e; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center;">🔍</button></div></div>
       <div class="unit-options">
         <label><input type="radio" name="unitType" value="box" checked onchange="updateUnitType()"> 상자</label>
         <label><input type="radio" name="unitType" value="individual" onchange="updateUnitType()"> 낱개</label>
@@ -2174,6 +2185,39 @@ function saveMetadata() {
     }
   } catch (e) {
   }
+}
+
+function onMainLocationChanged() {
+  saveMetadata();
+  const locationSelect = document.getElementById('location');
+  if (locationSelect && locationSelect.value && records && records.length > 0) {
+    let changed = false;
+    records.forEach(r => {
+      if (r.location !== locationSelect.value) {
+        r.location = locationSelect.value;
+        changed = true;
+      }
+    });
+    if (changed) {
+      saveTableData();
+      updateTable();
+    }
+  }
+}
+
+function openLocationPickerForCurrentCart() {
+  const locationSelect = document.getElementById('location');
+  const currentVal = locationSelect ? locationSelect.value : '';
+  pendingMultiLocState = {
+    records: records,
+    detectedAdmin: null,
+    usageMetadata: null,
+    usedModel: null,
+    customerName: currentVal,
+    isCartUpdateOnly: true,
+    mode: 'manual'
+  };
+  openMultiLocationSelectModal([], currentVal, 'manual');
 }
 
 function restoreMetadata() {
@@ -2846,7 +2890,7 @@ function updateTable() {
           <td contenteditable="true" class="editable" onblur="updateRecord(${idx}, 'boxQty', this.textContent)">${currentType === 'in' ? rec.boxQty : Math.abs(rec.boxQty)}</td>
           <td contenteditable="true" class="editable" onblur="updateRecord(${idx}, 'individualQty', this.textContent)">${currentType === 'in' ? rec.individualQty : Math.abs(rec.individualQty)}</td>
           <td contenteditable="true" class="editable" onblur="updateRecord(${idx}, 'boxContent', this.textContent)">${rec.boxContent}</td>
-          <td>${rec.location}</td>
+          <td onclick="openLocationPickerForCurrentCart()" title="클릭하여 출고처/입고처 일괄 변경" style="cursor: pointer; font-weight: 600; color: #0f766e;"><span style="border-bottom: 1px dashed #0d9488;">${rec.location}</span> <span style="font-size: 8pt; opacity: 0.7;">✏️</span></td>
         </tr>
       `;
     }
@@ -5713,52 +5757,50 @@ function findMatchingLocations(rawBranch, locationList) {
     .filter(p => p.fullLoc && p.fullLoc !== '선택');
 
   const normBranchNoParen = normBranch.replace(/[()]/g, ' ').replace(/\s+/g, ' ').trim();
+  const matchMap = new Map();
 
-  // 1. 전체 배송지 명칭과 완전 일치 (예: "william tienda 1" or "william (tienda 1)")
-  const exactFullMatches = [];
-  for (const p of parsedLocs) {
+  // 1. 전체 배송지 명칭과 완전 일치 (Score 1.0)
+  parsedLocs.forEach(p => {
     const normFull = p.fullLoc.toLowerCase();
     const normFullNoParen = normFull.replace(/[()]/g, ' ').replace(/\s+/g, ' ').trim();
     if (normFull === normBranch || normFullNoParen === normBranchNoParen) {
-      exactFullMatches.push({ ...p, score: 1.0 });
+      matchMap.set(p.fullLoc, { ...p, score: 1.0 });
     }
-  }
-  if (exactFullMatches.length === 1) {
-    return exactFullMatches;
-  }
+  });
 
-  // 2. 고객 기본명(괄호/구분자 앞) 기준 매칭 및 부분일치
-  const matches = [];
-  for (const p of parsedLocs) {
+  // 2. 고객 기본명(괄호/구분자 앞) 기준 매칭, 접두사 및 유사 형제 지점 (예: ARGENTINA -> ARGENTINA2 등)
+  parsedLocs.forEach(p => {
     const normBase = p.baseName.toLowerCase();
     const normFull = p.fullLoc.toLowerCase();
-    let isMatch = false;
+    const normFullNoParen = normFull.replace(/[()]/g, ' ').replace(/\s+/g, ' ').trim();
     let score = 0;
 
-    if (normBase === normBranch) {
-      isMatch = true;
-      score = 1.0;
+    if (normBase === normBranch || normBase === normBranchNoParen) {
+      score = 0.98;
+    } else if (normFull.startsWith(normBranch) || normFullNoParen.startsWith(normBranchNoParen)) {
+      score = 0.95; // 예: ARGENTINA -> ARGENTINA2
     } else if (normBranch.length >= 3 && (normBase.startsWith(normBranch) || normBranch.startsWith(normBase))) {
-      isMatch = true;
-      score = 0.9;
-    } else if (normBranch.length >= 3 && normFull.includes(normBranch)) {
-      isMatch = true;
+      score = 0.90;
+    } else if (normBranch.length >= 3 && (normFull.includes(normBranch) || normFullNoParen.includes(normBranchNoParen))) {
       score = 0.85;
     } else {
       const sim = sequenceMatcher(normBranch, normBase);
       if (sim >= 0.70) {
-        isMatch = true;
         score = sim;
       }
     }
 
-    if (isMatch) {
-      matches.push({ ...p, score });
+    if (score > 0) {
+      const existing = matchMap.get(p.fullLoc);
+      if (!existing || existing.score < score) {
+        matchMap.set(p.fullLoc, { ...p, score });
+      }
     }
-  }
+  });
 
+  const matches = Array.from(matchMap.values());
   matches.sort((a, b) => b.score - a.score);
-  return matches;
+  return matches.slice(0, 10);
 }
 
 let currentMultiLocMatches = [];
@@ -5771,8 +5813,10 @@ function openMultiLocationSelectModal(matches, customerName, mode = 'candidates'
   const modal = document.getElementById('multiLocationSelectModal');
   const overlay = document.getElementById('modalOverlay');
   const titleEl = document.getElementById('multiLocModalTitle');
+  const confirmBanner = document.getElementById('multiLocConfirmBanner');
   const candidateBanner = document.getElementById('multiLocCandidateBanner');
   const manualBanner = document.getElementById('multiLocManualBanner');
+  const detectedNameEl = document.getElementById('multiLocDetectedName');
   const nameEl = document.getElementById('multiLocCustomerName');
   const listEl = document.getElementById('multiLocationList');
   const manualSection = document.getElementById('multiLocationManualSection');
@@ -5781,37 +5825,52 @@ function openMultiLocationSelectModal(matches, customerName, mode = 'candidates'
   if (!modal) return;
 
   if (mode === 'candidates') {
-    if (titleEl) titleEl.textContent = '배송지(출고처) 선택 필요';
-    if (candidateBanner) candidateBanner.style.display = 'block';
+    const topMatch = currentMultiLocMatches[0]?.fullLoc || customerName || '';
+    if (titleEl) titleEl.textContent = '🏢 출고처(배송지) 확인 및 선택';
+    if (confirmBanner) {
+      confirmBanner.style.display = 'block';
+      if (detectedNameEl) detectedNameEl.textContent = topMatch;
+    }
+    if (candidateBanner) candidateBanner.style.display = 'none';
     if (manualBanner) manualBanner.style.display = 'none';
     if (nameEl) nameEl.textContent = customerName || '고객';
     if (listEl) listEl.style.display = 'flex';
-    if (manualSection) manualSection.style.display = 'none';
-    if (switchBtn) switchBtn.style.display = 'block';
-    if (hintEl) hintEl.textContent = '키보드 숫자키 (1, 2, 3...) 또는 마우스 클릭';
+    if (manualSection) manualSection.style.display = 'flex'; // 검색창도 아래에 상시 노출하여 즉시 타이핑 가능
+    if (switchBtn) switchBtn.style.display = 'none';
+    if (hintEl) hintEl.textContent = 'Enter / 숫자키(1~9) 또는 아래 검색어 입력';
 
     let html = '';
     currentMultiLocMatches.forEach((m, idx) => {
       const keyNum = idx + 1;
-      const destTag = m.subDest
-        ? `<span class="multi-loc-badge">📍 ${escapeHtml(m.subDest)}</span>`
-        : '<span class="multi-loc-badge" style="background: #f1f5f9; color: #475569; border-color: #cbd5e1;">기본</span>';
+      const isTop = (idx === 0);
+      const destTag = isTop
+        ? `<span class="multi-loc-badge" style="background: #dcfce7; color: #166534; border-color: #86efac; font-weight: 700;">🎯 AI 추천 (Enter/1번)</span>`
+        : (m.subDest
+            ? `<span class="multi-loc-badge">📍 ${escapeHtml(m.subDest)}</span>`
+            : '<span class="multi-loc-badge" style="background: #f1f5f9; color: #475569; border-color: #cbd5e1;">유사 지점</span>');
       const escapedLoc = m.fullLoc.replace(/'/g, "\\'");
+      const cardStyle = isTop ? 'border: 2px solid #22c55e; background: #f0fdf4;' : '';
+      const keyStyle = isTop ? 'background: #16a34a; color: white;' : '';
 
       html += `
-        <button type="button" class="multi-loc-card" onclick="selectDisambiguatedLocation('${escapedLoc}')">
+        <button type="button" class="multi-loc-card" onclick="selectDisambiguatedLocation('${escapedLoc}')" style="${cardStyle}">
           <div style="display: flex; align-items: center; gap: 8px;">
-            <span class="multi-loc-key">${keyNum <= 9 ? keyNum : '•'}</span>
-            <span class="multi-loc-name">${escapeHtml(m.baseName)}</span>
+            <span class="multi-loc-key" style="${keyStyle}">${keyNum <= 9 ? keyNum : '•'}</span>
+            <span class="multi-loc-name" style="${isTop ? 'font-weight: 800; color: #15803d;' : 'font-weight: 700; color: #1e293b;'}">${escapeHtml(m.fullLoc)}</span>
           </div>
           ${destTag}
         </button>
       `;
     });
     if (listEl) listEl.innerHTML = html;
+
+    const searchInput = document.getElementById('manualLocSearchInput');
+    if (searchInput) searchInput.value = '';
+    renderManualLocationResults('');
   } else {
     // manual 모드: 출고처 미인식 또는 직접 검색 모드
-    if (titleEl) titleEl.textContent = '출고처(배송지) 선택 필수';
+    if (titleEl) titleEl.textContent = pendingMultiLocState?.isCartUpdateOnly ? '🏢 장바구니 출고처 일괄 변경' : '🏢 출고처(배송지) 선택 필수';
+    if (confirmBanner) confirmBanner.style.display = 'none';
     if (candidateBanner) candidateBanner.style.display = 'none';
     if (manualBanner) manualBanner.style.display = 'block';
     if (listEl) listEl.style.display = 'none';
@@ -5892,6 +5951,30 @@ function closeMultiLocationSelectModal() {
 function selectDisambiguatedLocation(selectedLoc) {
   if (!pendingMultiLocState) {
     closeMultiLocationSelectModal();
+    return;
+  }
+
+  // 🚨 장바구니 품목 출고처 일괄 변경 모드인 경우
+  if (pendingMultiLocState.isCartUpdateOnly) {
+    const currentLocEl = document.getElementById('location');
+    if (currentLocEl) {
+      if (!Array.from(currentLocEl.options).some(o => o.value === selectedLoc)) {
+        const opt = document.createElement('option');
+        opt.value = selectedLoc;
+        opt.text = selectedLoc;
+        currentLocEl.add(opt);
+      }
+      currentLocEl.value = selectedLoc;
+    }
+    if (records && records.length > 0) {
+      records.forEach(r => { r.location = selectedLoc; });
+    }
+    saveMetadata();
+    saveTableData();
+    updateTable();
+    closeMultiLocationSelectModal();
+    pendingMultiLocState = null;
+    alert(`✅ 출고처가 [${selectedLoc}]로 일괄 변경되었습니다.`);
     return;
   }
 
@@ -5989,6 +6072,12 @@ function cancelMultiLocationSelect() {
     return;
   }
 
+  if (pendingMultiLocState.isCartUpdateOnly) {
+    closeMultiLocationSelectModal();
+    pendingMultiLocState = null;
+    return;
+  }
+
   // 🚨 [사장님 핵심 원칙] 출고처 없는 유령 데이터 장바구니 유입 원천 차단
   const ok = confirm('⚠️ 출고처를 선택하지 않으면 장바구니에 담을 수 없습니다.\n\n정말 이번 영수증 스캔을 취소하시겠습니까?');
   if (!ok) {
@@ -6083,17 +6172,16 @@ function onHandwrittenExtracted(data) {
     }
 
     if (mismatchErrors.length > 0) {
-      alert(`❌ [주문서 헤더 불일치 오류]\n\n현재 장바구니에 이미 담긴 품목들과 다른 주문서입니다!\n제출(전송) 전까지는 동일한 출고처/관리자 주문서만 추가할 수 있습니다.\n\n${mismatchErrors.join('\n')}\n\n⚠️ 기존 품목을 먼저 [제출] 처리하시거나, 올바른 주문서 이미지를 다시 확인해 주세요.`);
-      return;
+      const confirmContinue = confirm(`⚠️ [주문서 헤더 확인]\n\n현재 장바구니 헤더와 새로 스캔한 주문서 정보에 차이가 있습니다:\n${mismatchErrors.join('\n')}\n\n동일 고객의 연속 장이 맞다면 [확인]을 눌러 현재 장바구니 [${currentLocValue}]에 계속 누적 추가하시겠습니까?\n([취소] 시 이번 스캔이 중단됩니다.)`);
+      if (!confirmContinue) {
+        return;
+      }
+      detectedLoc = currentLocValue;
     }
   } else {
-    // 첫 번째 장인 경우: 단일 후보 감지 시 자동 선택
-    if (candidateLocations.length === 1) {
+    // 첫 번째 장인 경우: 모달에서 최종 확정하므로 detectedLoc 후보만 기록
+    if (candidateLocations.length > 0) {
       detectedLoc = candidateLocations[0].fullLoc;
-      if (currentLocEl) {
-        currentLocEl.value = detectedLoc;
-        saveMetadata();
-      }
     }
     if (detectedAdmin && currentAdminEl) {
       currentAdminEl.value = detectedAdmin;
@@ -6362,33 +6450,25 @@ function onHandwrittenExtracted(data) {
     return;
   }
 
-  // 🚨 [사장님 업무 규칙] 출고 모드에서 출고처 미인식 또는 다중 배송지 감지 시 스마트 선택 게이트 모달 오픈
+  // 🚨 [사장님 업무 규칙] 출고 모드에서 파싱 완료 시 항상 출고처 확인/선택 게이트 모달을 디폴트로 오픈!
   if (!hasExistingRecords && currentType === 'out') {
-    if (candidateLocations.length >= 2) {
-      // 1. 동일 고객 다중 배송지 후보 감지 시 (예: william 지점 2곳 이상)
-      pendingMultiLocState = {
-        records: newRecords,
-        detectedAdmin: detectedAdmin,
-        usageMetadata: data.usageMetadata,
-        usedModel: data.usedModel,
-        customerName: candidateLocations[0].baseName || rawBranchCandidate,
-        mode: 'candidates'
-      };
-      openMultiLocationSelectModal(candidateLocations, candidateLocations[0].baseName || rawBranchCandidate, 'candidates');
-      return;
-    } else if (!detectedLoc) {
-      // 2. 출고처 미인식 또는 매칭 실패 시 -> 출고처 강제 선택 모달 오픈!
-      pendingMultiLocState = {
-        records: newRecords,
-        detectedAdmin: detectedAdmin,
-        usageMetadata: data.usageMetadata,
-        usedModel: data.usedModel,
-        customerName: rawBranchCandidate || '',
-        mode: 'manual'
-      };
-      openMultiLocationSelectModal([], rawBranchCandidate || '', 'manual');
-      return;
+    const defaultCustName = (candidateLocations[0]?.baseName || rawBranchCandidate || detectedLoc || '').trim();
+    pendingMultiLocState = {
+      records: newRecords,
+      detectedAdmin: detectedAdmin,
+      usageMetadata: data.usageMetadata,
+      usedModel: data.usedModel,
+      customerName: defaultCustName,
+      detectedLoc: detectedLoc || (candidateLocations[0]?.fullLoc || ''),
+      mode: (candidateLocations.length > 0) ? 'candidates' : 'manual'
+    };
+
+    if (candidateLocations.length > 0) {
+      openMultiLocationSelectModal(candidateLocations, defaultCustName, 'candidates');
+    } else {
+      openMultiLocationSelectModal([], defaultCustName, 'manual');
     }
+    return;
   }
 
   // 🚨 [사장님 업무 규칙] 기존 장바구니 품목과의 1줄 통합 (Cross-Page 누적 합산)
@@ -7191,19 +7271,35 @@ function confirmAddSubWarehouseOrder() {
 
 function setupHotkeyShortcuts() {
   window.addEventListener('keydown', (e) => {
-    // 🏢 출고처(배송지) 선택 모달이 열려 있는 경우 숫자키(1~9) 및 Escape 처리
+    // 🏢 출고처(배송지) 선택 모달이 열려 있는 경우 숫자키(1~9), Enter 및 Escape 처리
     const multiLocModal = document.getElementById('multiLocationSelectModal');
     if (multiLocModal && multiLocModal.style.display === 'block') {
       if (e.target && e.target.tagName === 'INPUT') {
         if (e.key === 'Escape') {
           e.preventDefault();
           cancelMultiLocationSelect();
+        } else if (e.key === 'Enter') {
+          const results = document.querySelectorAll('#manualLocationResultsList .multi-loc-card');
+          if (results && results.length > 0) {
+            e.preventDefault();
+            results[0].click();
+          } else if (currentMultiLocMatches && currentMultiLocMatches.length > 0) {
+            e.preventDefault();
+            selectDisambiguatedLocation(currentMultiLocMatches[0].fullLoc);
+          }
         }
         return;
       }
+      if (e.key === 'Enter') {
+        if (currentMultiLocMatches && currentMultiLocMatches.length > 0) {
+          e.preventDefault();
+          selectDisambiguatedLocation(currentMultiLocMatches[0].fullLoc);
+          return;
+        }
+      }
       if (!e.altKey && !e.shiftKey && !e.ctrlKey && e.key >= '1' && e.key <= '9') {
         const idx = parseInt(e.key, 10) - 1;
-        if (currentMultiLocMode === 'candidates' && currentMultiLocMatches && idx >= 0 && idx < currentMultiLocMatches.length) {
+        if (currentMultiLocMatches && idx >= 0 && idx < currentMultiLocMatches.length) {
           e.preventDefault();
           selectDisambiguatedLocation(currentMultiLocMatches[idx].fullLoc);
           return;
