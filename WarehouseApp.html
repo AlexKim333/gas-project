@@ -156,6 +156,7 @@
     }
     .input-area {
       flex: 1;
+      min-width: 0;
       padding: 10px 14px;
       display: flex;
       flex-direction: row;
@@ -439,7 +440,7 @@
     }
     #recordTable {
       width: 100%;
-      min-width: 480px;
+      min-width: 440px;
       table-layout: fixed;
       border-collapse: collapse;
     }
@@ -448,7 +449,7 @@
       color: #1e293b;
       font-size: 8pt;
       font-weight: 700;
-      padding: 6px 2px;
+      padding: 5px 2px;
       border: 1px solid #cbd5e1;
       position: sticky;
       top: 0;
@@ -459,7 +460,7 @@
     }
     td {
       font-size: 8.5pt;
-      padding: 5px 2px;
+      padding: 4px 2px;
       border: 1px solid #e2e8f0;
       text-align: center;
       white-space: nowrap;
@@ -467,13 +468,13 @@
     tr:hover td {
       background-color: #f8fafc;
     }
-    #recordTable th:nth-child(1), #recordTable td:nth-child(1) { width: 30px; min-width: 30px; max-width: 30px; text-align: center; padding: 4px 1px; }
-    #recordTable th:nth-child(2), #recordTable td:nth-child(2) { width: auto; min-width: 130px; text-align: left; padding: 4px 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    #recordTable th:nth-child(3), #recordTable td:nth-child(3) { width: 68px; min-width: 68px; max-width: 68px; text-align: center; padding: 4px 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    #recordTable th:nth-child(4), #recordTable td:nth-child(4) { width: 60px; min-width: 60px; max-width: 60px; text-align: center; padding: 4px 2px; }
-    #recordTable th:nth-child(5), #recordTable td:nth-child(5) { width: 60px; min-width: 60px; max-width: 60px; text-align: center; padding: 4px 2px; }
-    #recordTable th:nth-child(6), #recordTable td:nth-child(6) { width: 66px; min-width: 66px; max-width: 66px; text-align: center; padding: 4px 2px; }
-    #recordTable th:nth-child(7), #recordTable td:nth-child(7) { width: 62px; min-width: 62px; max-width: 62px; text-align: center; padding: 4px 2px; }
+    #recordTable th:nth-child(1), #recordTable td:nth-child(1) { width: 28px; text-align: center; padding: 4px 1px; }
+    #recordTable th:nth-child(2), #recordTable td:nth-child(2) { width: 140px; text-align: left; padding: 4px 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #recordTable th:nth-child(3), #recordTable td:nth-child(3) { width: 58px; text-align: center; padding: 4px 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #recordTable th:nth-child(4), #recordTable td:nth-child(4) { width: 52px; text-align: center; padding: 4px 2px; }
+    #recordTable th:nth-child(5), #recordTable td:nth-child(5) { width: 52px; text-align: center; padding: 4px 2px; }
+    #recordTable th:nth-child(6), #recordTable td:nth-child(6) { width: 58px; text-align: center; padding: 4px 2px; }
+    #recordTable th:nth-child(7), #recordTable td:nth-child(7) { width: 64px; text-align: center; padding: 4px 2px; }
     .modal {
       display: none;
       position: fixed;
@@ -1625,7 +1626,7 @@
         <div class="table-section">
           <div class="table-top-bar">
             <div class="action-buttons">
-              <button type="button" class="action-btn btn-ocr" id="btnOcrUpload" onclick="triggerHandwrittenImageUpload()" title="손글씨 주문서/송장 사진 촬영 또는 선택 (Ctrl+V)">📷 주문서 (Ctrl+V)</button>
+              <button type="button" class="action-btn btn-ocr" id="btnOcrUpload" onclick="triggerHandwrittenImageUpload()" title="손글씨 주문서/송장 사진 촬영 또는 붙여넣기 (Ctrl+V)">📷 주문서</button>
               <input type="file" id="orderCameraInput" accept="image/*" capture="environment" style="display:none;" onchange="handleImageFileSelect(event)">
               <input type="file" id="orderGalleryInput" accept="image/*" style="display:none;" onchange="handleImageFileSelect(event)">
               <input type="file" id="orderImageFileInput" accept="image/*" style="display:none;" onchange="handleImageFileSelect(event)">
@@ -1656,13 +1657,13 @@
           <div class="scrollable-table" id="scrollableTable">
             <table id="recordTable">
               <colgroup>
-                <col style="width: 30px;">
-                <col style="width: auto;">
-                <col style="width: 68px;">
-                <col style="width: 60px;">
-                <col style="width: 60px;">
-                <col style="width: 66px;">
-                <col style="width: 62px;">
+                <col style="width: 28px;">
+                <col style="width: 140px;">
+                <col style="width: 58px;">
+                <col style="width: 52px;">
+                <col style="width: 52px;">
+                <col style="width: 58px;">
+                <col style="width: 64px;">
               </colgroup>
               <thead id="tableHeader">
                 <tr>
@@ -2768,7 +2769,7 @@ function setPage(page, initialData = null) {
         btnOcr.style.background = '#0f766e';
         btnOcr.style.color = '#ffffff';
       } else {
-        btnOcr.textContent = '📷 주문서 (Ctrl+V)';
+        btnOcr.textContent = '📷 주문서';
         btnOcr.title = '손글씨 주문서 사진 붙여넣기 (Ctrl+V) 또는 파일 선택';
         btnOcr.style.background = '';
         btnOcr.style.color = '';
@@ -3625,7 +3626,7 @@ function updateTable() {
           <td contenteditable="true" class="editable" onblur="updateRecord(${idx}, 'individualQty', this.textContent)">${currentType === 'in' ? rec.individualQty : Math.abs(rec.individualQty)}</td>
           <td contenteditable="true" class="editable" onblur="updateRecord(${idx}, 'boxContent', this.textContent)">${rec.boxContent}</td>
           <td style="text-align: center; vertical-align: middle;">
-            <span style="font-weight: 700; font-size: 7.8pt; padding: 2px 7px; border-radius: 9999px; display: inline-flex; align-items: center; justify-content: center; background: ${badgeBg}; color: ${badgeColor}; border: 1px solid ${badgeBorder}; cursor: help;" title="${matchTooltip}">
+            <span style="font-weight: 700; font-size: 7.5pt; padding: 2px 5px; border-radius: 9999px; display: inline-flex; align-items: center; justify-content: center; background: ${badgeBg}; color: ${badgeColor}; border: 1px solid ${badgeBorder}; cursor: help;" title="${matchTooltip}">
               ${badgeText}
             </span>
           </td>
