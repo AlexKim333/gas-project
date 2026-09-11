@@ -1390,6 +1390,10 @@
               <span class="total-pill"><span id="totalBoxesLabel">상자: 0</span></span>
               <span class="total-divider">|</span>
               <span class="total-pill"><span id="totalIndividualsLabel">낱개: 0</span></span>
+              <span class="total-divider" id="aiTokenDivider" style="display: none;">|</span>
+              <span class="total-pill" id="aiTokenPill" style="display: none; background: #faf5ff; color: #7e22ce; border: 1px solid #e9d5ff; font-weight: 600; cursor: help;" title="최근 AI 파싱 토큰 소비량">
+                ⚡ <span id="aiTokenLabel">AI: 0토큰</span>
+              </span>
             </div>
           </div>
           <div class="scrollable-table" id="scrollableTable">
@@ -4036,6 +4040,24 @@ function updateTotals() {
   }
 }
 
+function updateAiTokenPill(usageMetadata, usedModel) {
+  const pill = document.getElementById('aiTokenPill');
+  const label = document.getElementById('aiTokenLabel');
+  const divider = document.getElementById('aiTokenDivider');
+  if (!pill || !label || !usageMetadata) return;
+
+  const total = (usageMetadata.totalTokenCount || 0).toLocaleString();
+  const prompt = (usageMetadata.promptTokenCount || 0).toLocaleString();
+  const output = (usageMetadata.candidatesTokenCount || 0).toLocaleString();
+  const thoughts = usageMetadata.thoughtsTokenCount ? usageMetadata.thoughtsTokenCount.toLocaleString() : '0';
+  const model = usedModel || 'gemini-3.7-flash';
+
+  label.textContent = `AI: ${total} 토큰`;
+  pill.title = `[최근 AI 토큰 소비 내역]\n• 총 토큰: ${total}\n• 입력(Prompt): ${prompt}\n• 출력(Output): ${output}\n• 추론(Thinking): ${thoughts}\n• 사용 모델: ${model}`;
+  pill.style.display = 'inline-flex';
+  if (divider) divider.style.display = 'inline';
+}
+
 function handleError(error) {
   alert('오류 발생: ' + error.message);
   const buttonContainer = document.querySelector('#modalButtons .button-container:first-child');
@@ -5598,6 +5620,10 @@ function onCartaDePorteExtracted(res) {
     return;
   }
 
+  if (res.usageMetadata) {
+    updateAiTokenPill(res.usageMetadata, res.usedModel);
+  }
+
   // 1. 출발 창고 드롭다운 자동 지정
   const originWh = (res.origin_warehouse || 'PANTACO').toUpperCase().trim();
   const locSelect = document.getElementById('location');
@@ -6150,7 +6176,7 @@ function selectDisambiguatedLocation(selectedLoc) {
 
   // 4. 완료 알림 팝업
   const addedCount = pendingRecs.length;
-  let msg = `🎉 손글씨 주문서 1줄 통합 인식 성공!\n\n총 ${addedCount}개 대표 품목이 장바구니에 추가되었습니다.`;
+  let msg = `🎉 손글씨 주문서 1줄 통합 인식 성공!\n총 ${addedCount}개 대표 품목이 장바구니에 추가되었습니다.`;
   msg += `\n출고처: [${selectedLoc}] 선택 완료`;
   if (detectedAdmin) {
     msg += `\n요청자(관리자): [${detectedAdmin}] 자동 선택됨`;
@@ -6159,7 +6185,21 @@ function selectDisambiguatedLocation(selectedLoc) {
     msg += `\n(기존 장바구니에 있던 ${mergedIntoExistingCount}개 동일 품목 라인에 자동 합산되었습니다.)`;
   }
 
-  msg += '\n\n📋 [1줄 통합 적재 내역]:\n' + pendingRecs.map((rec, i) => {
+  // ⚡ [핵심] 토큰 소비량을 상단에 먼저 배치 (브라우저 alert 창 높이 제한으로 인한 잘림 원천 방지)
+  if (usageMetadata) {
+    const meta = usageMetadata;
+    const totalTokens = (meta.totalTokenCount || 0).toLocaleString();
+    const promptTokens = (meta.promptTokenCount || 0).toLocaleString();
+    const outputTokens = (meta.candidatesTokenCount || 0).toLocaleString();
+    const thoughtsTokens = (meta.thoughtsTokenCount || 0).toLocaleString();
+    const modelName = usedModel || 'gemini-3.7-flash';
+    msg += `\n\n⚡ [AI 소비 토큰]: 총 ${totalTokens} 토큰\n(입력: ${promptTokens} / 출력: ${outputTokens} / 추론: ${thoughtsTokens} · ${modelName})`;
+    updateAiTokenPill(usageMetadata, usedModel);
+  }
+
+  const maxDisplay = 10;
+  const displayRecs = pendingRecs.slice(0, maxDisplay);
+  msg += '\n\n📋 [1줄 통합 적재 내역' + (pendingRecs.length > maxDisplay ? ` (상위 ${maxDisplay}개 / 총 ${pendingRecs.length}개)` : '') + ']:\n' + displayRecs.map((rec, i) => {
     let qtyDesc = '';
     const b = Math.abs(rec.boxQty || 0);
     const ind = Math.abs(rec.individualQty || 0);
@@ -6169,14 +6209,8 @@ function selectDisambiguatedLocation(selectedLoc) {
     return ` ${i + 1}. ${rec.itemName} | 컬러: ${rec.color} | ${qtyDesc} (규격: ${rec.boxContent}개/박스)`;
   }).join('\n');
 
-  if (usageMetadata) {
-    const meta = usageMetadata;
-    const totalTokens = (meta.totalTokenCount || 0).toLocaleString();
-    const promptTokens = (meta.promptTokenCount || 0).toLocaleString();
-    const outputTokens = (meta.candidatesTokenCount || 0).toLocaleString();
-    const thoughtsTokens = (meta.thoughtsTokenCount || 0).toLocaleString();
-    const modelName = usedModel || 'gemini-3.7-flash';
-    msg += `\n\n⚡ [AI 소비 토큰]: 총 ${totalTokens} 토큰\n(입력: ${promptTokens} / 출력: ${outputTokens} / 추론: ${thoughtsTokens} · ${modelName})`;
+  if (pendingRecs.length > maxDisplay) {
+    msg += `\n ... 외 ${pendingRecs.length - maxDisplay}개 품목 (장바구니 테이블에서 확인 가능)`;
   }
 
   closeMultiLocationSelectModal();
@@ -6680,7 +6714,25 @@ function onHandwrittenExtracted(data) {
     msg += `\n(기존 [${currentLocValue}] 주문서에 이어서 누적 추가됨)`;
   }
 
-  msg += '\n\n📋 [1줄 통합 적재 내역]:\n' + newRecords.map((rec, i) => {
+  // ⚡ [핵심] 토큰 소비량을 상단에 먼저 배치 (브라우저 alert 창 높이 제한으로 인한 잘림 원천 방지)
+  if (data.usageMetadata) {
+    const meta = data.usageMetadata;
+    const totalTokens = (meta.totalTokenCount || 0).toLocaleString();
+    const promptTokens = (meta.promptTokenCount || 0).toLocaleString();
+    const outputTokens = (meta.candidatesTokenCount || 0).toLocaleString();
+    const thoughtTokens = meta.thoughtsTokenCount ? meta.thoughtsTokenCount.toLocaleString() : null;
+    const modelName = data.usedModel || 'gemini-3.7-flash';
+    let detail = `입력: ${promptTokens} / 출력: ${outputTokens}`;
+    if (thoughtTokens) {
+      detail += ` / 추론: ${thoughtTokens}`;
+    }
+    msg += `\n\n⚡ [AI 소비 토큰]: 총 ${totalTokens} 토큰\n(${detail} · ${modelName})`;
+    updateAiTokenPill(data.usageMetadata, data.usedModel);
+  }
+
+  const maxDisplay = 10;
+  const displayRecs = newRecords.slice(0, maxDisplay);
+  msg += '\n\n📋 [1줄 통합 적재 내역' + (newRecords.length > maxDisplay ? ` (상위 ${maxDisplay}개 / 총 ${newRecords.length}개)` : '') + ']:\n' + displayRecs.map((rec, i) => {
     let qtyDesc = '';
     const b = Math.abs(rec.boxQty);
     const ind = Math.abs(rec.individualQty);
@@ -6690,18 +6742,8 @@ function onHandwrittenExtracted(data) {
     return ` ${i + 1}. ${rec.itemName} | 컬러: ${rec.color} | ${qtyDesc} (규격: ${rec.boxContent}개/박스)`;
   }).join('\n');
 
-  if (data.usageMetadata) {
-    const meta = data.usageMetadata;
-    const totalTokens = (meta.totalTokenCount || 0).toLocaleString();
-    const promptTokens = (meta.promptTokenCount || 0).toLocaleString();
-    const outputTokens = (meta.candidatesTokenCount || 0).toLocaleString();
-    const thoughtTokens = meta.thoughtsTokenCount ? meta.thoughtsTokenCount.toLocaleString() : null;
-    const modelName = data.usedModel || 'Gemini 3 Flash';
-    let detail = `입력: ${promptTokens} / 출력: ${outputTokens}`;
-    if (thoughtTokens) {
-      detail += ` / 추론: ${thoughtTokens}`;
-    }
-    msg += `\n\n⚡ [AI 소비 토큰]: 총 ${totalTokens} 토큰\n(${detail} · ${modelName})`;
+  if (newRecords.length > maxDisplay) {
+    msg += `\n ... 외 ${newRecords.length - maxDisplay}개 품목 (장바구니 테이블에서 확인 가능)`;
   }
 
   alert(msg);
