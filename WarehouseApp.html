@@ -2275,7 +2275,7 @@ try {
 
 // 🏷️ 대표 상품 별명(Alias) 룰북 매핑 사전 (사장님 요청 8대 대표 모델 공식 별명)
 const PRODUCT_ALIAS_MAP = {
-  // P-4D70: LICRA LARGA
+  // P-4D70: LICRA LARGA, LICRA #70
   'LICRALARGA': 'P-4D70',
   'LICRALARGAS': 'P-4D70',
   'LICRALARG': 'P-4D70',
@@ -2283,20 +2283,64 @@ const PRODUCT_ALIAS_MAP = {
   'LICRALARGOS': 'P-4D70',
   'LLARGA': 'P-4D70',
   'LLARGAS': 'P-4D70',
+  'LICRA70': 'P-4D70',
+  'LICRA#70': 'P-4D70',
   'P4D70': 'P-4D70',
   'P-4D70': 'P-4D70',
 
-  // P-D60: LICRA CORTA
+  // P-D60: LICRA CORTA, LICRA #60
   'LICRACORTA': 'P-D60',
   'LICRACORTAS': 'P-D60',
   'LICRACORTO': 'P-D60',
   'LICRACORTOS': 'P-D60',
   'LCORTA': 'P-D60',
   'LCORTAS': 'P-D60',
+  'LICRA60': 'P-D60',
+  'LICRA#60': 'P-D60',
   'PD60': 'P-D60',
   'P-D60': 'P-D60',
 
-  // P-160: FAJA, MAYON FAJA, FAJA MAYON
+  // BL-50: MALLON NIÑO #50, MALLON NIÑO 50
+  'MALLONNINO50': 'BL-50',
+  'MALLONNINO#50': 'BL-50',
+  'MALLON50': 'BL-50',
+  'MALLON#50': 'BL-50',
+  'MAYONNINO50': 'BL-50',
+  'MAYON50': 'BL-50',
+  'BL50': 'BL-50',
+  'BL-50': 'BL-50',
+
+  // BL-60: MALLON NIÑO #60, MALLON NIÑO 60
+  'MALLONNINO60': 'BL-60',
+  'MALLONNINO#60': 'BL-60',
+  'MALLON60': 'BL-60',
+  'MALLON#60': 'BL-60',
+  'MAYONNINO60': 'BL-60',
+  'MAYON60': 'BL-60',
+  'BL60': 'BL-60',
+  'BL-60': 'BL-60',
+
+  // BL-70: MALLON NIÑO #70, MALLON NIÑO 70
+  'MALLONNINO70': 'BL-70',
+  'MALLONNINO#70': 'BL-70',
+  'MALLON70': 'BL-70',
+  'MALLON#70': 'BL-70',
+  'MAYONNINO70': 'BL-70',
+  'MAYON70': 'BL-70',
+  'BL70': 'BL-70',
+  'BL-70': 'BL-70',
+
+  // BL-80: MALLON NIÑO #80, MALLON NIÑO 80
+  'MALLONNINO80': 'BL-80',
+  'MALLONNINO#80': 'BL-80',
+  'MALLON80': 'BL-80',
+  'MALLON#80': 'BL-80',
+  'MAYONNINO80': 'BL-80',
+  'MAYON80': 'BL-80',
+  'BL80': 'BL-80',
+  'BL-80': 'BL-80',
+
+  // P-160: FAJA, MAYON FAJA, FAJA MAYON, MALLON #160
   'FAJA': 'P-160',
   'FAJAS': 'P-160',
   'MAYONFAJA': 'P-160',
@@ -2305,17 +2349,23 @@ const PRODUCT_ALIAS_MAP = {
   'MALLONFAJA': 'P-160',
   'MALLONFAJAS': 'P-160',
   'FAJAMALLON': 'P-160',
+  'MALLON160': 'P-160',
+  'MALLON#160': 'P-160',
+  'MAYON160': 'P-160',
+  'MAYON#160': 'P-160',
   'P160': 'P-160',
   'P-160': 'P-160',
 
-  // P-150: MAYON TERMICO, TERMICO MAYON, TERMICO 150
+  // P-150: MAYON TERMICO, TERMICO MAYON, TERMICO 150, MALLON #150
   'MAYONTERMICO': 'P-150',
   'TERMICOMAYON': 'P-150',
   'TERMICO150': 'P-150',
   'MALLONTERMICO': 'P-150',
   'TERMICOMALLON': 'P-150',
   'MALLON150': 'P-150',
+  'MALLON#150': 'P-150',
   'MAYON150': 'P-150',
+  'MAYON#150': 'P-150',
   'P150': 'P-150',
   'P-150': 'P-150',
 
@@ -2371,14 +2421,26 @@ const PRODUCT_ALIAS_MAP = {
   'AL165': 'L-AL165'
 };
 
+function normalizeAliasCleanKey(str) {
+  return String(str || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[\s_\-\/.,#]+/g, '')
+    .toUpperCase();
+}
+
 function resolveModelAlias(rawQuery) {
   if (!rawQuery) return null;
-  const clean = String(rawQuery).replace(/[\s_\-\/.,]+/g, '').toUpperCase();
+  const clean = normalizeAliasCleanKey(rawQuery);
   if (PRODUCT_ALIAS_MAP[clean]) {
     return { targetModel: PRODUCT_ALIAS_MAP[clean], rawAlias: rawQuery.trim() };
   }
   for (const [aliasClean, target] of Object.entries(PRODUCT_ALIAS_MAP)) {
-    if (aliasClean.length >= 4 && (clean.startsWith(aliasClean) || clean === aliasClean)) {
+    const normA = normalizeAliasCleanKey(aliasClean);
+    if (clean === normA) {
+      return { targetModel: target, rawAlias: rawQuery.trim() };
+    }
+    if (normA.length >= 4 && (clean.startsWith(normA) || normA.startsWith(clean))) {
       return { targetModel: target, rawAlias: rawQuery.trim() };
     }
   }
@@ -6015,13 +6077,14 @@ function resolveDerivedModelName(rawModel, lastModel) {
     }
   }
 
-  // 2. 숫자 접미사 치환 (예: cur = "960", prev = "PH959" -> "PH960")
-  if (/^\d{2,4}$/.test(cur)) {
+  // 2. 숫자 접미사 치환 (예: cur = "960" 또는 "# 70", prev = "PH959" -> "PH960")
+  const cleanNum = cur.replace(/^[#\s]+/, '');
+  if (/^\d{2,4}$/.test(cleanNum)) {
     // 앞 품명에서 마지막 연속 숫자 부분을 추출
     const match = prev.match(/^(.*?)(\d+)$/);
     if (match) {
       const prefix = match[1]; // 예: "PH"
-      return prefix + cur;
+      return prefix + cleanNum;
     }
   }
 
@@ -7307,9 +7370,13 @@ function onHandwrittenExtracted(data) {
     let rowMatchScore = 1.0;
     let matchRes = null;
 
+    const cleanNumSuffix = rawModel.replace(/^[#\s]+/, '');
     const isSingleAlpha = /^[A-Za-z]$/.test(rawModel);
-    const isNumericSuffix = /^\d{2,4}$/.test(rawModel);
+    const isNumericSuffix = /^\d{2,4}$/.test(cleanNumSuffix);
     const isDeltaSuffix = isSingleAlpha || isNumericSuffix;
+    if (isNumericSuffix && !isSingleAlpha) {
+      rawModel = cleanNumSuffix;
+    }
 
     if (lastBaseModel && isDeltaSuffix) {
       // 🏭 [전자동 델타 매칭 엔진]

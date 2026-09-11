@@ -1842,10 +1842,14 @@ Rules:
      Combine the letter into the model code (e.g. "CK928O", "CK928K", "CECIK999C") and set color to "SURTIDO" unless an actual color word like "Negro" or "Blanco" is written!
 
 8. Known Model Aliases / Nicknames (TRADE TERMS):
-   - "LICRA LARGA" / "LICRA LARG" / "LICRA LARGO" -> Recognized as "P-4D70" (can return "Licra larga" or "P-4D70").
-   - "LICRA CORTA" / "LICRA CORTO" -> Recognized as "P-D60".
-   - "FAJA" / "MAYON FAJA" / "FAJA MAYON" -> Recognized as "P-160".
-   - "MAYON TERMICO" / "TERMICO MAYON" / "TERMICO 150" -> Recognized as "P-150".
+   - "LICRA LARGA" / "LICRA LARG" / "LICRA LARGO" / "LICRA #70" / "LICRA 70" -> Recognized as "P-4D70".
+   - "LICRA CORTA" / "LICRA CORTO" / "LICRA #60" / "LICRA 60" -> Recognized as "P-D60".
+   - "MALLON NIÑO #50" / "MALLON NIÑO 50" / "MALLON 50" -> Recognized as "BL-50".
+   - "MALLON NIÑO #60" / "MALLON NIÑO 60" / "MALLON 60" -> Recognized as "BL-60".
+   - "MALLON NIÑO #70" / "MALLON NIÑO 70" / "MALLON 70" -> Recognized as "BL-70".
+   - "MALLON NIÑO #80" / "MALLON NIÑO 80" / "MALLON 80" -> Recognized as "BL-80".
+   - "FAJA" / "MAYON FAJA" / "FAJA MAYON" / "MALLON #160" / "MALLON 160" -> Recognized as "P-160".
+   - "MAYON TERMICO" / "TERMICO MAYON" / "TERMICO 150" / "MALLON #150" / "MALLON 150" -> Recognized as "P-150".
    - "TIRANTE" / "BULUSA TIRANTE" / "BLUSA TIRANTE" -> Recognized as "L-TP75".
    - "OLIMPICA" / "BULUSA OLIMPICA" / "BLUSA OLIMPICA" -> Recognized as "L-OP80".
    - "BULUSA TERMICA REDONDO" / "BLUSA TERMICA REDONDO" / "TERMICA REDONDO" -> Recognized as "L-PL160".
@@ -1860,6 +1864,22 @@ Rules:
         {"modelo": "Licra larg", "color": "Marino", "raw_qty": "1", "boxes": 1},
         {"modelo": "Licra larg", "color": "Cafe", "raw_qty": "1", "boxes": 1},
         {"modelo": "Licra larg", "color": "Blanco", "raw_qty": "1", "boxes": 1}
+
+10. Multi-line Items & Hierarchical Sub-Colors (CRITICAL):
+    - When a model name is written on a line (e.g. "Mallon # 160" or "Licra # 60"), and subsequent lines list colors with quantities (e.g. "Jade 1", "Morado 1", "Negro 2"):
+      MUST treat every following color line as belonging to that parent model, and output EACH color as an individual entry with the parent's full model name repeated:
+      For example:
+      "Mallon # 160"
+      "Jade 1"
+      "Morado 1"
+      "Negro 2"
+      -> MUST output 3 separate rows:
+         {"modelo": "Mallon # 160", "color": "Jade", "raw_qty": "1", "boxes": 1},
+         {"modelo": "Mallon # 160", "color": "Morado", "raw_qty": "1", "boxes": 1},
+         {"modelo": "Mallon # 160", "color": "Negro", "raw_qty": "2", "boxes": 2}
+    - When a model name and its size/number are split across two lines (e.g. Line 1: "Mallon Niño", Line 2: "# 70 1 Bulto"):
+      Combine them into a single entry:
+      {"modelo": "Mallon Niño # 70", "color": "SURTIDO", "raw_qty": "1", "boxes": 1}
 
 Return ONLY valid JSON:
 {
