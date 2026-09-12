@@ -60,6 +60,79 @@ function makeKey(name, color, boxContent) {
   return `${n}_${c}_${b}`;
 }
 
+/**
+ * 재고시트를 makeKey(품명+색상+박스당수량) 기준 맵으로 읽어들인다.
+ *
+ * 같은 키를 가진 행이 둘 이상 있으면 수량을 합산해 하나로 병합한다.
+ * 이전에는 `map[key] = {...}`로 뒤 행이 앞 행을 덮어썼고, 이 맵을 다시
+ * 시트에 일괄 기록하면서 앞 행의 박스/낱개 수량이 통째로 사라졌다.
+ * (재고시트를 전량 재작성하는 processForm / updateStockSheet /
+ *  updatePendingRecords / processQuickStockAdjustment 모두 같은 경로였다.)
+ *
+ * 병합 규칙:
+ *   - box / individual / initialStock : 합산 (수량이므로 보존이 최우선)
+ *   - safeStock : 최대값. 임계값이라 합산하면 과다 발주로 이어진다.
+ *   - manufacturer : 처음 등장한 비어있지 않은 값
+ *   - isDelta : 하나라도 델타면 델타
+ *   - 행 위치와 품명/색상 표기는 첫 등장 행을 따른다.
+ *
+ * @param {GoogleAppsScript.Spreadsheet.Sheet} stockSheet
+ * @param {number} lastRow 재고시트의 getLastRow() 값
+ * @returns {{map: Object, duplicateKeys: string[], rowCount: number}}
+ */
+function buildStockMap(stockSheet, lastRow) {
+  const map = Object.create(null);
+  const duplicateKeys = [];
+
+  if (lastRow < 2) {
+    return { map: map, duplicateKeys: duplicateKeys, rowCount: 0 };
+  }
+
+  const rows = stockSheet.getRange(2, 1, lastRow - 1, 9).getValues();
+  rows.forEach(row => {
+    const name = normalizeText(row[0]);
+    const color = normalizeText(row[1]) || DEFAULTS.COLOR;
+    const boxContent = normalizeNumber(row[5]);
+    const key = makeKey(name, color, boxContent);
+    const deltaVal = normalizeText(row[8]).toUpperCase();
+    const isDelta = row[8] === true || deltaVal === 'Y' || deltaVal === 'TRUE';
+
+    const existing = map[key];
+    if (!existing) {
+      map[key] = {
+        name: name,
+        color: color,
+        box: normalizeNumber(row[2]),
+        individual: normalizeNumber(row[3]),
+        safeStock: normalizeNumber(row[4]),
+        boxContent: boxContent,
+        initialStock: normalizeNumber(row[6]),
+        manufacturer: normalizeText(row[7]),
+        isDelta: isDelta
+      };
+      return;
+    }
+
+    duplicateKeys.push(key);
+    existing.box += normalizeNumber(row[2]);
+    existing.individual += normalizeNumber(row[3]);
+    existing.initialStock += normalizeNumber(row[6]);
+    existing.safeStock = Math.max(existing.safeStock, normalizeNumber(row[4]));
+    if (!existing.manufacturer) existing.manufacturer = normalizeText(row[7]);
+    existing.isDelta = existing.isDelta || isDelta;
+  });
+
+  if (duplicateKeys.length > 0) {
+    const uniq = Object.keys(duplicateKeys.reduce((acc, k) => { acc[k] = true; return acc; }, {}));
+    console.warn(
+      `[재고시트] 중복 키 ${duplicateKeys.length}건(고유 ${uniq.length}종)을 수량 합산으로 병합했습니다. ` +
+      `대상: ${uniq.slice(0, 10).join(' | ')}${uniq.length > 10 ? ' …' : ''}`
+    );
+  }
+
+  return { map: map, duplicateKeys: duplicateKeys, rowCount: rows.length };
+}
+
 function formatDate(date) {
   const tz = Session.getScriptTimeZone() || 'GMT';
   return Utilities.formatDate(date, tz, 'yyyy/MM/dd');
@@ -165,8 +238,90 @@ function getAdminList() {
 // 재고 조회 및 유효성 검사
 // -------------------------------------------------------------------
 
+// -------------------------------------------------------------------
+// 재고 데이터 캐시 (CacheService)
+// -------------------------------------------------------------------
+
+const STOCK_CACHE_KEY = 'CACHE_STOCK_DATA_V1';
+const STOCK_CACHE_TTL = 300; // 5분. 쓰기 시점에 즉시 무효화되므로 짧게 둘 필요가 없다.
+
+// CacheService는 값 하나당 100KB(바이트) 제한이 있다. JSON 문자열을 문자 수로
+// 자르므로, 한글처럼 UTF-8에서 3바이트를 쓰는 문자가 섞여도 안전하도록
+// 문자당 4바이트 최악값을 가정해 25,000자로 나눈다 (25,000 × 4 = 100KB).
+const CACHE_CHUNK_CHARS = 25000;
+const CACHE_MAX_CHUNKS = 40; // 최대 약 100만 자. 이보다 크면 캐시를 포기한다.
+
+function putChunkedCache(cache, baseKey, json, ttlSeconds) {
+  const count = Math.ceil(json.length / CACHE_CHUNK_CHARS);
+  if (count > CACHE_MAX_CHUNKS) {
+    console.warn(`[Cache] ${baseKey}: ${json.length}자는 캐시 한도를 초과하여 캐싱을 건너뜁니다.`);
+    return false;
+  }
+  const payload = {};
+  for (let i = 0; i < count; i++) {
+    payload[`${baseKey}_${i}`] = json.substr(i * CACHE_CHUNK_CHARS, CACHE_CHUNK_CHARS);
+  }
+  payload[`${baseKey}_meta`] = String(count);
+  cache.putAll(payload, ttlSeconds);
+  return true;
+}
+
+function getChunkedCache(cache, baseKey) {
+  const meta = cache.get(`${baseKey}_meta`);
+  if (!meta) return null;
+  const count = parseInt(meta, 10);
+  if (!(count > 0)) return null;
+
+  const keys = [];
+  for (let i = 0; i < count; i++) keys.push(`${baseKey}_${i}`);
+  const parts = cache.getAll(keys);
+
+  let json = '';
+  for (let i = 0; i < count; i++) {
+    const part = parts[`${baseKey}_${i}`];
+    // 청크 하나라도 없으면 조각난 데이터를 쓰지 않고 캐시 미스로 처리한다.
+    if (part === null || part === undefined) return null;
+    json += part;
+  }
+  return json;
+}
+
+function removeChunkedCache(cache, baseKey) {
+  const meta = cache.get(`${baseKey}_meta`);
+  const count = meta ? parseInt(meta, 10) : 0;
+  const keys = [`${baseKey}_meta`];
+  // meta가 이미 만료됐어도 남은 청크가 재사용되지 않도록 최대치까지 지운다.
+  const upto = count > 0 ? count : CACHE_MAX_CHUNKS;
+  for (let i = 0; i < upto; i++) keys.push(`${baseKey}_${i}`);
+  cache.removeAll(keys);
+}
+
+/**
+ * 재고 캐시를 즉시 무효화한다. 재고시트를 쓰는 모든 함수가 finally에서 호출해,
+ * 쓰기가 중간에 실패했더라도 작업자가 구버전 재고를 보지 않도록 보장한다.
+ * (과도한 무효화는 캐시 미스 한 번일 뿐이라 해롭지 않다.)
+ */
+function invalidateStockCache() {
+  try {
+    removeChunkedCache(CacheService.getScriptCache(), STOCK_CACHE_KEY);
+  } catch (e) {
+    console.warn(`[Cache] 재고 캐시 무효화 실패: ${e.message}`);
+  }
+}
+
 function getStockData() {
   try {
+    const cache = CacheService.getScriptCache();
+    const cachedJson = getChunkedCache(cache, STOCK_CACHE_KEY);
+    if (cachedJson) {
+      try {
+        return JSON.parse(cachedJson);
+      } catch (e) {
+        console.warn(`[Cache] 재고 캐시 파싱 실패, 시트에서 다시 읽습니다: ${e.message}`);
+        removeChunkedCache(cache, STOCK_CACHE_KEY);
+      }
+    }
+
     const sheet = getSheet(SHEETS.STOCK);
     ensureSheetColumns(sheet, 9);
     const lastRow = sheet.getLastRow();
@@ -191,6 +346,12 @@ function getStockData() {
         key: makeKey(name, color, boxContent)
       };
     }).filter(item => item.name);
+
+    try {
+      putChunkedCache(cache, STOCK_CACHE_KEY, JSON.stringify(items), STOCK_CACHE_TTL);
+    } catch (e) {
+      console.warn(`[Cache] 재고 캐시 저장 실패(조회는 정상): ${e.message}`);
+    }
 
     return items;
   } catch (e) {
@@ -218,6 +379,11 @@ function getFilteredItemNames(searchText = '') {
   }];
 }
 
+// 아래 두 함수는 화면에 즉시 피드백을 주기 위한 사전 조회이며, 캐시를 경유하므로
+// 최대 STOCK_CACHE_TTL만큼 오래된 값일 수 있다. 재고 부족의 최종 판정은 항상
+// processForm이 락 안에서 시트를 직접 읽어(buildStockMap) 수행하므로,
+// 이 값이 낙관적이어도 재고를 초과해 출고되지는 않는다.
+// => processForm의 검증을 캐시로 바꾸지 말 것.
 function checkItemRegistration(itemName, color, boxContent) {
   const items = getStockData();
   const targetKey = makeKey(itemName, color, boxContent);
@@ -372,6 +538,7 @@ function registerProduct(tableData) {
     console.error(`registerProduct error: ${e.message}`);
     throw e;
   } finally {
+    invalidateStockCache();
     lock.releaseLock();
   }
 }
@@ -405,29 +572,7 @@ function processForm(tableData, mode, admin) {
     // 1. 재고 데이터 맵 로드
     ensureSheetColumns(stockSheet, 9);
     const stockLastRow = stockSheet.getLastRow();
-    const stockMap = Object.create(null);
-
-    if (stockLastRow >= 2) {
-      const stockData = stockSheet.getRange(2, 1, stockLastRow - 1, 9).getValues();
-      stockData.forEach(row => {
-        const name = normalizeText(row[0]);
-        const color = normalizeText(row[1]) || DEFAULTS.COLOR;
-        const boxContent = normalizeNumber(row[5]);
-        const key = makeKey(name, color, boxContent);
-        const deltaVal = normalizeText(row[8]).toUpperCase();
-        stockMap[key] = {
-          name: name,
-          color: color,
-          box: normalizeNumber(row[2]),
-          individual: normalizeNumber(row[3]),
-          safeStock: normalizeNumber(row[4]),
-          boxContent: boxContent,
-          initialStock: normalizeNumber(row[6]),
-          manufacturer: normalizeText(row[7]),
-          isDelta: row[8] === true || deltaVal === 'Y' || deltaVal === 'TRUE'
-        };
-      });
-    }
+    const stockMap = buildStockMap(stockSheet, stockLastRow).map;
 
     // 2. 재고 계산 및 검증 (메모리에서 사전 검증: 실패 시 어떤 시트도 건드리지 않음)
     tableData.forEach(record => {
@@ -561,6 +706,7 @@ function processForm(tableData, mode, admin) {
     console.error(`processForm error: ${e.message}`);
     throw e;
   } finally {
+    invalidateStockCache();
     lock.releaseLock();
   }
 }
@@ -578,29 +724,7 @@ function updateStockSheet(tableData, mode) {
     const sheet = getSheet(SHEETS.STOCK);
     ensureSheetColumns(sheet, 9);
     const lastRow = sheet.getLastRow();
-    const stockMap = Object.create(null);
-
-    if (lastRow >= 2) {
-      const data = sheet.getRange(2, 1, lastRow - 1, 9).getValues();
-      data.forEach(row => {
-        const name = normalizeText(row[0]);
-        const color = normalizeText(row[1]) || DEFAULTS.COLOR;
-        const boxContent = normalizeNumber(row[5]);
-        const key = makeKey(name, color, boxContent);
-        const deltaVal = normalizeText(row[8]).toUpperCase();
-        stockMap[key] = {
-          name: name,
-          color: color,
-          box: normalizeNumber(row[2]),
-          individual: normalizeNumber(row[3]),
-          safeStock: normalizeNumber(row[4]),
-          boxContent: boxContent,
-          initialStock: normalizeNumber(row[6]),
-          manufacturer: normalizeText(row[7]),
-          isDelta: row[8] === true || deltaVal === 'Y' || deltaVal === 'TRUE'
-        };
-      });
-    }
+    const stockMap = buildStockMap(sheet, lastRow).map;
 
     tableData.forEach(record => {
       const name = normalizeText(record.itemName);
@@ -682,6 +806,7 @@ function updateStockSheet(tableData, mode) {
     console.error(`updateStockSheet error: ${e.message}`);
     throw e;
   } finally {
+    invalidateStockCache();
     lock.releaseLock();
   }
 }
@@ -730,28 +855,7 @@ function updatePendingRecords(invoiceNumber, type, newRecords, admin) {
     // 1. 재고 맵 로드
     ensureSheetColumns(stockSheet, 9);
     const stockLastRow = stockSheet.getLastRow();
-    const stockMap = Object.create(null);
-    if (stockLastRow >= 2) {
-      const sData = stockSheet.getRange(2, 1, stockLastRow - 1, 9).getValues();
-      sData.forEach(row => {
-        const name = normalizeText(row[0]);
-        const color = normalizeText(row[1]) || DEFAULTS.COLOR;
-        const boxContent = normalizeNumber(row[5]);
-        const key = makeKey(name, color, boxContent);
-        const deltaVal = normalizeText(row[8]).toUpperCase();
-        stockMap[key] = {
-          name: name,
-          color: color,
-          box: normalizeNumber(row[2]),
-          individual: normalizeNumber(row[3]),
-          safeStock: normalizeNumber(row[4]),
-          boxContent: boxContent,
-          initialStock: normalizeNumber(row[6]),
-          manufacturer: normalizeText(row[7]),
-          isDelta: row[8] === true || deltaVal === 'Y' || deltaVal === 'TRUE'
-        };
-      });
-    }
+    const stockMap = buildStockMap(stockSheet, stockLastRow).map;
 
     // 2. PendingSheet 데이터 로드 및 분류 (유지할 행 vs 삭제/수정 대상 행)
     const pendingLastRow = pendingSheet.getLastRow();
@@ -922,6 +1026,7 @@ function updatePendingRecords(invoiceNumber, type, newRecords, admin) {
     console.error(`updatePendingRecords error: ${e.message}`);
     throw e;
   } finally {
+    invalidateStockCache();
     lock.releaseLock();
   }
 }
@@ -1610,6 +1715,7 @@ function setupDeltaItemFields() {
     SpreadsheetApp.getUi().alert(`델타 품목 필드 설정 오류: ${e.message}`);
     throw e;
   } finally {
+    invalidateStockCache();
     lock.releaseLock();
   }
 }
@@ -2024,29 +2130,7 @@ function processQuickStockAdjustment(adjustments, admin) {
     // 1. 재고 데이터 로드
     ensureSheetColumns(stockSheet, 9);
     const stockLastRow = stockSheet.getLastRow();
-    const stockMap = Object.create(null);
-
-    if (stockLastRow >= 2) {
-      const stockData = stockSheet.getRange(2, 1, stockLastRow - 1, 9).getValues();
-      stockData.forEach(row => {
-        const name = normalizeText(row[0]);
-        const color = normalizeText(row[1]) || DEFAULTS.COLOR;
-        const boxContent = normalizeNumber(row[5]);
-        const key = makeKey(name, color, boxContent);
-        const deltaVal = normalizeText(row[8]).toUpperCase();
-        stockMap[key] = {
-          name: name,
-          color: color,
-          box: normalizeNumber(row[2]),
-          individual: normalizeNumber(row[3]),
-          safeStock: normalizeNumber(row[4]),
-          boxContent: boxContent,
-          initialStock: normalizeNumber(row[6]),
-          manufacturer: normalizeText(row[7]),
-          isDelta: row[8] === true || deltaVal === 'Y' || deltaVal === 'TRUE'
-        };
-      });
-    }
+    const stockMap = buildStockMap(stockSheet, stockLastRow).map;
 
     // 2. 조정 번호 생성 및 PendingSheet / stockMap 반영
     const seq = generateInvoiceNumber('재고조정');
@@ -2142,6 +2226,7 @@ function processQuickStockAdjustment(adjustments, admin) {
     console.error(`processQuickStockAdjustment error: ${e.message}`);
     throw e;
   } finally {
+    invalidateStockCache();
     lock.releaseLock();
   }
 }
@@ -2173,6 +2258,18 @@ function verifyStockIntegrity() {
     const box = normalizeNumber(row[2]);
     const ind = normalizeNumber(row[3]);
     const initStock = normalizeNumber(row[6]);
+
+    // 중복 키 행을 덮어쓰면 시트 재고가 실제보다 적게 집계되어, 전표 누적치와
+    // 비교하는 이 검사가 존재하지 않는 오차를 보고한다. 수량을 합산해 집계한다.
+    const existing = stockMap[key];
+    if (existing) {
+      existing.currentBox += box;
+      existing.currentIndividual += ind;
+      existing.initialStock += initStock;
+      existing.currentTotalIndiv += (box * boxContent) + ind;
+      existing.calculatedTotalIndiv += (initStock * boxContent);
+      return;
+    }
 
     stockMap[key] = {
       name: name,
@@ -2651,6 +2748,7 @@ function executeStockNormalization() {
     console.error(`executeStockNormalization error: ${err.message}`);
     throw err;
   } finally {
+    invalidateStockCache();
     lock.releaseLock();
   }
 }
@@ -3015,6 +3113,7 @@ function executeColorNormalization() {
     console.error(`executeColorNormalization error: ${err.message}`);
     throw err;
   } finally {
+    invalidateStockCache();
     lock.releaseLock();
   }
 }
@@ -3512,6 +3611,7 @@ function applyRecommendedSafeStockToMaster() {
     console.error('applyRecommendedSafeStockToMaster error: ' + e.message);
     throw e;
   } finally {
+    invalidateStockCache();
     lock.releaseLock();
   }
 }
