@@ -593,6 +593,7 @@ function processForm(tableData, mode, admin) {
   }
 
   const lock = LockService.getScriptLock();
+  let cacheWarmed = false;
   try {
     lock.waitLock(20000); // 최대 20초 락 획득
 
@@ -732,7 +733,6 @@ function processForm(tableData, mode, admin) {
       }
     }
 
-    let cacheWarmed = false;
     try {
       cacheWarmed = warmStockCacheFromMap(stockMap);
     } catch (cErr) {
@@ -745,10 +745,18 @@ function processForm(tableData, mode, admin) {
     console.error(`processForm error: ${e.message}`);
     throw e;
   } finally {
-    if (!cacheWarmed) {
-      invalidateStockCache();
+    try {
+      if (!cacheWarmed) {
+        invalidateStockCache();
+      }
+    } catch (finErr) {
+      console.warn(`[Cache] 캐시 무효화 실패: ${finErr.message}`);
     }
-    lock.releaseLock();
+    try {
+      lock.releaseLock();
+    } catch (lErr) {
+      console.warn(`[Lock] 락 해제 경고: ${lErr.message}`);
+    }
   }
 }
 
@@ -2160,6 +2168,7 @@ function processQuickStockAdjustment(adjustments, admin) {
   }
 
   const lock = LockService.getScriptLock();
+  let cacheWarmed = false;
   try {
     lock.waitLock(20000);
 
@@ -2257,7 +2266,6 @@ function processQuickStockAdjustment(adjustments, admin) {
     }
     SpreadsheetApp.flush();
 
-    let cacheWarmed = false;
     try {
       cacheWarmed = warmStockCacheFromMap(stockMap);
     } catch (cErr) {}
@@ -2272,10 +2280,18 @@ function processQuickStockAdjustment(adjustments, admin) {
     console.error(`processQuickStockAdjustment error: ${e.message}`);
     throw e;
   } finally {
-    if (!cacheWarmed) {
-      invalidateStockCache();
+    try {
+      if (!cacheWarmed) {
+        invalidateStockCache();
+      }
+    } catch (finErr) {
+      console.warn(`[Cache] 캐시 무효화 실패: ${finErr.message}`);
     }
-    lock.releaseLock();
+    try {
+      lock.releaseLock();
+    } catch (lErr) {
+      console.warn(`[Lock] 락 해제 경고: ${lErr.message}`);
+    }
   }
 }
 
