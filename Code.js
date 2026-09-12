@@ -1637,8 +1637,16 @@ function promptSetGeminiApiKey() {
   }
 }
 
+/**
+ * HTML 파일 안에서 <?!= include('Shared') ?> 로 다른 HTML 파일을 삽입한다.
+ */
+function include(filename) {
+  return HtmlService.createHtmlOutputFromFile(filename).getContent();
+}
+
 function showSearchModify() {
-  const html = HtmlService.createHtmlOutputFromFile('SearchModify')
+  const html = HtmlService.createTemplateFromFile('SearchModify')
+    .evaluate()
     .setWidth(1075)
     .setHeight(851);
   SpreadsheetApp.getUi().showModalDialog(html, '창고 관리 - 검색수정');

@@ -1,0 +1,219 @@
+<script>
+// =====================================================================
+// WarehouseApp / SearchModify 두 다이얼로그가 공유하는 로직
+// ---------------------------------------------------------------------
+// 이전에는 loadStockData / printReceipt가 파일별로 복제되어 있었고,
+// 한쪽만 수정되는 일이 반복됐다 (예: 인쇄 콜백 미실행 시 커밋 후 장바구니
+// 미정리 → 재전송 위험). 두 화면의 공통 뼈대만 이 파일에 두고,
+// 화면별로 다른 부분은 호출부가 콜백으로 주입한다.
+// =====================================================================
+
+// 재고 로드 in-flight 가드. filterItems 등 다른 코드도 이 값을 읽는다.
+let isLoadingStockData = false;
+
+/**
+ * 재고 데이터 로드의 공통 뼈대: 재진입 가드, 30초 타임아웃, 로딩 표시,
+ * localStorage 영속화, 실패 시 로컬 캐시 유지를 담당한다.
+ *
+ * @param {Object}   options
+ * @param {boolean}  options.silent    로딩 인디케이터를 띄우지 않음
+ * @param {Function} options.apply     (data) => 최종 배열. 캐시 반영·렌더를 수행하고
+ *                                     localStorage에 저장할 배열을 반환한다.
+ * @param {Function} options.hasCache  () => boolean. 실패 시 폴백 데이터 보유 여부.
+ */
+function loadStockDataShared(options) {
+  const opts = options || {};
+  const silent = !!opts.silent;
+  const apply = typeof opts.apply === 'function' ? opts.apply : (data => data);
+  const hasCache = typeof opts.hasCache === 'function' ? opts.hasCache : (() => false);
+
+  if (isLoadingStockData) return;
+  isLoadingStockData = true;
+
+  let loadingIndicator = null;
+  if (!silent) {
+    loadingIndicator = document.createElement('div');
+    loadingIndicator.id = 'loadingIndicator';
+    loadingIndicator.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 10px; border: 1px solid #ccc; z-index: 1000;';
+    loadingIndicator.textContent = '재고 데이터 로드 중...';
+    document.body.appendChild(loadingIndicator);
+  }
+  const removeIndicator = () => {
+    if (loadingIndicator && document.body.contains(loadingIndicator)) {
+      document.body.removeChild(loadingIndicator);
+    }
+  };
+
+  let timerId = null;
+  const clearTimer = () => {
+    if (timerId) { clearTimeout(timerId); timerId = null; }
+  };
+
+  const timeoutPromise = new Promise((_, reject) => {
+    timerId = setTimeout(() => reject(new Error('재고 데이터 로드 타임아웃')), 30000);
+  });
+
+  const loadPromise = new Promise((resolve, reject) => {
+    google.script.run
+      .withSuccessHandler(data => { clearTimer(); resolve(data); })
+      .withFailureHandler(err => { clearTimer(); reject(err); })
+      .getStockData();
+  });
+
+  Promise.race([loadPromise, timeoutPromise])
+    .then(data => {
+      isLoadingStockData = false;
+      removeIndicator();
+      const finalData = apply(data || []);
+      try {
+        localStorage.setItem('cached_stock_data', JSON.stringify(finalData));
+        localStorage.setItem('stock_data_updated', Date.now().toString());
+      } catch (e) {}
+    })
+    .catch(err => {
+      isLoadingStockData = false;
+      removeIndicator();
+      const errMsg = (err && err.message) ? err.message : String(err || '알 수 없는 오류');
+      console.error('Failed to load stock data:', errMsg);
+      if (hasCache()) {
+        console.warn('⚠️ 최신 재고 조회 실패로 로컬 캐시 재고 데이터를 유지합니다:', errMsg);
+      } else if (!silent) {
+        alert('재고 데이터를 불러오는 데 실패했습니다: ' + errMsg);
+      }
+    });
+}
+
+/**
+ * 입출고증(COMPROBANTE) 2연 인쇄.
+ *
+ * invoiceNumber는 호출부에 따라 순번만(`001`) 또는 날짜 포함
+ * 전체 송장번호(`2026/09/12-001`)로 들어온다. 전표에는 순번만 찍는다.
+ *
+ * print()가 예외를 던지거나 사용자가 인쇄를 취소해도 callback은 반드시
+ * 실행된다. 커밋 후 정리 작업을 이 콜백에 의존하는 호출부가 있기 때문이다.
+ */
+function printReceipt(records, type, selectedDate, admin, invoiceNumber, callback) {
+  const iframe = document.getElementById('printFrame');
+  if (!iframe) return;
+  const doc = iframe.contentWindow.document;
+  const invoiceNo = String(invoiceNumber || '');
+  const displayNumber = invoiceNo.includes('-') ? invoiceNo.split('-')[1] : invoiceNo;
+  const formattedDate = selectedDate.replace(/-/g, '/');
+  const totalItems = new Set(records.map(r => `${r.itemName}_${r.color}`)).size;
+  const totalBoxes = records.reduce((sum, r) => sum + Math.abs(r.boxQty), 0);
+  const totalIndividuals = records.reduce((sum, r) => sum + Math.abs(r.individualQty), 0);
+  const rowsPerPage = 15;
+  const pages = Math.ceil(records.length / rowsPerPage);
+  const title = type === 'in' ? 'COMPROBANTE DE ENTRADA' : 'COMPROBANTE DE SALIDA';
+  const titleColor = type === 'in' ? 'red' : 'black';
+  const adminColor = admin === 'ADMIN' ? 'black' : 'green';
+  const adminStyle = `font-size: 11pt; color: ${adminColor};`;
+  let htmlContent = '';
+  const locationValue = records.length > 0 ? records[0].location : '미지정';
+  for (let page = 0; page < pages; page++) {
+    const startIdx = page * rowsPerPage;
+    const endIdx = Math.min(startIdx + rowsPerPage, records.length);
+    const pageRecords = records.slice(startIdx, endIdx);
+    let tableRows = '<tr><th>PRODUCTO</th><th>COLOR</th><th>BULTO</th><th>PZS</th><th>PZS/B</th><th>TOTAL</th></tr>';
+    for (let i = 0; i < rowsPerPage; i++) {
+      if (i < pageRecords.length) {
+        const rec = pageRecords[i];
+        const boxQty = Math.abs(rec.boxQty);
+        const individualQty = Math.abs(rec.individualQty);
+        const boxContent = rec.boxContent || 0;
+        const totalIndividual = (boxQty * boxContent) + individualQty;
+        tableRows += `<tr><td>${rec.itemName}</td><td>${rec.color}</td><td>${boxQty}</td><td>${individualQty}</td><td>${boxContent}</td><td>${totalIndividual}</td></tr>`;
+      } else {
+        tableRows += `<tr><td></td><td></td><td></td><td></td><td></td><td></td></tr>`;
+      }
+    }
+    const summaryTable = page === 0 ? `
+      <table class="summary-table">
+        <tr><th>cant item</th><th>cant bulto</th><th>cant pzs</th></tr>
+        <tr><td>${totalItems}</td><td>${totalBoxes}</td><td>${totalIndividuals}</td></tr>
+      </table>
+    ` : '';
+    htmlContent += `
+      <div class="page">
+        <div class="receipt-container">
+          <div class="receipt">
+            <div class="header" style="color: ${titleColor};">${title}</div>
+            <div class="details">
+              <p>No: ${displayNumber}</p>
+              <p>fetcha: ${formattedDate}</p>
+              <p class="location">UBICACION: <span class="location-value">${locationValue}</span></p>
+              <p class="admin">VENDEDOR: <span style="${adminStyle}">${admin}</span></p>
+              ${summaryTable}
+            </div>
+            <table class="main-table">${tableRows}</table>
+            <div class="footer">
+              <span>ANIMO!!!</span>
+              <span class="page-number">${page + 1}-${pages}</span>
+            </div>
+          </div>
+          <div class="receipt">
+            <div class="header" style="color: ${titleColor};">${title}</div>
+            <div class="details">
+              <p>No: ${displayNumber}</p>
+              <p>fetcha: ${formattedDate}</p>
+              <p class="location">UBICACION: <span class="location-value">${locationValue}</span></p>
+              <p class="admin">VENDEDOR: <span style="${adminStyle}">${admin}</span></p>
+              ${summaryTable}
+            </div>
+            <table class="main-table">${tableRows}</table>
+            <div class="footer">
+              <span>ANIMO!!!</span>
+              <span class="page-number">${page + 1}-${pages}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+  doc.open();
+  doc.write(`
+    <html>
+      <head>
+        <style>
+          @page { size: letter landscape; margin: 0.5in; margin-bottom: 1in; }
+          body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
+          .page { width: 100%; height: 7.5in; display: flex; justify-content: center; align-items: center; page-break-after: always; margin-bottom: 0.5in; }
+          .receipt-container { display: flex; justify-content: space-between; width: 10in; margin-top: 0.2in; }
+          .receipt { width: 4.75in; border: 1px solid #000; padding: 0.1in; box-sizing: border-box; margin-bottom: 0.2in; }
+          .header { text-align: center; font-weight: bold; font-size: 14pt; margin-bottom: 0.2in; }
+          .details { font-size: 10pt; margin-bottom: 0.2in; }
+          .details p { margin: 0.05in 0; }
+          .location { font-size: 10pt; font-weight: bold; text-decoration: underline; }
+          .location-value { color: blue; font-size: 13pt; }
+          .admin { font-size: 9pt; font-weight: bold; }
+          .summary-table { width: 60%; margin: 0.1in auto; border-collapse: collapse; font-size: 10pt; }
+          .summary-table th, .summary-table td { border: 1px solid #000; padding: 0.05in; text-align: center; }
+          .summary-table th { background-color: #f2f2f2; font-weight: bold; }
+          .main-table { width: 100%; border-collapse: collapse; font-size: 10pt; }
+          .main-table th, .main-table td { border: 1px solid #000; padding: 0.05in; text-align: center; height: 0.3in; }
+          .main-table th { background-color: #f2f2f2; font-weight: bold; }
+          .footer { text-align: center; font-size: 10pt; margin-top: 0.2in; display: flex; justify-content: space-between; align-items: center; }
+          .page-number { font-weight: bold; }
+        </style>
+      </head>
+      <body>${htmlContent}</body>
+    </html>
+  `);
+  doc.close();
+  iframe.contentWindow.focus();
+  setTimeout(() => {
+    try {
+      iframe.contentWindow.print();
+    } catch (printErr) {
+      console.warn('printReceipt iframe print error:', printErr);
+    }
+    if (typeof callback === 'function') {
+      try {
+        callback();
+      } catch (cbErr) {
+        console.warn('printReceipt callback error:', cbErr);
+      }
+    }
+  }, 500);
+}
+</script>

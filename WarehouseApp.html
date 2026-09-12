@@ -2366,6 +2366,8 @@
     <iframe id="printFrame" style="display: none;"></iframe>
   </div>
 
+<?!= include('Shared') ?>
+
 <script>
 let dropdownVisible = false;
 let records = [];
@@ -2621,7 +2623,7 @@ try {
 let locationCache = [];
 let debounceTimeout;
 let subWhDebounceTimeout;
-let isLoadingStockData = false;
+// isLoadingStockData는 Shared.html이 소유한다.
 let lastSyncedStockTime = '';
 try {
   lastSyncedStockTime = localStorage.getItem('stock_data_updated') || '';
@@ -2751,65 +2753,18 @@ const typeConfig = {
 };
 
 function loadStockData(silent = false) {
-  if (isLoadingStockData) return;
-  isLoadingStockData = true;
-  let loadingIndicator = null;
-  if (!silent) {
-    loadingIndicator = document.createElement('div');
-    loadingIndicator.id = 'loadingIndicator';
-    loadingIndicator.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 10px; border: 1px solid #ccc; z-index: 1000;';
-    loadingIndicator.textContent = '재고 데이터 로드 중...';
-    document.body.appendChild(loadingIndicator);
-  }
-
-  let timerId = null;
-  const timeoutPromise = new Promise((_, reject) => {
-    timerId = setTimeout(() => reject(new Error('재고 데이터 로드 타임아웃')), 30000);
-  });
-
-  const loadPromise = new Promise((resolve, reject) => {
-    google.script.run
-      .withSuccessHandler(data => {
-        if (timerId) { clearTimeout(timerId); timerId = null; }
-        resolve(data);
-      })
-      .withFailureHandler(err => {
-        if (timerId) { clearTimeout(timerId); timerId = null; }
-        reject(err);
-      })
-      .getStockData();
-  });
-
-  Promise.race([loadPromise, timeoutPromise])
-    .then(data => {
-      stockDataCache = applyRecentAdjustments(data || []);
-      isLoadingStockData = false;
-      if (loadingIndicator && document.body.contains(loadingIndicator)) {
-        document.body.removeChild(loadingIndicator);
-      }
-      try {
-        localStorage.setItem('cached_stock_data', JSON.stringify(stockDataCache));
-        localStorage.setItem('stock_data_updated', Date.now().toString());
-      } catch (e) {}
+  loadStockDataShared({
+    silent: silent,
+    hasCache: () => stockDataCache && stockDataCache.length > 0,
+    apply: data => {
+      stockDataCache = applyRecentAdjustments(data);
       initProductHotkeys();
       updateTable();
       updateTotals();
       if (typeof updateUnitType === 'function') updateUnitType();
-    })
-    .catch(err => {
-      isLoadingStockData = false;
-      const errMsg = (err && err.message) ? err.message : String(err || '알 수 없는 오류');
-      console.error('Failed to load stock data:', errMsg);
-      if (stockDataCache && stockDataCache.length > 0) {
-        console.warn('⚠️ 최신 재고 조회 실패로 로컬 캐시 재고 데이터를 유지합니다:', errMsg);
-      } else if (!silent) {
-        alert('재고 데이터를 불러오는 데 실패했습니다: ' + errMsg);
-      }
-      if (loadingIndicator && document.body.contains(loadingIndicator)) {
-        document.body.removeChild(loadingIndicator);
-      }
-      stockDataCache = stockDataCache || [];
-    });
+      return stockDataCache;
+    }
+  });
 }
 
 function loadManufacturers() {
@@ -4982,128 +4937,7 @@ function handleError(error) {
   }
 }
 
-function printReceipt(records, type, selectedDate, admin, invoiceNumber, callback) {
-  const iframe = document.getElementById('printFrame');
-  if (!iframe) return;
-  const doc = iframe.contentWindow.document;
-  const formattedDate = selectedDate.replace(/-/g, '/');
-  const totalItems = new Set(records.map(r => `${r.itemName}_${r.color}`)).size;
-  const totalBoxes = records.reduce((sum, r) => sum + Math.abs(r.boxQty), 0);
-  const totalIndividuals = records.reduce((sum, r) => sum + Math.abs(r.individualQty), 0);
-  const rowsPerPage = 15;
-  const pages = Math.ceil(records.length / rowsPerPage);
-  const title = type === 'in' ? 'COMPROBANTE DE ENTRADA' : 'COMPROBANTE DE SALIDA';
-  const titleColor = type === 'in' ? 'red' : 'black';
-  const adminColor = admin === 'ADMIN' ? 'black' : 'green';
-  const adminStyle = `font-size: 11pt; color: ${adminColor};`;
-  let htmlContent = '';
-  const locationValue = records.length > 0 ? records[0].location : '미지정';
-  for (let page = 0; page < pages; page++) {
-    const startIdx = page * rowsPerPage;
-    const endIdx = Math.min(startIdx + rowsPerPage, records.length);
-    const pageRecords = records.slice(startIdx, endIdx);
-    let tableRows = '<tr><th>PRODUCTO</th><th>COLOR</th><th>BULTO</th><th>PZS</th><th>PZS/B</th><th>TOTAL</th></tr>';
-    for (let i = 0; i < 15; i++) {
-      if (i < pageRecords.length) {
-        const rec = pageRecords[i];
-        const boxQty = Math.abs(rec.boxQty);
-        const individualQty = Math.abs(rec.individualQty);
-        const boxContent = rec.boxContent || 0;
-        const totalIndividual = (boxQty * boxContent) + individualQty;
-        tableRows += `<tr><td>${rec.itemName}</td><td>${rec.color}</td><td>${boxQty}</td><td>${individualQty}</td><td>${boxContent}</td><td>${totalIndividual}</td></tr>`;
-      } else {
-        tableRows += `<tr><td></td><td></td><td></td><td></td><td></td><td></td></tr>`;
-      }
-    }
-    const summaryTable = page === 0 ? `
-      <table class="summary-table">
-        <tr><th>cant item</th><th>cant bulto</th><th>cant pzs</th></tr>
-        <tr><td>${totalItems}</td><td>${totalBoxes}</td><td>${totalIndividuals}</td></tr>
-      </table>
-    ` : '';
-    htmlContent += `
-      <div class="page">
-        <div class="receipt-container">
-          <div class="receipt">
-            <div class="header" style="color: ${titleColor};">${title}</div>
-            <div class="details">
-              <p>No: ${invoiceNumber}</p>
-              <p>fetcha: ${formattedDate}</p>
-              <p class="location">UBICACION: <span class="location-value">${locationValue}</span></p>
-              <p class="admin">VENDEDOR: <span style="${adminStyle}">${admin}</span></p>
-              ${summaryTable}
-            </div>
-            <table class="main-table">${tableRows}</table>
-            <div class="footer">
-              <span>ANIMO!!!</span>
-              <span class="page-number">${page + 1}-${pages}</span>
-            </div>
-          </div>
-          <div class="receipt">
-            <div class="header" style="color: ${titleColor};">${title}</div>
-            <div class="details">
-              <p>No: ${invoiceNumber}</p>
-              <p>fetcha: ${formattedDate}</p>
-              <p class="location">UBICACION: <span class="location-value">${locationValue}</span></p>
-              <p class="admin">VENDEDOR: <span style="${adminStyle}">${admin}</span></p>
-              ${summaryTable}
-            </div>
-            <table class="main-table">${tableRows}</table>
-            <div class="footer">
-              <span>ANIMO!!!</span>
-              <span class="page-number">${page + 1}-${pages}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
-  }
-  doc.open();
-  doc.write(`
-    <html>
-      <head>
-        <style>
-          @page { size: letter landscape; margin: 0.5in; margin-bottom: 1in; }
-          body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
-          .page { width: 100%; height: 7.5in; display: flex; justify-content: center; align-items: center; page-break-after: always; margin-bottom: 0.5in; }
-          .receipt-container { display: flex; justify-content: space-between; width: 10in; margin-top: 0.2in; }
-          .receipt { width: 4.75in; border: 1px solid #000; padding: 0.1in; box-sizing: border-box; margin-bottom: 0.2in; }
-          .header { text-align: center; font-weight: bold; font-size: 14pt; margin-bottom: 0.2in; }
-          .details { font-size: 10pt; margin-bottom: 0.2in; }
-          .details p { margin: 0.05in 0; }
-          .location { font-size: 10pt; font-weight: bold; text-decoration: underline; }
-          .location-value { color: blue; font-size: 13pt; }
-          .admin { font-size: 9pt; font-weight: bold; }
-          .summary-table { width: 60%; margin: 0.1in auto; border-collapse: collapse; font-size: 10pt; }
-          .summary-table th, .summary-table td { border: 1px solid #000; padding: 0.05in; text-align: center; }
-          .summary-table th { background-color: #f2f2f2; font-weight: bold; }
-          .main-table { width: 100%; border-collapse: collapse; font-size: 10pt; }
-          .main-table th, .main-table td { border: 1px solid #000; padding: 0.05in; text-align: center; height: 0.3in; }
-          .main-table th { background-color: #f2f2f2; font-weight: bold; }
-          .footer { text-align: center; font-size: 10pt; margin-top: 0.2in; display: flex; justify-content: space-between; align-items: center; }
-          .page-number { font-weight: bold; }
-        </style>
-      </head>
-      <body>${htmlContent}</body>
-    </html>
-  `);
-  doc.close();
-  iframe.contentWindow.focus();
-  setTimeout(() => {
-    try {
-      iframe.contentWindow.print();
-    } catch (printErr) {
-      console.warn('printReceipt iframe print error:', printErr);
-    }
-    if (typeof callback === 'function') {
-      try {
-        callback();
-      } catch (cbErr) {
-        console.warn('printReceipt callback error:', cbErr);
-      }
-    }
-  }, 500);
-}
+// printReceipt는 Shared.html로 이동했다 (SearchModify와 공유).
 
 // 🖨️ [사장님 업무 지시] 장바구니 품목 스페인어 작업지시서(ORDEN DE TRABAJO) 즉시 인쇄
 function printWorkOrder() {
