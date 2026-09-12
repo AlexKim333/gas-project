@@ -389,7 +389,7 @@ function loadStockData(silent = false) {
 function loadDropdowns() {
   if (locationCache.length > 0) {
     const select = document.getElementById('location');
-    select.innerHTML = '<option value="">선택</option>' + locationCache.map(loc => `<option value="${loc}">${loc}</option>`).join('');
+    select.innerHTML = '<option value="">선택</option>' + locationCache.map(loc => `<option value="${escapeHtml(loc)}">${escapeHtml(loc)}</option>`).join('');
     return;
   }
   callServer(currentType === 'in' ? 'getInLocations' : 'getOutLocations', [], {
@@ -398,7 +398,7 @@ function loadDropdowns() {
     onSuccess: data => {
       locationCache = data;
       const select = document.getElementById('location');
-      select.innerHTML = '<option value="">선택</option>' + data.map(loc => `<option value="${loc}">${loc}</option>`).join('');
+      select.innerHTML = '<option value="">선택</option>' + data.map(loc => `<option value="${escapeHtml(loc)}">${escapeHtml(loc)}</option>`).join('');
     },
     onError: err => {
       console.error('Failed to load locations:', err);
@@ -635,12 +635,12 @@ function updateTable() {
     html += `
       <tr>
         <td><input type="checkbox" class="rowCheckbox" data-index="${idx}"></td>
-        <td>${rec.itemName}</td>
-        <td>${rec.color}</td>
+        <td>${escapeHtml(rec.itemName)}</td>
+        <td>${escapeHtml(rec.color)}</td>
         <td contenteditable="true" class="editable" onblur="updateRecord(${idx}, 'boxQty', this.textContent)">${Math.abs(rec.boxQty)}</td>
         <td contenteditable="true" class="editable" onblur="updateRecord(${idx}, 'individualQty', this.textContent)">${Math.abs(rec.individualQty)}</td>
         <td>${rec.boxContent}</td>
-        <td>${rec.location}</td>
+        <td>${escapeHtml(rec.location)}</td>
       </tr>
     `;
   });

@@ -2793,7 +2793,7 @@ function loadAdminList() {
       const select = document.getElementById('adminSelect');
       if (!select) return;
       select.innerHTML = '<option value="ADMIN" selected>ADMIN</option>' +
-        admins.map(admin => `<option value="${admin}">${admin}</option>`).join('');
+        admins.map(admin => `<option value="${escapeHtml(admin)}">${escapeHtml(admin)}</option>`).join('');
       restoreMetadata();
       updatePendingCount();
     },
@@ -3096,7 +3096,7 @@ function updateClock() {
 function loadDropdowns() {
   if (locationCache.length > 0) {
     const select = document.getElementById('location');
-    select.innerHTML = '<option value="">선택</option>' + locationCache.map(loc => `<option value="${loc}">${loc}</option>`).join('');
+    select.innerHTML = '<option value="">선택</option>' + locationCache.map(loc => `<option value="${escapeHtml(loc)}">${escapeHtml(loc)}</option>`).join('');
     restoreMetadata();
     initLocationHotkeys();
     return;
@@ -3109,7 +3109,7 @@ function loadDropdowns() {
       locationCache = data;
       const select = document.getElementById('location');
       if (!select) return;
-      select.innerHTML = '<option value="">선택</option>' + data.map(loc => `<option value="${loc}">${loc}</option>`).join('');
+      select.innerHTML = '<option value="">선택</option>' + data.map(loc => `<option value="${escapeHtml(loc)}">${escapeHtml(loc)}</option>`).join('');
       restoreMetadata();
       initLocationHotkeys();
     },
@@ -3163,9 +3163,9 @@ function filterItems(searchText) {
       const li = document.createElement('li');
       li.innerHTML = `
         <div style="display:flex; align-items:center; gap:6px; overflow:hidden; text-overflow:ellipsis;">
-          <strong style="color:#0f172a; font-size:9pt;">${item.name}</strong>
-          <span style="font-size:7.5pt; background:#f1f5f9; color:#475569; padding:1px 5px; border-radius:3px; font-weight:600;">${item.color}</span>
-          ${isAliasMatch ? `<span style="font-size:7pt; background:#eff6ff; color:#1d4ed8; padding:1px 4px; border-radius:3px; font-weight:600; border: 1px solid #bfdbfe;">🏷️ 별명(${aliasInfo.rawAlias})</span>` : ''}
+          <strong style="color:#0f172a; font-size:9pt;">${escapeHtml(item.name)}</strong>
+          <span style="font-size:7.5pt; background:#f1f5f9; color:#475569; padding:1px 5px; border-radius:3px; font-weight:600;">${escapeHtml(item.color)}</span>
+          ${isAliasMatch ? `<span style="font-size:7pt; background:#eff6ff; color:#1d4ed8; padding:1px 4px; border-radius:3px; font-weight:600; border: 1px solid #bfdbfe;">🏷️ 별명(${escapeHtml(aliasInfo.rawAlias)})</span>` : ''}
         </div>
         <div style="font-size:7.8pt; color:#64748b; flex:none; text-align:right;">
           재고: <strong style="color:#2e7d32;">${item.stockBox}상자</strong> + ${item.stockIndividual}개 <span style="color:#94a3b8;">(${item.boxContent}入)</span>
@@ -3688,12 +3688,12 @@ function updateTable() {
       html += `
         <tr class="${editingClass}" ondblclick="enterEditMode(${idx})" title="더블클릭하여 품목 수정">
           <td><input type="checkbox" class="rowCheckbox" data-index="${idx}" ${isEditingThisRow ? 'checked' : ''}></td>
-          <td>${rec.itemName}</td>
-          <td contenteditable="true" class="editable" onblur="updateRecord(${idx}, 'color', this.textContent)">${rec.color}</td>
+          <td>${escapeHtml(rec.itemName)}</td>
+          <td contenteditable="true" class="editable" onblur="updateRecord(${idx}, 'color', this.textContent)">${escapeHtml(rec.color)}</td>
           <td contenteditable="true" class="editable" onblur="updateRecord(${idx}, 'boxContent', this.textContent)">${rec.boxContent}</td>
           <td>${rec.safeStock}</td>
           <td>${rec.initialStock}</td>
-          <td>${rec.manufacturer || ''}</td>
+          <td>${escapeHtml(rec.manufacturer || '')}</td>
         </tr>
       `;
     } else {
@@ -3735,7 +3735,7 @@ function updateTable() {
             shortageBadge = `
               <div style="margin-top: 2px; display: flex; align-items: center; gap: 4px;">
                 <span style="font-size: 7.2pt; background: #fee2e2; color: #b91c1c; padding: 1px 5px; border-radius: 3px; font-weight: 700;">${shortText}</span>
-                <button type="button" class="btn-quick-adj no-print" onclick="openQuickAdjustModal('${(rec.itemName || '').replace(/'/g, "\\'")}', '${(rec.color || 'SURTIDO').replace(/'/g, "\\'")}', ${rec.boxContent || 0}, ${curBox}, ${curIndiv}, ${reqBox || 1})" title="실재고 반영을 위한 퀵 재고조정">⚡ 퀵재고</button>
+                <button type="button" class="btn-quick-adj no-print" onclick="openQuickAdjustModal(${jsArg(rec.itemName || '')}, ${jsArg(rec.color || 'SURTIDO')}, ${rec.boxContent || 0}, ${curBox}, ${curIndiv}, ${reqBox || 1})" title="실재고 반영을 위한 퀵 재고조정">⚡ 퀵재고</button>
               </div>
             `;
           }
@@ -3807,7 +3807,7 @@ function updateTable() {
 
           siblingChipsHtml = `
             <div class="sibling-chip-wrap no-print" style="margin-top: 3px; display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; position: relative;">
-              <button type="button" class="${chipCls}" onclick="swapRecordItemName(${idx}, '${topSib.name}')" title="${chipTitle}">
+              <button type="button" class="${chipCls}" onclick="swapRecordItemName(${idx}, '${escapeHtml(topSib.name)}')" title="${chipTitle}">
                 💡 [${topSib.name}] (${topSib.stockBox}상자) 교체
               </button>
               ${hasOtherSiblings ? `
@@ -3819,8 +3819,8 @@ function updateTable() {
                     자매 품목 선택
                   </div>
                   ${siblings.slice(1).map(sib => `
-                    <div class="sibling-menu-item" onclick="swapRecordItemName(${idx}, '${sib.name}')">
-                      <span style="font-weight: 600; color: #1e293b;">${sib.name}</span>
+                    <div class="sibling-menu-item" onclick="swapRecordItemName(${idx}, '${escapeHtml(sib.name)}')">
+                      <span style="font-weight: 600; color: #1e293b;">${escapeHtml(sib.name)}</span>
                       <span style="font-size: 7.2pt; color: ${sib.stockBox > 0 ? '#16a34a' : '#94a3b8'}; font-weight: 600;">(${sib.stockBox}상자)</span>
                     </div>
                   `).join('')}
@@ -3835,12 +3835,12 @@ function updateTable() {
         <tr class="${editingClass}" style="${finalRowStyle}" ondblclick="enterEditMode(${idx})" title="더블클릭하여 품목 수정">
           <td><input type="checkbox" class="rowCheckbox" data-index="${idx}" ${isEditingThisRow ? 'checked' : ''}></td>
           <td>
-            <span style="font-weight: 600;">${rec.itemName}</span>
+            <span style="font-weight: 600;">${escapeHtml(rec.itemName)}</span>
             ${stockDisplay}
             ${shortageBadge}
             ${siblingChipsHtml}
           </td>
-          <td>${rec.color}</td>
+          <td>${escapeHtml(rec.color)}</td>
           <td contenteditable="true" class="editable" onblur="updateRecord(${idx}, 'boxQty', this.textContent)">${currentType === 'in' ? rec.boxQty : Math.abs(rec.boxQty)}</td>
           <td contenteditable="true" class="editable" onblur="updateRecord(${idx}, 'individualQty', this.textContent)">${currentType === 'in' ? rec.individualQty : Math.abs(rec.individualQty)}</td>
           <td contenteditable="true" class="editable" onblur="updateRecord(${idx}, 'boxContent', this.textContent)">${rec.boxContent}</td>
@@ -3951,21 +3951,21 @@ function showConfirmModal() {
   records.forEach(rec => {
     html += currentType === 'product' ? `
       <tr>
-        <td>${rec.itemName}</td>
-        <td>${rec.color}</td>
+        <td>${escapeHtml(rec.itemName)}</td>
+        <td>${escapeHtml(rec.color)}</td>
         <td>${rec.boxContent}</td>
         <td>${rec.safeStock}</td>
         <td>${rec.initialStock}</td>
-        <td>${rec.manufacturer || ''}</td>
+        <td>${escapeHtml(rec.manufacturer || '')}</td>
       </tr>
     ` : `
       <tr>
-        <td>${rec.itemName}</td>
-        <td>${rec.color}</td>
+        <td>${escapeHtml(rec.itemName)}</td>
+        <td>${escapeHtml(rec.color)}</td>
         <td>${currentType === 'in' ? rec.boxQty : Math.abs(rec.boxQty)}</td>
         <td>${currentType === 'in' ? rec.individualQty : Math.abs(rec.individualQty)}</td>
         <td>${rec.boxContent}</td>
-        <td>${rec.location}</td>
+        <td>${escapeHtml(rec.location)}</td>
         <td style="text-align: center; font-weight: 700; color: ${(rec.matchRate || 100) >= 80 ? '#15803d' : '#b45309'};">${rec.matchRate !== undefined ? rec.matchRate + '%' : '100%'}</td>
       </tr>
     `;
@@ -4168,8 +4168,8 @@ function showPendingModal() {
       <tr onclick="selectPending(${idx})" id="pendingRow${idx}">
         <td>${idx + 1}</td>
         <td>${pending.createdAt}</td>
-        <td>${pending.location || '-'}</td>
-        <td>${pending.admin || '-'}</td>
+        <td>${escapeHtml(pending.location || '-')}</td>
+        <td>${escapeHtml(pending.admin || '-')}</td>
         <td>${itemCount}</td>
       </tr>
     `;
@@ -4205,8 +4205,8 @@ function selectPending(index) {
   pendingList[index].records.forEach(rec => {
     html += `
       <tr>
-        <td>${rec.itemName || ''}</td>
-        <td>${rec.color || ''}</td>
+        <td>${escapeHtml(rec.itemName || '')}</td>
+        <td>${escapeHtml(rec.color || '')}</td>
         <td>${currentType === 'in' ? rec.boxQty : Math.abs(rec.boxQty || 0)}</td>
         <td>${currentType === 'in' ? rec.individualQty : Math.abs(rec.individualQty || 0)}</td>
         <td>${rec.boxContent || ''}</td>
@@ -4385,8 +4385,8 @@ function deletePending() {
       <tr onclick="selectPending(${idx})" id="pendingRow${idx}">
         <td>${idx + 1}</td>
         <td>${pending.createdAt}</td>
-        <td>${pending.location || '-'}</td>
-        <td>${pending.admin || '-'}</td>
+        <td>${escapeHtml(pending.location || '-')}</td>
+        <td>${escapeHtml(pending.admin || '-')}</td>
         <td>${itemCount}</td>
       </tr>
     `;
@@ -4442,8 +4442,8 @@ function runStockAudit() {
           return `
             <tr style="border-bottom: 1px solid #e2e8f0;">
               <td style="padding: 8px; text-align: center;">${i + 1}</td>
-              <td style="padding: 8px; font-weight: bold;">${d.name}</td>
-              <td style="padding: 8px; text-align: center;">${d.color}</td>
+              <td style="padding: 8px; font-weight: bold;">${escapeHtml(d.name)}</td>
+              <td style="padding: 8px; text-align: center;">${escapeHtml(d.color)}</td>
               <td style="padding: 8px; text-align: right;">${d.currentBox}박스 (${d.currentIndividual}개)</td>
               <td style="padding: 8px; text-align: right; color: #475569;">${d.expectedTotal}개</td>
               <td style="padding: 8px; text-align: right; color: ${color}; font-weight: bold;">
@@ -4551,8 +4551,8 @@ function runStockNormalizeAnalysis() {
         const origRowsHtml = g.originalItems.map(item => `
           <tr style="background: #f8fafc; border-bottom: 1px solid #f1f5f9; font-size: 11.5px;">
             <td style="padding: 4px 8px; color: #64748b;">${item.row}행</td>
-            <td style="padding: 4px 8px; font-weight: bold;">${item.name}</td>
-            <td style="padding: 4px 8px; text-align: center;">${item.color}</td>
+            <td style="padding: 4px 8px; font-weight: bold;">${escapeHtml(item.name)}</td>
+            <td style="padding: 4px 8px; text-align: center;">${escapeHtml(item.color)}</td>
             <td style="padding: 4px 8px; text-align: right;">${item.boxContent}개/박스</td>
             <td style="padding: 4px 8px; text-align: right;">${item.stockBox}박스 (${item.stockIndividual}개)</td>
             <td style="padding: 4px 8px; text-align: right; color: #475569;">총 ${item.totalIndiv}개</td>
@@ -4568,7 +4568,7 @@ function runStockNormalizeAnalysis() {
             <div style="background: #f1f5f9; padding: 8px 12px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0;">
               <div>
                 <strong style="color: #0f172a; font-size: 13px;">#${idx + 1}. [표준] ${g.canonicalName}</strong>
-                <span style="color: #475569; font-size: 12px; margin-left: 6px;">(색상: ${g.color})</span>
+                <span style="color: #475569; font-size: 12px; margin-left: 6px;">(색상: ${escapeHtml(g.color)})</span>
                 ${tags.join('')}
               </div>
               <div style="font-size: 11.5px; color: #64748b;">
@@ -4676,7 +4676,7 @@ function confirmAndExecuteNormalization() {
             <div style="font-size: 48px;">🎉</div>
             <h3 style="margin: 12px 0; font-size: 18px;">재고시트 데이터 정규화 및 통합 완료!</h3>
             <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 16px; margin: 16px auto; max-width: 550px; text-align: left; font-size: 13px; color: #166534; line-height: 1.8;">
-              <div>🛡️ <strong>자동 백업 시트:</strong> <code style="background: #dcfce7; padding: 2px 6px; border-radius: 4px;">${res.backupSheetName}</code></div>
+              <div>🛡️ <strong>자동 백업 시트:</strong> <code style="background: #dcfce7; padding: 2px 6px; border-radius: 4px;">${escapeHtml(res.backupSheetName)}</code></div>
               <div>📊 <strong>데이터 행 정리:</strong> 기존 ${res.originalRowCount}행 → 통합 후 ${res.finalRowCount}행 (${res.reducedRowsCount}개 중복 행 정리)</div>
               <div>⚖️ <strong>수량 보존:</strong> 모든 낱개 수량이 대표 규격으로 100% 오차 없이 편입·합산되었습니다.</div>
             </div>
@@ -4835,8 +4835,8 @@ function onWinterSafeStockAnalysisLoaded(res) {
     html += `
       <tr style="background: ${rowBg}; border-bottom: 1px solid #e2e8f0;">
         <td style="padding: 6px 4px; text-align: center; color: #64748b;">${idx + 1}</td>
-        <td style="padding: 6px 6px; font-weight: bold; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${item.name}">${item.name}</td>
-        <td style="padding: 6px 4px; text-align: center; color: #475569;">${item.color}</td>
+        <td style="padding: 6px 6px; font-weight: bold; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</td>
+        <td style="padding: 6px 4px; text-align: center; color: #475569;">${escapeHtml(item.color)}</td>
         <td style="padding: 6px 4px; text-align: center;">
           ${item.isHotInSubWh ? '<span style="background: #fef08a; color: #854d0e; padding: 1px 4px; border-radius: 3px; font-size: 7.5pt; font-weight: bold;">🌟관심</span>' : (item.isHot ? '<span style="background: #fed7aa; color: #9a3412; padding: 1px 4px; border-radius: 3px; font-size: 7.5pt; font-weight: bold;">🔥피크</span>' : '<span style="color: #94a3b8; font-size: 7.5pt;">일반</span>')}
         </td>
@@ -5034,7 +5034,7 @@ function printWorkOrder() {
     <html>
       <head>
         <meta charset="utf-8">
-        <title>ORDEN DE TRABAJO - ${locationValue}</title>
+        <title>ORDEN DE TRABAJO - ${escapeHtml(locationValue)}</title>
         <style>
           @page { size: letter portrait; margin: 12mm 15mm; }
           body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 0; color: #0f172a; }
@@ -5275,7 +5275,7 @@ function renderLocationHotkeys() {
         onclick="selectLocationHotkey(${i})" 
         oncontextmenu="event.preventDefault(); openHotkeyConfigModal('location');"
         title="${loc ? `${i + 1}번 거래처 선택 (Alt+${i + 1})` : '클릭하여 거래처 설정'}">
-        <div class="btn-text"><span class="btn-num">${i + 1}.</span>${loc || '+ 슬롯 설정'}</div>
+        <div class="btn-text"><span class="btn-num">${i + 1}.</span>${escapeHtml(loc || '+ 슬롯 설정')}</div>
       </button>
     `;
   }
@@ -5372,8 +5372,8 @@ function renderBestsellerHotkeys() {
         onclick="selectBestsellerHotkey(${i})"
         oncontextmenu="event.preventDefault(); openHotkeyConfigModal('bestseller');"
         title="${hasItem ? `${item.name} (${item.color}) 선택` : '클릭하여 베스트셀러 설정'}">
-        <div class="btn-text"><span class="btn-num">${i + 1}.</span>${hasItem ? item.name : '+ 슬롯 설정'}</div>
-        ${hasItem ? `<div class="btn-sub">${item.color} (${item.boxContent}入)</div>` : ''}
+        <div class="btn-text"><span class="btn-num">${i + 1}.</span>${escapeHtml(hasItem ? item.name : '+ 슬롯 설정')}</div>
+        ${hasItem ? `<div class="btn-sub">${escapeHtml(item.color)} (${item.boxContent}入)</div>` : ''}
       </button>
     `;
   }
@@ -5450,7 +5450,7 @@ function renderGridHotkeys() {
         onclick="openGridSelectionModal(${i})"
         oncontextmenu="event.preventDefault(); openHotkeyConfigModal('grid');"
         title="${hasItem ? `${itemName} (${variantCount}개 컬러) 일괄입력 열기` : '클릭하여 그리드 상품 설정'}">
-        <div class="btn-text"><span class="btn-num">${i + 1}.</span>${hasItem ? itemName : '+ 슬롯 설정'}</div>
+        <div class="btn-text"><span class="btn-num">${i + 1}.</span>${escapeHtml(hasItem ? itemName : '+ 슬롯 설정')}</div>
         ${hasItem ? `<div class="btn-sub" style="color: #00897b; font-weight: bold;">${variantCount}개 컬러 일괄입력</div>` : ''}
       </button>
     `;
@@ -5488,7 +5488,7 @@ function openGridSelectionModal(idx) {
   activeGridVariants.forEach((v, vIdx) => {
     html += `
       <tr>
-        <td style="font-weight: bold; text-align: left; padding-left: 10px;">${v.color}</td>
+        <td style="font-weight: bold; text-align: left; padding-left: 10px;">${escapeHtml(v.color)}</td>
         <td>${v.boxContent}개입</td>
         <td style="color: #555;">${v.stockBox}상자 (${v.stockIndividual}개)</td>
         <td><input type="number" min="0" class="grid-input" id="gridBox_${vIdx}" oninput="calcGridRowTotal(${vIdx})" placeholder="0"></td>
@@ -5781,8 +5781,8 @@ function renderConfigSearchMatrix() {
       const assignedSlot = configTempSlots.findIndex(s => s === loc);
       const isAssigned = (assignedSlot !== -1);
       html += `
-        <div class="cfg-item-card-loc ${isAssigned ? 'assigned' : ''}" onclick="assignLocationToSlot('${loc.replace(/'/g, "\\'")}')">
-          <div class="cfg-card-name">${loc}</div>
+        <div class="cfg-item-card-loc ${isAssigned ? 'assigned' : ''}" onclick="assignLocationToSlot(${jsArg(loc)})">
+          <div class="cfg-card-name">${escapeHtml(loc)}</div>
           ${isAssigned ? `<span class="cfg-card-assigned-badge">슬롯 ${assignedSlot + 1}</span>` : `<span class="cfg-card-assign-hint">+ 슬롯 ${configActiveSlotIndex + 1}</span>`}
         </div>
       `;
@@ -5809,10 +5809,10 @@ function renderConfigSearchMatrix() {
       const assignedSlot = configTempSlots.findIndex(s => s && s.name === item.name && s.color === item.color && s.boxContent === item.boxContent);
       const isAssigned = (assignedSlot !== -1);
       html += `
-        <div class="cfg-item-card ${isAssigned ? 'assigned' : ''}" onclick="assignBestsellerToSlot('${item.name.replace(/'/g, "\\'")}', '${(item.color || 'SURTIDO').replace(/'/g, "\\'")}', ${item.boxContent || 0})">
+        <div class="cfg-item-card ${isAssigned ? 'assigned' : ''}" onclick="assignBestsellerToSlot(${jsArg(item.name)}, ${jsArg(item.color || 'SURTIDO')}, ${item.boxContent || 0})">
           <div class="cfg-card-top">
-            <span class="cfg-card-name">${item.name}</span>
-            <span class="cfg-card-color">${item.color}</span>
+            <span class="cfg-card-name">${escapeHtml(item.name)}</span>
+            <span class="cfg-card-color">${escapeHtml(item.color)}</span>
           </div>
           <div class="cfg-card-bottom">
             <span class="cfg-card-boxcnt">📦 ${item.boxContent}개입</span>
@@ -5847,9 +5847,9 @@ function renderConfigSearchMatrix() {
       const isAssigned = (assignedSlot !== -1);
 
       html += `
-        <div class="cfg-item-card ${isAssigned ? 'assigned' : ''}" onclick="assignGridToSlot('${uName.replace(/'/g, "\\'")}')">
+        <div class="cfg-item-card ${isAssigned ? 'assigned' : ''}" onclick="assignGridToSlot(${jsArg(uName)})">
           <div class="cfg-card-top">
-            <span class="cfg-card-name">${uName}</span>
+            <span class="cfg-card-name">${escapeHtml(uName)}</span>
             <span class="cfg-card-badge-count">${variantCount}개 컬러</span>
           </div>
           <div class="cfg-card-colors-preview">색상: ${sampleColors}${variantCount > 3 ? ' 외' : ''}</div>
@@ -7105,7 +7105,7 @@ function applyCartaDePorteDelta(res) {
   // 5. 델타 반영 결과 리포트 알림
   const currentTotalBoxes = records.reduce((s, r) => s + (r.boxQty || 0), 0);
   let summaryMsg = `📄 [서브창고 송장 델타 분석 및 테이블 자동 보정 완료]`;
-  summaryMsg += `\n• 출발창고: [${res.origin_warehouse || 'PANTACO'}]`;
+  summaryMsg += `\n• 출발창고: [${escapeHtml(res.origin_warehouse || 'PANTACO')}]`;
   summaryMsg += `\n• 송장 일자: ${res.date || '-'}`;
   if (res.transport) summaryMsg += `\n• 차량/기사: ${res.transport}`;
   summaryMsg += `\n• 현재 테이블 총 수량: ${currentTotalBoxes}상자`;
@@ -7191,15 +7191,7 @@ function onHandwrittenError(err) {
 // 🏢 다중 배송지(출고처) 감지 및 괄호 () 배송지 파싱 엔진
 // -------------------------------------------------------------------
 
-function escapeHtml(str) {
-  if (!str) return '';
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
+// escapeHtml / jsArg는 Shared.html이 소유한다.
 
 function parseLocationEntry(loc, query) {
   const trimmed = String(loc || '').trim();
@@ -7351,12 +7343,11 @@ function openMultiLocationSelectModal(matches, customerName, mode = 'candidates'
         : (m.subDest
             ? `<span class="multi-loc-badge">📍 ${escapeHtml(m.subDest)}</span>`
             : '<span class="multi-loc-badge" style="background: #f1f5f9; color: #475569; border-color: #cbd5e1;">유사 지점</span>');
-      const escapedLoc = m.fullLoc.replace(/'/g, "\\'");
       const cardStyle = isTop ? 'border: 2px solid #22c55e; background: #f0fdf4;' : '';
       const keyStyle = isTop ? 'background: #16a34a; color: white;' : '';
 
       html += `
-        <button type="button" class="multi-loc-card" onclick="selectDisambiguatedLocation('${escapedLoc}')" style="${cardStyle}">
+        <button type="button" class="multi-loc-card" onclick="selectDisambiguatedLocation(${jsArg(m.fullLoc)})" style="${cardStyle}">
           <div style="display: flex; align-items: center; gap: 8px;">
             <span class="multi-loc-key" style="${keyStyle}">${keyNum <= 9 ? keyNum : '•'}</span>
             <span class="multi-loc-name" style="${isTop ? 'font-weight: 800; color: #15803d;' : 'font-weight: 700; color: #1e293b;'}">${escapeHtml(m.fullLoc)}</span>
@@ -7427,9 +7418,8 @@ function renderManualLocationResults(filterText) {
   const displayList = matched.slice(0, 50);
   let html = '';
   displayList.forEach(loc => {
-    const escapedLoc = String(loc).replace(/'/g, "\\'");
     html += `
-      <button type="button" class="multi-loc-card" onclick="selectDisambiguatedLocation('${escapedLoc}')" style="justify-content: space-between; padding: 8px 12px;">
+      <button type="button" class="multi-loc-card" onclick="selectDisambiguatedLocation(${jsArg(loc)})" style="justify-content: space-between; padding: 8px 12px;">
         <span style="font-weight: 600; color: #1e293b; font-size: 9pt;">🏢 ${escapeHtml(loc)}</span>
         <span class="multi-loc-badge" style="background: #e0f2fe; color: #0369a1; border-color: #bae6fd;">선택</span>
       </button>
@@ -8262,8 +8252,8 @@ function renderOrderDraftTable() {
     html += `
       <tr style="border-bottom: 1px solid #f1f5f9;">
         <td style="padding: 7px 8px; text-align: center; font-weight: bold; color: #0f766e; background: #f0fdf4;">${item.warehouse || '미지정'}</td>
-        <td style="padding: 7px 8px; text-align: left; font-weight: 600; color: #0f172a;">${item.itemName}</td>
-        <td style="padding: 7px 8px; text-align: center; color: #475569;">${item.color || 'SURTIDO'}</td>
+        <td style="padding: 7px 8px; text-align: left; font-weight: 600; color: #0f172a;">${escapeHtml(item.itemName)}</td>
+        <td style="padding: 7px 8px; text-align: center; color: #475569;">${escapeHtml(item.color || 'SURTIDO')}</td>
         <td style="padding: 7px 8px; text-align: right; font-weight: bold; color: #0f766e;">${item.boxQty} 상자</td>
         <td style="padding: 7px 8px; text-align: center; color: #94a3b8; font-size: 8pt;">${item.addedAt || '-'}</td>
         <td style="padding: 7px 8px; text-align: center;">
@@ -8523,7 +8513,7 @@ function updateTruckGauges() {
     html += `
       <div style="background: #ffffff; border: 1.5px solid ${isFull ? '#10b981' : (qty > 0 ? '#99f6e4' : '#e2e8f0')}; border-radius: 5px; padding: 3px 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.04);">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
-          <strong style="font-size: 8pt; color: ${isFull ? '#065f46' : '#1e293b'};">${wh}</strong>
+          <strong style="font-size: 8pt; color: ${isFull ? '#065f46' : '#1e293b'};">${escapeHtml(wh)}</strong>
           <span style="font-size: 7pt; font-weight: bold; color: ${isFull ? '#047857' : (qty > 0 ? '#0f766e' : '#94a3b8')};">${badgeText}</span>
         </div>
         <div style="font-size: 8.5pt; font-weight: 800; color: ${qty > 0 ? '#0f766e' : '#64748b'}; margin-bottom: 2px; line-height: 1.1;">
@@ -8631,7 +8621,7 @@ function renderSubWhTable(items, cartKeyMap) {
       <th style="padding: 7px 2px; position: sticky; left: 200px; z-index: 25; background: #1e3a8a !important; color: #93c5fd !important; width: 70px; min-width: 70px; max-width: 70px; border-right: 1px solid #3b82f6; font-weight: 700; font-size: 7.8pt;">🏢메인실재고</th>
       <th style="padding: 7px 2px; position: sticky; left: 270px; z-index: 25; background: #1e3a8a !important; color: #fdba74 !important; width: 65px; min-width: 65px; max-width: 65px; border-right: 1px solid #3b82f6; font-weight: 700; font-size: 7.8pt;">🚚이동중</th>
       <th style="padding: 7px 2px; position: sticky; left: 335px; z-index: 25; background: #1e3a8a !important; color: #86efac !important; width: 75px; min-width: 75px; max-width: 75px; border-right: 2px solid #0d9488; font-weight: 700; font-size: 7.8pt;">⭐유효재고</th>
-      ${warehouses.map(wh => `<th style="padding: 7px 2px; background: #134e4a !important; color: #ccfbf1 !important; border-right: 1px solid #0f766e; font-weight: 700; text-align: center; white-space: nowrap; font-size: 8.2pt;">${wh}</th>`).join('')}
+      ${warehouses.map(wh => `<th style="padding: 7px 2px; background: #134e4a !important; color: #ccfbf1 !important; border-right: 1px solid #0f766e; font-weight: 700; text-align: center; white-space: nowrap; font-size: 8.2pt;">${escapeHtml(wh)}</th>`).join('')}
     </tr>
   `;
 
@@ -8719,7 +8709,7 @@ function renderSubWhTable(items, cartKeyMap) {
       if (stock > 0) {
         html += `
           <td style="padding: 3px 4px; text-align: center; border-right: 1px solid #e2e8f0;">
-            <button type="button" onclick="onSubWhCellClick(${itemIdx}, '${wh}', ${stock})" style="width: 100%; min-height: 26px; padding: 3px 2px; background: ${draftedQty > 0 ? '#dbeafe' : '#ccfbf1'}; border: 1.5px solid ${draftedQty > 0 ? '#3b82f6' : '#2dd4bf'}; border-radius: 4px; font-weight: 800; color: ${draftedQty > 0 ? '#1d4ed8' : '#0f766e'}; cursor: pointer; font-size: 8.3pt; transition: all 0.15s ease;" title="${wh} 창고: 클릭하여 발주 수량 입력">
+            <button type="button" onclick="onSubWhCellClick(${itemIdx}, '${escapeHtml(wh)}', ${stock})" style="width: 100%; min-height: 26px; padding: 3px 2px; background: ${draftedQty > 0 ? '#dbeafe' : '#ccfbf1'}; border: 1.5px solid ${draftedQty > 0 ? '#3b82f6' : '#2dd4bf'}; border-radius: 4px; font-weight: 800; color: ${draftedQty > 0 ? '#1d4ed8' : '#0f766e'}; cursor: pointer; font-size: 8.3pt; transition: all 0.15s ease;" title="${escapeHtml(wh)} 창고: 클릭하여 발주 수량 입력">
               ${stock}
               ${draftedQty > 0 ? `<div style="font-size: 7pt; color: #1e40af; font-weight: 900; margin-top: 1px;">담김:${draftedQty}</div>` : ''}
             </button>
