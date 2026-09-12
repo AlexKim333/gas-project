@@ -7322,7 +7322,9 @@ function showOcrLoadingModal(show, previewSrc, compressInfo) {
   } else {
     modal.style.display = 'none';
     if (overlay) overlay.style.display = 'none';
-    activeOcrToken = 0;
+    // 0으로 리셋하면 다음 요청이 같은 토큰을 재발급받아 취소된 응답이 가드를 통과한다.
+    // 단조 증가만 시켜 미결 토큰을 영구 무효화한다.
+    activeOcrToken++;
     isOcrRunning = false;
   }
 }
@@ -9092,14 +9094,18 @@ function setupHotkeyShortcuts() {
   });
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+function bootstrapApp() {
   initPage();
   initAllHotkeys();
-});
-window.onload = () => {
-  initPage();
-  initAllHotkeys();
-};
+}
+
+// DOMContentLoaded와 window.onload를 모두 걸면 부팅이 2회 실행되어
+// keydown 리스너와 updateClock 인터벌이 중복 등록된다. 상태에 따라 한 번만 실행한다.
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', bootstrapApp, { once: true });
+} else {
+  bootstrapApp();
+}
 </script>
 </body>
 </html>
