@@ -1651,6 +1651,9 @@
       opacity: 1;
       transform: translateY(0);
     }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
   </style>
 </head>
 <body>
@@ -1658,9 +1661,7 @@
     <div class="banner">
       <div class="banner-left">
         <span id="formTitle" class="banner-title">출고입력</span>
-        <div id="invoiceRow" class="invoice-badge">
-          <span id="invoiceLabel">출고증번호:</span> <strong id="invoiceNumber">001</strong>
-        </div>
+        <span id="invoiceRow" class="banner-invoice">전표번호: <span id="invoiceNumber"></span></span>
         <!-- 🏢 상단으로 분산된 관리/유틸 버튼 그룹 -->
         <div class="banner-util-buttons" style="display: flex; align-items: center; gap: 6px; margin-left: 6px;">
           <button type="button" class="action-btn btn-order-draft" onclick="addSelectedToOrderDraft()" title="선택한 품목을 외부창고 발주 주문서 목록에 추가" style="padding: 4px 10px; font-size: 8.5pt;">📋 주문목록추가</button>
@@ -1671,6 +1672,11 @@
         </div>
       </div>
       <div class="banner-right">
+        <!-- 실시간 재고 동기화 상태 뱃지 (작업자 안내용) -->
+        <div id="stockSyncStatusIndicator" style="display: none; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 20px; font-size: 8pt; font-weight: 700; background: #fef3c7; color: #92400e; border: 1px solid #fde68a; margin-right: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08);">
+          <span style="display: inline-block; width: 9px; height: 9px; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite;"></span>
+          <span id="stockSyncStatusText">최신 재고 동기화 중...</span>
+        </div>
         <div class="banner-field">
           <label>일시:</label>
           <input type="text" id="datetime" readonly class="datetime-input">
@@ -2752,7 +2758,43 @@ const typeConfig = {
   }
 };
 
+/**
+ * 🔄 상단 배너 실시간 재고 동기화 상태 뱃지 업데이트
+ */
+function setStockSyncStatus(status) {
+  const badge = document.getElementById('stockSyncStatusIndicator');
+  const text = document.getElementById('stockSyncStatusText');
+  if (!badge || !text) return;
+
+  if (status === 'syncing') {
+    badge.style.display = 'inline-flex';
+    badge.style.background = '#fef3c7';
+    badge.style.color = '#92400e';
+    badge.style.borderColor = '#fde68a';
+    text.textContent = '최신 재고 동기화 중...';
+  } else if (status === 'done') {
+    badge.style.display = 'inline-flex';
+    badge.style.background = '#f0fdf4';
+    badge.style.color = '#166534';
+    badge.style.borderColor = '#bbf7d0';
+    text.textContent = '재고 동기화 완료';
+    setTimeout(() => {
+      badge.style.display = 'none';
+    }, 2000);
+  } else if (status === 'error') {
+    badge.style.display = 'inline-flex';
+    badge.style.background = '#fef2f2';
+    badge.style.color = '#b91c1c';
+    badge.style.borderColor = '#fecaca';
+    text.textContent = '재고 동기화 실패';
+    setTimeout(() => {
+      badge.style.display = 'none';
+    }, 3000);
+  }
+}
+
 function loadStockData(silent = false) {
+  setStockSyncStatus('syncing');
   loadStockDataShared({
     silent: silent,
     hasCache: () => stockDataCache && stockDataCache.length > 0,
@@ -2762,86 +2804,11 @@ function loadStockData(silent = false) {
       updateTable();
       updateTotals();
       if (typeof updateUnitType === 'function') updateUnitType();
+      setStockSyncStatus('done');
       return stockDataCache;
     },
     onPersisted: stamp => { lastSyncedStockTime = stamp; }
   });
-}
-
-/**
- * ★ [초고속 낙관적 인메모리 재고 반영 (Optimistic In-Memory Update)]
- * 서버 커밋 성공 즉시 프론트엔드 stockDataCache를 0.0001초 만에 최신화합니다.
- * 백그라운드 서버 재조회(loadStockData)가 완료되기 전이라도,
- * 작업자가 즉시 출고 탭으로 전환하거나 품명을 검색할 때 0초 딜레이로 최신 재고를 사용합니다.
- */
-function applyOptimisticStockUpdate(submittedRecords, type) {
-  if (!Array.isArray(submittedRecords) || submittedRecords.length === 0) return;
-  if (type !== 'in' && type !== 'out') return;
-
-  if (!Array.isArray(stockDataCache)) {
-    stockDataCache = [];
-  }
-
-  submittedRecords.forEach(rec => {
-    const targetClean = (rec.itemName || '').replace(/[\s_\-]/g, '').toLowerCase();
-    const targetColor = (rec.color || 'SURTIDO').trim().toLowerCase();
-    const targetBc = Number(rec.boxContent) || 0;
-
-    let item = stockDataCache.find(s => {
-      const sClean = (s.name || '').replace(/[\s_\-]/g, '').toLowerCase();
-      const sColor = (s.color || 'SURTIDO').trim().toLowerCase();
-      const sBc = Number(s.boxContent) || 0;
-      return sClean === targetClean && sColor === targetColor && (targetBc <= 0 || sBc === targetBc);
-    });
-
-    if (!item && targetColor === 'surtido') {
-      item = stockDataCache.find(s => {
-        const sClean = (s.name || '').replace(/[\s_\-]/g, '').toLowerCase();
-        return sClean === targetClean && (targetBc <= 0 || Number(s.boxContent) === targetBc);
-      });
-    }
-
-    const bQty = Math.abs(Number(rec.boxQty) || 0);
-    const iQty = Math.abs(Number(rec.individualQty) || 0);
-
-    if (type === 'in') {
-      if (item) {
-        item.stockBox = (Number(item.stockBox) || 0) + bQty;
-        item.stockIndividual = (Number(item.stockIndividual) || 0) + iQty;
-      } else {
-        const newItem = {
-          name: rec.itemName,
-          color: rec.color || 'SURTIDO',
-          stockBox: bQty,
-          stockIndividual: iQty,
-          safeStock: Number(rec.safeStock) || 0,
-          boxContent: targetBc,
-          initialStock: 0,
-          manufacturer: rec.manufacturer || '',
-          isDelta: false,
-          key: `${rec.itemName}_${rec.color || 'SURTIDO'}_${targetBc}`
-        };
-        stockDataCache.push(newItem);
-      }
-    } else if (type === 'out') {
-      if (item) {
-        item.stockBox = Math.max(0, (Number(item.stockBox) || 0) - bQty);
-        let curIndiv = Number(item.stockIndividual) || 0;
-        const bc = Number(item.boxContent) || 0;
-        while (curIndiv < iQty && item.stockBox > 0 && bc > 0) {
-          item.stockBox -= 1;
-          curIndiv += bc;
-        }
-        item.stockIndividual = Math.max(0, curIndiv - iQty);
-      }
-    }
-  });
-
-  try {
-    localStorage.setItem('cached_stock_data', JSON.stringify(stockDataCache));
-  } catch (e) {}
-
-  if (typeof updateTotals === 'function') updateTotals();
 }
 
 function loadManufacturers() {
@@ -2974,6 +2941,10 @@ function setPage(page, initialData = null) {
   if (!config) {
     alert(`오류: 페이지 유형 '${page}'를 설정할 수 없습니다.`);
     return;
+  }
+
+  if (isLoadingStockData) {
+    showAppToast('⏳ 최신 재고를 시트에서 동기화 중입니다. 잠시만 기다려주세요...', 2500);
   }
 
   try {
@@ -3212,7 +3183,14 @@ function filterItems(searchText) {
     return;
   }
 
-  if (isLoadingStockData && (!stockDataCache || stockDataCache.length === 0)) return;
+  if (isLoadingStockData && (!stockDataCache || stockDataCache.length === 0)) {
+    const list = document.getElementById('itemSuggestionsList');
+    if (list) {
+      list.innerHTML = '<li style="padding: 10px; color: #92400e; background: #fffbeb; text-align: center; font-size: 8.5pt; font-weight: 600;">🔄 최신 재고를 시트에서 동기화 중입니다. 잠시만 기다려주세요...</li>';
+      showCustomDropdown();
+    }
+    return;
+  }
 
   clearTimeout(debounceTimeout);
   debounceTimeout = setTimeout(() => {
@@ -4084,40 +4062,15 @@ function confirmSubmit() {
           pendingRecord = null;
           clearForm();
         }
-        // 신규 등록 상품 인메모리 캐시 즉시 반영 (0초 딜레이)
-        if (Array.isArray(result) && Array.isArray(stockDataCache)) {
-          result.filter(r => r.success).forEach(s => {
-            const rec = s.record;
-            if (rec && !stockDataCache.some(it => it.name === rec.itemName && it.color === (rec.color || 'SURTIDO') && Number(it.boxContent) === Number(rec.boxContent))) {
-              stockDataCache.push({
-                name: rec.itemName,
-                color: rec.color || 'SURTIDO',
-                stockBox: 0,
-                stockIndividual: 0,
-                safeStock: Number(rec.safeStock) || 0,
-                boxContent: Number(rec.boxContent) || 0,
-                initialStock: Number(rec.initialStock) || 0,
-                manufacturer: rec.manufacturer || '',
-                isDelta: false,
-                key: `${rec.itemName}_${rec.color || 'SURTIDO'}_${Number(rec.boxContent) || 0}`
-              });
-            }
-          });
-          try { localStorage.setItem('cached_stock_data', JSON.stringify(stockDataCache)); } catch (e) {}
-        }
         updateTable();
         toggleScroll();
         updateTotals();
         const confirmModalDiv = document.getElementById('confirmModal');
         if (confirmModalDiv) confirmModalDiv.style.display = 'none';
         if (adminSelect) adminSelect.value = 'ADMIN';
+        showAppToast('🔄 최신 상품 및 재고를 시트에서 동기화 중입니다...', 2500);
         loadStockData(true);
       } else {
-        // ★ [초고속 제로 레이턴시 낙관적 인메모리 반영]
-        // 서버 커밋 성공 즉시 프론트엔드 stockDataCache를 0.0001초 만에 최신화하여,
-        // UI를 닫지 않고 출고로 탭을 즉시 전환해도 방금 입고된 수량이 100% 가용재고로 즉각 반영됨
-        applyOptimisticStockUpdate(recordsToPrint, type);
-
         alert('입출고가 성공적으로 처리되었습니다.');
         // ★ [데이터 정합성 보장: 즉시 확정 커밋 패턴]
         // 인쇄 성공 여부/취소와 무관하게 서버 커밋 성공 즉시 장바구니/스토리지 정리 완료 -> 재고 이중 차감 원천 봉쇄
@@ -4138,6 +4091,7 @@ function confirmSubmit() {
         const confirmModalDiv = document.getElementById('confirmModal');
         if (confirmModalDiv) confirmModalDiv.style.display = 'none';
         if (adminSelect) adminSelect.value = 'ADMIN';
+        showAppToast('🔄 최신 재고를 시트에서 동기화 중입니다...', 2500);
         loadStockData(true);
 
         // 영수증 인쇄는 안전 격리 블록에서 독립 실행
