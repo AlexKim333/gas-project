@@ -392,17 +392,19 @@ function loadDropdowns() {
     select.innerHTML = '<option value="">선택</option>' + locationCache.map(loc => `<option value="${loc}">${loc}</option>`).join('');
     return;
   }
-  google.script.run
-    .withSuccessHandler(data => {
+  callServer(currentType === 'in' ? 'getInLocations' : 'getOutLocations', [], {
+    key: 'locations',
+    mode: 'latest',
+    onSuccess: data => {
       locationCache = data;
       const select = document.getElementById('location');
       select.innerHTML = '<option value="">선택</option>' + data.map(loc => `<option value="${loc}">${loc}</option>`).join('');
-    })
-    .withFailureHandler(err => {
+    },
+    onError: err => {
       console.error('Failed to load locations:', err);
       alert('입출고처 데이터를 불러오는 데 실패했습니다.');
-    })
-    [currentType === 'in' ? 'getInLocations' : 'getOutLocations']();
+    }
+  });
 }
 
 function filterItems(searchText) {
@@ -486,7 +488,12 @@ function updateInvoiceNumber() {
   const date = document.getElementById('searchDate').value;
   const typeValue = document.querySelector('input[name="recordType"]:checked').value;
   const type = typeValue === 'in' ? '입고' : '출고';
-  google.script.run.withSuccessHandler(setInvoiceNumber).getMaxSequentialNumber(date, type);
+  callServer('getMaxSequentialNumber', [date, type], {
+    key: 'maxSeq',
+    mode: 'latest',
+    onSuccess: setInvoiceNumber,
+    onError: err => alert('영수증 번호 조회 실패: ' + (err && err.message ? err.message : err))
+  });
 }
 
 function setInvoiceNumber(maxSeq) {
@@ -507,7 +514,13 @@ function searchRecords() {
   const formattedDate = date.replace(/-/g, '/');
   const fullInvoiceNumber = `${formattedDate}-${seq.padStart(3, '0')}`;
   document.getElementById('loadedInvoiceNumber').textContent = seq || '000';
-  google.script.run.withSuccessHandler(displayRecords).searchRecords(type, fullInvoiceNumber);
+  // 화살표로 전표를 빠르게 넘길 때 이전 조회 결과가 뒤늦게 도착해 덮어쓰지 않도록 최신 응답만 반영한다.
+  callServer('searchRecords', [type, fullInvoiceNumber], {
+    key: 'searchRecords',
+    mode: 'latest',
+    onSuccess: displayRecords,
+    onError: err => alert('전표 조회 실패: ' + (err && err.message ? err.message : err))
+  });
 }
 
 function displayRecords(recordsData) {
@@ -694,8 +707,10 @@ if (invoiceNumber.padStart(3, '0') !== loadedInvoiceNumber) {
   if (records.length === 0) {
     const confirmDelete = confirm(`${date} ${invoiceNumber}번 ${type}를 삭제하시겠습니까?`);
     if (confirmDelete) {
-      google.script.run
-        .withSuccessHandler(() => {
+      callServer('updatePendingRecords', [fullInvoiceNumber, type, [], adminValue], {
+        key: 'updateRecords',
+        timeout: 90000,
+        onSuccess: () => {
           alert('레코드가 성공적으로 삭제되었습니다.');
           loadStockData(true); // 즉시 백그라운드 재고 갱신
           records = [];
@@ -704,13 +719,13 @@ if (invoiceNumber.padStart(3, '0') !== loadedInvoiceNumber) {
           toggleScroll();
           originalButton.style.visibility = 'visible';
           buttonContainer.removeChild(processingButton);
-        })
-        .withFailureHandler(err => {
+        },
+        onError: err => {
           alert('삭제 실패: ' + err.message);
           originalButton.style.visibility = 'visible';
           buttonContainer.removeChild(processingButton);
-        })
-        .updatePendingRecords(fullInvoiceNumber, type, [], adminValue);
+        }
+      });
     } else {
       originalButton.style.visibility = 'visible';
       buttonContainer.removeChild(processingButton);
@@ -777,8 +792,10 @@ if (invoiceNumber.padStart(3, '0') !== loadedInvoiceNumber) {
 
   // 새 레코드로 업데이트
   const recordsToPrint = [...records];
-  google.script.run
-    .withSuccessHandler(() => {
+  callServer('updatePendingRecords', [fullInvoiceNumber, type, records, adminValue], {
+    key: 'updateRecords',
+    timeout: 90000,
+    onSuccess: () => {
       alert('레코드가 성공적으로 업데이트되었습니다.');
       loadStockData(true); // ★ 핵심: 인쇄 대기 없이 백그라운드에서 즉시 재고 갱신 시작!
       printReceipt(recordsToPrint, typeValue, date, adminValue, fullInvoiceNumber, () => {
@@ -790,13 +807,13 @@ if (invoiceNumber.padStart(3, '0') !== loadedInvoiceNumber) {
         buttonContainer.removeChild(processingButton);
         loadStockData(true); // 인쇄 콜백 완료 후 재확인
       });
-    })
-    .withFailureHandler(err => {
+    },
+    onError: err => {
       alert('업데이트 실패: ' + err.message);
       originalButton.style.visibility = 'visible';
       buttonContainer.removeChild(processingButton);
-    })
-    .updatePendingRecords(fullInvoiceNumber, type, records, adminValue);
+    }
+  });
 }
 
 
@@ -860,13 +877,18 @@ function incrementInvoice() {
   const date = document.getElementById('searchDate').value;
   const typeValue = document.querySelector('input[name="recordType"]:checked').value;
   const type = typeValue === 'in' ? '입고' : '출고';
-  google.script.run.withSuccessHandler(maxSeq => {
-    if (currentSeq < maxSeq) {
-      document.getElementById('invoiceNumber').value = String(currentSeq + 1).padStart(3, '0');
-    } else {
-      alert('선택한 입/출고 증은 없습니다');
-    }
-  }).getMaxSequentialNumber(date, type);
+  callServer('getMaxSequentialNumber', [date, type], {
+    key: 'maxSeq',
+    mode: 'latest',
+    onSuccess: maxSeq => {
+      if (currentSeq < maxSeq) {
+        document.getElementById('invoiceNumber').value = String(currentSeq + 1).padStart(3, '0');
+      } else {
+        alert('선택한 입/출고 증은 없습니다');
+      }
+    },
+    onError: err => alert('영수증 번호 조회 실패: ' + (err && err.message ? err.message : err))
+  });
 }
 
 function decrementInvoice() {
