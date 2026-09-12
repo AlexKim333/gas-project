@@ -1241,6 +1241,8 @@ Extract the following information:
    - "color": Extracted color if written with the model or in color column (e.g. "C", "F", "D", "K", "SURTIDO", "NEGRO", etc.). If single letter like C, F, D, K, extract it as color!
    - "boxes": Integer number of bultos / boxes (from "No. De Bultos" column).
    - "piezas": Integer number of pieces if any in "Cantidad de piezas", else 0.
+   - CRITICAL O vs A HANDWRITING DISAMBIGUATION:
+     In fast Mexican freight handwriting, the letter 'O' frequently has an upper loop or quick closing tail that resembles 'A'. If the glyph is an oval/circular loop without a distinct vertical downward leg on the right, transcribe it as 'O' (e.g. "CK928O"), NOT 'A' (e.g. "CK928A").
 9. "total_boxes": Total boxes/bultos (written at the bottom, e.g. 100).
 
 Directly extract visible text without excessive deliberation or orientation loops.
@@ -1840,6 +1842,9 @@ Rules:
    - Standard colors in this warehouse are real color words (e.g. Negro, Blanco, Azul, Rojo, Surtido, Beige, Vino, etc.).
    - If single letters like A, B, C, D, K, O appear with a model (e.g. "CK 928" with letters "O", "K" or "CECI 999" with letters "C", "J", "K"):
      Combine the letter into the model code (e.g. "CK928O", "CK928K", "CECIK999C") and set color to "SURTIDO" unless an actual color word like "Negro" or "Blanco" is written!
+   - CRITICAL O vs A HANDWRITING DISAMBIGUATION:
+     In fast Mexican warehouse handwriting, the letter 'O' frequently has an upper loop or quick closing flourish that resembles 'a' or 'A'.
+     If a model code ends in an oval/circle shape (e.g. "CK 928 O"), verify carefully: do NOT arbitrarily turn 'O' into 'A'. If the glyph is a continuous loop without a distinct vertical downward leg on the right, transcribe it as 'O' (e.g. "CK928O"), NOT 'A' (e.g. "CK928A").
 
 8. Known Model Aliases / Nicknames (TRADE TERMS):
    - "LICRA LARGA" / "LICRA LARG" / "LICRA LARGO" / "LICRA #70" / "LICRA 70" -> Recognized as "P-4D70".
