@@ -309,6 +309,38 @@ function invalidateStockCache() {
   }
 }
 
+/**
+ * ⚡ 재고 맵(stockMap)으로 CacheService를 즉시 갱신(Cache-Warming)
+ * 시트 I/O(getValues)를 우회하여 후속 getStockData를 0.01초 만에 반환
+ */
+function warmStockCacheFromMap(stockMap) {
+  if (!stockMap) return false;
+  try {
+    const freshItems = Object.values(stockMap).map(v => ({
+      name: v.name,
+      color: v.color,
+      stockBox: v.box,
+      stockIndividual: v.individual,
+      safeStock: v.safeStock,
+      boxContent: v.boxContent,
+      initialStock: v.initialStock,
+      manufacturer: v.manufacturer,
+      isDelta: v.isDelta,
+      key: makeKey(v.name, v.color, v.boxContent)
+    })).filter(it => it.name);
+
+    if (freshItems.length > 0) {
+      const cache = CacheService.getScriptCache();
+      putChunkedCache(cache, STOCK_CACHE_KEY, JSON.stringify(freshItems), STOCK_CACHE_TTL);
+      return true;
+    }
+    return false;
+  } catch (err) {
+    console.warn(`[Cache] warmStockCacheFromMap 실패: ${err.message}`);
+    return false;
+  }
+}
+
 function getStockData() {
   try {
     const cache = CacheService.getScriptCache();
@@ -700,13 +732,22 @@ function processForm(tableData, mode, admin) {
       }
     }
 
+    let cacheWarmed = false;
+    try {
+      cacheWarmed = warmStockCacheFromMap(stockMap);
+    } catch (cErr) {
+      console.warn(`[Cache] processForm 캐시 갱신 경고: ${cErr.message}`);
+    }
+
     console.log(`processForm 완료: ${invoiceNumber} (${typeKorean} ${pendingRows.length}건)`);
     return seq;
   } catch (e) {
     console.error(`processForm error: ${e.message}`);
     throw e;
   } finally {
-    invalidateStockCache();
+    if (!cacheWarmed) {
+      invalidateStockCache();
+    }
     lock.releaseLock();
   }
 }
@@ -2216,6 +2257,11 @@ function processQuickStockAdjustment(adjustments, admin) {
     }
     SpreadsheetApp.flush();
 
+    let cacheWarmed = false;
+    try {
+      cacheWarmed = warmStockCacheFromMap(stockMap);
+    } catch (cErr) {}
+
     return {
       success: true,
       invoiceNumber: invoiceNumber,
@@ -2226,7 +2272,9 @@ function processQuickStockAdjustment(adjustments, admin) {
     console.error(`processQuickStockAdjustment error: ${e.message}`);
     throw e;
   } finally {
-    invalidateStockCache();
+    if (!cacheWarmed) {
+      invalidateStockCache();
+    }
     lock.releaseLock();
   }
 }

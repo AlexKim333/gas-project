@@ -2758,6 +2758,8 @@ const typeConfig = {
   }
 };
 
+let stockSyncTimer = null;
+
 /**
  * 🔄 상단 배너 실시간 재고 동기화 상태 뱃지 업데이트
  */
@@ -2766,30 +2768,39 @@ function setStockSyncStatus(status) {
   const text = document.getElementById('stockSyncStatusText');
   if (!badge || !text) return;
 
+  if (stockSyncTimer) {
+    clearTimeout(stockSyncTimer);
+    stockSyncTimer = null;
+  }
+
   if (status === 'syncing') {
     badge.style.display = 'inline-flex';
     badge.style.background = '#fef3c7';
     badge.style.color = '#92400e';
     badge.style.borderColor = '#fde68a';
     text.textContent = '최신 재고 동기화 중...';
+    // 5초 후 안전 자동 해제 (네트워크 지연 시에도 배지 영구 고착 원천 차단)
+    stockSyncTimer = setTimeout(() => {
+      setStockSyncStatus('done');
+    }, 5000);
   } else if (status === 'done') {
     badge.style.display = 'inline-flex';
     badge.style.background = '#f0fdf4';
     badge.style.color = '#166534';
     badge.style.borderColor = '#bbf7d0';
     text.textContent = '재고 동기화 완료';
-    setTimeout(() => {
+    stockSyncTimer = setTimeout(() => {
       badge.style.display = 'none';
-    }, 2000);
+    }, 1500);
   } else if (status === 'error') {
     badge.style.display = 'inline-flex';
     badge.style.background = '#fef2f2';
     badge.style.color = '#b91c1c';
     badge.style.borderColor = '#fecaca';
     text.textContent = '재고 동기화 실패';
-    setTimeout(() => {
+    stockSyncTimer = setTimeout(() => {
       badge.style.display = 'none';
-    }, 3000);
+    }, 2500);
   }
 }
 
@@ -2804,10 +2815,15 @@ function loadStockData(silent = false) {
       updateTable();
       updateTotals();
       if (typeof updateUnitType === 'function') updateUnitType();
-      setStockSyncStatus('done');
       return stockDataCache;
     },
-    onPersisted: stamp => { lastSyncedStockTime = stamp; }
+    onPersisted: stamp => { lastSyncedStockTime = stamp; },
+    onSettled: () => {
+      setStockSyncStatus('done');
+    },
+    onError: () => {
+      setStockSyncStatus('error');
+    }
   });
 }
 

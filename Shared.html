@@ -157,7 +157,10 @@ function loadStockDataShared(options) {
   const apply = typeof opts.apply === 'function' ? opts.apply : (data => data);
   const hasCache = typeof opts.hasCache === 'function' ? opts.hasCache : (() => false);
 
-  if (isLoadingStockData) return;
+  if (isLoadingStockData) {
+    console.warn('[loadStockDataShared] 이미 재고 데이터 로딩이 진행 중입니다.');
+    return;
+  }
   isLoadingStockData = true;
 
   let loadingIndicator = null;
@@ -169,8 +172,10 @@ function loadStockDataShared(options) {
     document.body.appendChild(loadingIndicator);
   }
 
-  callServer('getStockData', [], {
+  const sent = callServer('getStockData', [], {
     key: 'stockData',
+    mode: 'latest', // ★ 최신 응답 수신 보장 (block으로 차단되지 않음)
+    timeout: 20000,
     onSuccess: data => {
       const finalData = apply(data || []);
       const stamp = Date.now().toString();
@@ -178,13 +183,12 @@ function loadStockDataShared(options) {
         localStorage.setItem('cached_stock_data', JSON.stringify(finalData));
         localStorage.setItem('stock_data_updated', stamp);
       } catch (e) {}
-      // 방금 쓴 타임스탬프를 호출부에 알려, 포커스 복귀 시 같은 데이터를
-      // 다시 파싱·렌더하는 낭비를 막는다.
       if (typeof opts.onPersisted === 'function') opts.onPersisted(stamp);
     },
     onError: err => {
       const errMsg = (err && err.message) ? err.message : String(err || '알 수 없는 오류');
       console.error('Failed to load stock data:', errMsg);
+      if (typeof opts.onError === 'function') opts.onError(err);
       if (hasCache()) {
         console.warn('⚠️ 최신 재고 조회 실패로 로컬 캐시 재고 데이터를 유지합니다:', errMsg);
       } else if (!silent) {
@@ -196,8 +200,17 @@ function loadStockDataShared(options) {
       if (loadingIndicator && document.body.contains(loadingIndicator)) {
         document.body.removeChild(loadingIndicator);
       }
+      if (typeof opts.onSettled === 'function') opts.onSettled();
     }
   });
+
+  if (!sent) {
+    isLoadingStockData = false;
+    if (loadingIndicator && document.body.contains(loadingIndicator)) {
+      document.body.removeChild(loadingIndicator);
+    }
+    if (typeof opts.onSettled === 'function') opts.onSettled();
+  }
 }
 
 /**
