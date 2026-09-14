@@ -2190,22 +2190,40 @@
         </div>
       </div>
 
-      <!-- 수량 입력 & 퀵 증감 버튼 -->
+      <!-- 수량 입력 & 퀵 증감 버튼 (4자리 컴팩트 입력 + 1, 5, 10 대형 터치 버튼) -->
       <div style="margin-bottom: 10px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-          <label style="font-size: 8.5pt; font-weight: 700; color: #334155;">실사 수량 입력:</label>
+          <label style="font-size: 8.5pt; font-weight: 700; color: #334155;">실사 수량 입력 (최대 4자리):</label>
           <div style="display: flex; gap: 8px; font-size: 8pt; font-weight: 700;">
             <label style="cursor: pointer;"><input type="radio" name="mAdjUnit" value="box" checked onchange="updateMobileAdjUnit()"> 상자</label>
             <label style="cursor: pointer;"><input type="radio" name="mAdjUnit" value="individual" onchange="updateMobileAdjUnit()"> 낱개</label>
           </div>
         </div>
 
-        <div style="display: flex; gap: 6px; align-items: center;">
-          <input type="number" id="mAdjQtyInput" min="0" placeholder="수량 입력" oninput="updateMobileAdjLivePreview()" style="flex: 1; padding: 8px 10px; font-size: 14pt; font-weight: 800; text-align: right; border: 2px solid #cbd5e1; border-radius: 6px;">
-          <div style="display: flex; gap: 4px;">
-            <button type="button" onclick="stepMobileAdjQty(1)" style="padding: 7px 10px; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px; font-weight: bold; cursor: pointer;">+1</button>
-            <button type="button" onclick="stepMobileAdjQty(5)" style="padding: 7px 10px; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px; font-weight: bold; cursor: pointer;">+5</button>
-            <button type="button" onclick="stepMobileAdjQty(10)" style="padding: 7px 10px; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px; font-weight: bold; cursor: pointer;">+10</button>
+        <div style="display: flex; gap: 8px; align-items: stretch;">
+          <!-- 4자리 전용 컴팩트 수량 입력란 -->
+          <input type="number" id="mAdjQtyInput" min="0" max="9999" placeholder="0" 
+            oninput="if(this.value.length > 4) this.value = this.value.slice(0, 4); updateMobileAdjLivePreview();" 
+            style="width: 86px; min-width: 86px; max-width: 95px; padding: 6px 4px; font-size: 17pt; font-weight: 800; text-align: center; border: 2.5px solid #818cf8; border-radius: 8px; background: #ffffff; color: #1e1b4b; box-sizing: border-box; outline: none;">
+          
+          <!-- 큼직한 1, 5, 10 퀵 증감 버튼 그룹 -->
+          <div style="flex: 1; display: flex; gap: 6px;">
+            <button type="button" onclick="stepMobileAdjQty(1)" 
+              style="flex: 1; height: 48px; background: #f8fafc; border: 2px solid #cbd5e1; border-radius: 8px; font-weight: 800; font-size: 13pt; color: #1e293b; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05); -webkit-tap-highlight-color: rgba(0,0,0,0.1);">
+              +1
+            </button>
+            <button type="button" onclick="stepMobileAdjQty(5)" 
+              style="flex: 1; height: 48px; background: #ecfdf5; border: 2px solid #86efac; border-radius: 8px; font-weight: 800; font-size: 13pt; color: #15803d; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(22,163,74,0.12); -webkit-tap-highlight-color: rgba(0,0,0,0.1);">
+              +5
+            </button>
+            <button type="button" onclick="stepMobileAdjQty(10)" 
+              style="flex: 1; height: 48px; background: #eff6ff; border: 2px solid #93c5fd; border-radius: 8px; font-weight: 800; font-size: 13pt; color: #1d4ed8; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(37,99,235,0.15); -webkit-tap-highlight-color: rgba(0,0,0,0.1);">
+              +10
+            </button>
+            <button type="button" onclick="stepMobileAdjQty(-1)" title="1 차감" 
+              style="width: 38px; height: 48px; background: #fef2f2; border: 1.5px solid #fecaca; border-radius: 8px; font-weight: 800; font-size: 11pt; color: #dc2626; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+              -1
+            </button>
           </div>
         </div>
 
@@ -2214,21 +2232,33 @@
         </div>
       </div>
 
+      <!-- ✏️ 수정 모드 안내 배너 (목록 터치 시 표시) -->
+      <div id="mAdjEditNotice" style="display: none; justify-content: space-between; align-items: center; background: #eff6ff; border: 1.5px solid #93c5fd; border-radius: 8px; padding: 8px 12px; margin-bottom: 8px;">
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span style="font-size: 12pt;">✏️</span>
+          <span style="color: #1d4ed8; font-weight: 800; font-size: 9pt;"><span id="mAdjEditNoticeText">항목 수정 중</span></span>
+        </div>
+        <button type="button" onclick="cancelMobileEditItem()" style="background: #ffffff; border: 1px solid #bfdbfe; color: #475569; border-radius: 5px; font-weight: 800; font-size: 8pt; cursor: pointer; padding: 3px 8px;">✕ 수정 취소</button>
+      </div>
+
       <!-- 💾 원터치 저장 & 다음 품목 연속 입력 버튼 (제안 2번: Continuous Loop) -->
       <div style="margin-bottom: 12px;">
-        <button type="button" id="btnMAdjSaveAndNext" onclick="submitMobileAdjItem(true)" style="width: 100%; padding: 12px 14px; background: linear-gradient(135deg, #2563eb, #1d4ed8); color: white; border: none; border-radius: 8px; font-size: 11pt; font-weight: 800; cursor: pointer; box-shadow: 0 4px 12px rgba(37,99,235,0.3); display: flex; align-items: center; justify-content: center; gap: 6px;">
+        <button type="button" id="btnMAdjSaveAndNext" onclick="submitMobileAdjItem(true)" style="width: 100%; padding: 13px 14px; background: linear-gradient(135deg, #2563eb, #1d4ed8); color: white; border: none; border-radius: 8px; font-size: 11pt; font-weight: 800; cursor: pointer; box-shadow: 0 4px 12px rgba(37,99,235,0.3); display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.2s ease;">
           <span>💾 저장 후 다음 품목 ➔</span>
         </button>
       </div>
 
-      <!-- 이번 세션 실사 목록 (미니 리스트) -->
-      <div style="border-top: 1.5px solid #f1f5f9; padding-top: 8px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-          <span style="font-size: 8.5pt; font-weight: 700; color: #475569;">📋 이번 실사 목록 (<span id="mAdjSessionCount">0</span>건)</span>
-          <button type="button" onclick="submitFormFromMobileModal()" style="padding: 4px 10px; background: #16a34a; color: white; border: none; border-radius: 5px; font-size: 8pt; font-weight: 800; cursor: pointer;">🚀 서버 최종 제출</button>
+      <!-- 이번 세션 실사 목록 (확장된 미니 리스트) -->
+      <div style="border-top: 1.5px solid #e2e8f0; padding-top: 10px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <span style="font-size: 9pt; font-weight: 800; color: #334155;">📋 이번 실사 목록 (<span id="mAdjSessionCount">0</span>건)</span>
+            <span style="font-size: 7.5pt; color: #4338ca; background: #ede9fe; padding: 2px 6px; border-radius: 4px; font-weight: 700;">항목 터치 시 재수정</span>
+          </div>
+          <button type="button" onclick="submitFormFromMobileModal()" style="padding: 5px 12px; background: #16a34a; color: white; border: none; border-radius: 6px; font-size: 8.5pt; font-weight: 800; cursor: pointer; box-shadow: 0 2px 5px rgba(22,163,74,0.3);">🚀 서버 최종 제출</button>
         </div>
-        <div id="mAdjSessionList" style="max-height: 120px; overflow-y: auto; font-size: 8pt; border: 1px solid #e2e8f0; border-radius: 6px; padding: 4px;">
-          <div style="color: #94a3b8; text-align: center; padding: 12px 0;">아직 입력된 실사 내역이 없습니다.</div>
+        <div id="mAdjSessionList" style="max-height: 200px; overflow-y: auto; font-size: 9pt; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 6px; background: #ffffff;">
+          <div style="color: #94a3b8; text-align: center; padding: 16px 0; font-size: 8.5pt;">아직 입력된 실사 내역이 없습니다.</div>
         </div>
       </div>
     </div>
@@ -10158,6 +10188,17 @@ function openMobileStockAdjModal() {
   currentMobileAdjMode = 'replace';
   setMobileAdjMode('replace');
 
+  editingMobileRecordIndex = -1;
+  const editNotice = document.getElementById('mAdjEditNotice');
+  if (editNotice) editNotice.style.display = 'none';
+
+  const btnSave = document.getElementById('btnMAdjSaveAndNext');
+  if (btnSave) {
+    btnSave.innerHTML = '<span>💾 저장 후 다음 품목 ➔</span>';
+    btnSave.style.background = 'linear-gradient(135deg, #2563eb, #1d4ed8)';
+    btnSave.style.boxShadow = '0 4px 12px rgba(37,99,235,0.3)';
+  }
+
   const dropdown = document.getElementById('mAdjDropdown');
   if (dropdown) dropdown.style.display = 'none';
   _mobileAdjAllMatched = [];
@@ -10189,6 +10230,9 @@ function closeMobileStockAdjModal() {
   if (overlay) overlay.style.display = 'none';
   if (dropdown) dropdown.style.display = 'none';
   _mobileAdjAllMatched = [];
+  editingMobileRecordIndex = -1;
+  const editNotice = document.getElementById('mAdjEditNotice');
+  if (editNotice) editNotice.style.display = 'none';
 }
 
 function setMobileAdjMode(mode) {
@@ -10369,11 +10413,15 @@ function updateMobileAdjUnit() {
   updateMobileAdjLivePreview();
 }
 
+let editingMobileRecordIndex = -1;
+
 function stepMobileAdjQty(step) {
   const qtyInput = document.getElementById('mAdjQtyInput');
   if (!qtyInput) return;
   const curVal = parseInt(qtyInput.value, 10) || 0;
-  qtyInput.value = Math.max(0, curVal + step);
+  let nextVal = Math.max(0, curVal + step);
+  if (nextVal > 9999) nextVal = 9999;
+  qtyInput.value = nextVal;
   updateMobileAdjLivePreview();
 }
 
@@ -10444,27 +10492,44 @@ function submitMobileAdjItem(isContinue) {
     matchRate: 100
   };
 
-  // 1. 메인 records 배열에 추가
-  records.push(newRec);
+  const modeName = currentMobileAdjMode === 'increment' ? '➕추가' : '🔄치환';
+  const isEditing = (editingMobileRecordIndex >= 0 && editingMobileRecordIndex < records.length);
 
-  // 2. 실사 이력 로컬 저장
+  if (isEditing) {
+    // 💡 기존 레코드 덮어쓰기 수정 (수정 모드)
+    records[editingMobileRecordIndex] = newRec;
+    showAppToast(`✅ [#${editingMobileRecordIndex + 1}번] ${newRec.itemName} 수정 완료`, 1800);
+    editingMobileRecordIndex = -1;
+
+    const editNotice = document.getElementById('mAdjEditNotice');
+    if (editNotice) editNotice.style.display = 'none';
+
+    const btnSave = document.getElementById('btnMAdjSaveAndNext');
+    if (btnSave) {
+      btnSave.innerHTML = '<span>💾 저장 후 다음 품목 ➔</span>';
+      btnSave.style.background = 'linear-gradient(135deg, #2563eb, #1d4ed8)';
+      btnSave.style.boxShadow = '0 4px 12px rgba(37,99,235,0.3)';
+    }
+  } else {
+    // 신규 추가
+    records.push(newRec);
+    showAppToast(`✅ [${modeName}] ${newRec.itemName} (${newRec.boxQty}상자 ${newRec.individualQty}개) 기록 완료`, 1800);
+  }
+
+  // 실사 이력 로컬 저장
   recordStockAuditHistory(newRec.itemName, newRec.color, newRec.boxQty, newRec.individualQty, newRec.adjType);
 
-  // 3. 진동 피드백 (모바일 지원 시)
+  // 진동 피드백 (모바일 지원 시)
   if (navigator.vibrate) {
     try { navigator.vibrate(50); } catch(e) {}
   }
 
-  // 4. 화면 토스트 알림
-  const modeName = currentMobileAdjMode === 'increment' ? '➕추가' : '🔄치환';
-  showAppToast(`✅ [${modeName}] ${newRec.itemName} (${newRec.boxQty}상자 ${newRec.individualQty}개) 기록 완료`, 1800);
-
-  // 5. 메인 테이블 동기화
+  // 메인 테이블 동기화
   saveTableData();
   updateTable();
   updateTotals();
 
-  // 6. 모바일 미니 목록 갱신
+  // 모바일 미니 목록 갱신
   renderMobileAdjSessionList();
 
   if (isContinue) {
@@ -10491,6 +10556,118 @@ function submitMobileAdjItem(isContinue) {
   }
 }
 
+// ✏️ 하단 실사 목록 항목 클릭 시 입력란으로 롤백 (수정 기능)
+function editMobileSessionItem(index) {
+  if (index < 0 || index >= records.length) return;
+  editingMobileRecordIndex = index;
+  const r = records[index];
+
+  // 1. 검색창 및 선택 품목 복원
+  const searchInput = document.getElementById('mAdjItemSearch');
+  if (searchInput) searchInput.value = `${r.itemName} (${r.color || 'SURTIDO'})`;
+
+  // stockDataCache 에서 해당 품목 탐색
+  const cleanName = (r.itemName || '').replace(/[\s_\-]/g, '').toLowerCase();
+  const cleanColor = (r.color || 'SURTIDO').trim().toLowerCase();
+  let found = null;
+  if (stockDataCache) {
+    found = stockDataCache.find(it => {
+      const itN = (it.name || '').replace(/[\s_\-]/g, '').toLowerCase();
+      const itC = (it.color || 'SURTIDO').trim().toLowerCase();
+      return itN === cleanName && itC === cleanColor;
+    }) || stockDataCache.find(it => (it.name || '').replace(/[\s_\-]/g, '').toLowerCase() === cleanName);
+  }
+
+  currentMobileAdjItem = found || {
+    name: r.itemName,
+    color: r.color || 'SURTIDO',
+    boxContent: r.boxContent || 0,
+    stockBox: 0,
+    stockIndividual: 0
+  };
+
+  // 2. 품목 카드 출력
+  const card = document.getElementById('mAdjSelectedCard');
+  const cardTitle = document.getElementById('mAdjCardTitle');
+  const cardSpec = document.getElementById('mAdjCardSpec');
+  const cardStock = document.getElementById('mAdjCardCurrentStock');
+  const hintBadge = document.getElementById('mAdjSmartHintBadge');
+
+  if (card) card.style.display = 'block';
+  if (cardTitle) cardTitle.textContent = currentMobileAdjItem.name;
+  if (cardSpec) cardSpec.textContent = `${currentMobileAdjItem.color || 'SURTIDO'} (박스당 ${currentMobileAdjItem.boxContent || 0}개)`;
+  if (cardStock) cardStock.textContent = `${currentMobileAdjItem.stockBox || 0}상자 (${currentMobileAdjItem.stockIndividual || 0}개)`;
+  if (hintBadge) hintBadge.style.display = 'none';
+
+  // 3. 모드(치환/추가) 복원
+  setMobileAdjMode(r.adjType || 'replace');
+
+  // 4. 단위(상자/낱개) 복원
+  const unit = r.unitType || (r.individualQty && !r.boxQty ? 'individual' : 'box');
+  const unitRadio = document.querySelector(`input[name="mAdjUnit"][value="${unit}"]`);
+  if (unitRadio) unitRadio.checked = true;
+
+  // 5. 수량 복원
+  const qtyInput = document.getElementById('mAdjQtyInput');
+  const qtyVal = unit === 'box' ? r.boxQty : r.individualQty;
+  if (qtyInput) {
+    qtyInput.value = qtyVal !== undefined ? qtyVal : (r.boxQty || r.individualQty || 0);
+    setTimeout(() => {
+      qtyInput.focus();
+      qtyInput.select();
+    }, 80);
+  }
+
+  // 6. 실시간 미리보기 갱신
+  updateMobileAdjLivePreview();
+
+  // 7. 수정 모드 안내 배너 및 버튼 전환
+  const editNotice = document.getElementById('mAdjEditNotice');
+  const editNoticeText = document.getElementById('mAdjEditNoticeText');
+  if (editNotice) editNotice.style.display = 'flex';
+  if (editNoticeText) editNoticeText.textContent = `✏️ #${index + 1}번 [${r.itemName}] 항목 수정 중`;
+
+  const btnSave = document.getElementById('btnMAdjSaveAndNext');
+  if (btnSave) {
+    btnSave.innerHTML = `<span>💾 #${index + 1}번 수정 내용 저장 ➔</span>`;
+    btnSave.style.background = 'linear-gradient(135deg, #059669, #047857)';
+    btnSave.style.boxShadow = '0 4px 12px rgba(5,150,105,0.35)';
+  }
+
+  renderMobileAdjSessionList();
+  showAppToast(`✏️ [${r.itemName}] 항목이 입력란으로 롤백되었습니다.`, 1500);
+}
+
+function cancelMobileEditItem() {
+  editingMobileRecordIndex = -1;
+  const editNotice = document.getElementById('mAdjEditNotice');
+  if (editNotice) editNotice.style.display = 'none';
+
+  const btnSave = document.getElementById('btnMAdjSaveAndNext');
+  if (btnSave) {
+    btnSave.innerHTML = '<span>💾 저장 후 다음 품목 ➔</span>';
+    btnSave.style.background = 'linear-gradient(135deg, #2563eb, #1d4ed8)';
+    btnSave.style.boxShadow = '0 4px 12px rgba(37,99,235,0.3)';
+  }
+
+  currentMobileAdjItem = null;
+  const card = document.getElementById('mAdjSelectedCard');
+  if (card) card.style.display = 'none';
+  const preview = document.getElementById('mAdjLivePreviewBox');
+  if (preview) preview.style.display = 'none';
+
+  const qtyInput = document.getElementById('mAdjQtyInput');
+  if (qtyInput) qtyInput.value = '';
+
+  const searchInput = document.getElementById('mAdjItemSearch');
+  if (searchInput) {
+    searchInput.value = '';
+    searchInput.focus();
+  }
+
+  renderMobileAdjSessionList();
+}
+
 function renderMobileAdjSessionList() {
   const countSpan = document.getElementById('mAdjSessionCount');
   const container = document.getElementById('mAdjSessionList');
@@ -10498,7 +10675,7 @@ function renderMobileAdjSessionList() {
 
   if (!records || records.length === 0) {
     if (countSpan) countSpan.textContent = '0';
-    container.innerHTML = `<div style="color: #94a3b8; text-align: center; padding: 12px 0;">아직 입력된 실사 내역이 없습니다.</div>`;
+    container.innerHTML = `<div style="color: #94a3b8; text-align: center; padding: 16px 0; font-size: 8.5pt;">아직 입력된 실사 내역이 없습니다.</div>`;
     return;
   }
 
@@ -10508,17 +10685,30 @@ function renderMobileAdjSessionList() {
   for (let i = records.length - 1; i >= 0; i--) {
     const r = records[i];
     const isInc = r.adjType === 'increment';
-    const tag = isInc ? '<span style="color:#047857; font-weight:700;">➕추가</span>' : '<span style="color:#1d4ed8; font-weight:700;">🔄치환</span>';
+    const isEditing = (editingMobileRecordIndex === i);
+    const tagBg = isInc ? '#ecfdf5' : '#eff6ff';
+    const tagColor = isInc ? '#047857' : '#1d4ed8';
+    const tagBorder = isInc ? '#a7f3d0' : '#bfdbfe';
+    const tagText = isInc ? '➕추가' : '🔄치환';
+
+    const rowBg = isEditing ? '#eff6ff' : '#f8fafc';
+    const rowBorder = isEditing ? '2px solid #3b82f6' : '1px solid #e2e8f0';
+
     html += `
-      <div style="padding: 5px 8px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center;">
-        <div>
-          <strong style="color: #1e293b;">${escapeHtml(r.itemName)}</strong>
-          <span style="color: #64748b; font-size: 7.5pt;">(${escapeHtml(r.color)})</span>
-          <span style="margin-left: 4px; font-size: 7.5pt;">${tag}</span>
+      <div onclick="editMobileSessionItem(${i})" style="padding: 9px 12px; margin-bottom: 5px; border-radius: 8px; background: ${rowBg}; border: ${rowBorder}; display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: all 0.15s ease; -webkit-tap-highlight-color: rgba(99,102,241,0.15);" title="터치하여 입력란으로 롤백 및 수정">
+        <div style="flex: 1; min-width: 0; padding-right: 8px;">
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <strong style="color: #0f172a; font-size: 10pt; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(r.itemName)}</strong>
+            <span style="font-size: 8.5pt; color: #64748b;">(${escapeHtml(r.color)})</span>
+            <span style="font-size: 7.5pt; font-weight: 700; background: ${tagBg}; color: ${tagColor}; border: 1px solid ${tagBorder}; padding: 1px 6px; border-radius: 4px;">${tagText}</span>
+          </div>
+          <div style="font-size: 7.5pt; color: #64748b; margin-top: 3px;">
+            ${isEditing ? '<strong style="color: #2563eb;">✏️ 현재 상단 입력란에서 수정 중...</strong>' : '<span style="color: #6366f1; font-weight: 600;">👆 터치하여 재수정 (롤백)</span>'}
+          </div>
         </div>
-        <div style="display: flex; align-items: center; gap: 6px;">
-          <span style="font-weight: 800; color: #0f766e;">${r.boxQty}상자</span>
-          <button type="button" onclick="deleteMobileSessionItem(${i})" style="background:none; border:none; color:#ef4444; font-weight:bold; cursor:pointer; font-size:9pt; padding:0 2px;">✕</button>
+        <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
+          <span style="font-weight: 800; font-size: 11pt; color: #0f766e;">${r.boxQty}상자</span>
+          <button type="button" onclick="deleteMobileSessionItem(${i}, event)" style="background: #fee2e2; border: 1px solid #fca5a5; color: #dc2626; font-weight: bold; border-radius: 6px; cursor: pointer; font-size: 10pt; padding: 4px 8px; line-height: 1;" title="삭제">✕</button>
         </div>
       </div>
     `;
@@ -10526,8 +10716,17 @@ function renderMobileAdjSessionList() {
   container.innerHTML = html;
 }
 
-function deleteMobileSessionItem(index) {
+function deleteMobileSessionItem(index, event) {
+  if (event) {
+    event.stopPropagation();
+    event.preventDefault();
+  }
   if (index < 0 || index >= records.length) return;
+  if (editingMobileRecordIndex === index) {
+    cancelMobileEditItem();
+  } else if (editingMobileRecordIndex > index) {
+    editingMobileRecordIndex--;
+  }
   records.splice(index, 1);
   saveTableData();
   updateTable();
