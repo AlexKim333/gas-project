@@ -2148,7 +2148,7 @@
         <div style="display: flex; gap: 6px;">
           <div style="position: relative; flex: 1;">
             <input type="text" id="mAdjItemSearch" placeholder="품명 검색 (예: CECI)" autocomplete="off" oninput="filterMobileAdjItems(this.value)" style="width: 100%; box-sizing: border-box; padding: 8px 10px; font-size: 10.5pt; font-weight: 700; border: 2px solid #818cf8; border-radius: 6px;">
-            <div id="mAdjDropdown" class="dropdown-container" style="display: none; position: absolute; top: 100%; left: 0; width: 100%; z-index: 1100; max-height: 180px; overflow-y: auto; background: white; border: 1.5px solid #818cf8; border-radius: 6px; box-shadow: 0 6px 16px rgba(0,0,0,0.15);">
+            <div id="mAdjDropdown" class="dropdown-container" style="display: none; position: absolute; top: 100%; left: 0; width: 100%; z-index: 1100; max-height: 270px; overflow-y: auto; background: white; border: 1.5px solid #818cf8; border-radius: 6px; box-shadow: 0 6px 16px rgba(0,0,0,0.15);">
               <ul id="mAdjSuggestionsList" style="list-style: none; margin: 0; padding: 0;"></ul>
             </div>
           </div>
@@ -10158,6 +10158,11 @@ function openMobileStockAdjModal() {
   currentMobileAdjMode = 'replace';
   setMobileAdjMode('replace');
 
+  const dropdown = document.getElementById('mAdjDropdown');
+  if (dropdown) dropdown.style.display = 'none';
+  _mobileAdjAllMatched = [];
+  _mobileAdjPageLimit = MOBILE_ADJ_PAGE_SIZE;
+
   const card = document.getElementById('mAdjSelectedCard');
   if (card) card.style.display = 'none';
 
@@ -10179,8 +10184,11 @@ function openMobileStockAdjModal() {
 function closeMobileStockAdjModal() {
   const modal = document.getElementById('mobileStockAdjModal');
   const overlay = document.getElementById('modalOverlay');
+  const dropdown = document.getElementById('mAdjDropdown');
   if (modal) modal.style.display = 'none';
   if (overlay) overlay.style.display = 'none';
+  if (dropdown) dropdown.style.display = 'none';
+  _mobileAdjAllMatched = [];
 }
 
 function setMobileAdjMode(mode) {
@@ -10207,6 +10215,10 @@ function setMobileAdjMode(mode) {
   updateMobileAdjLivePreview();
 }
 
+let _mobileAdjAllMatched = [];
+let _mobileAdjPageLimit = 15;
+const MOBILE_ADJ_PAGE_SIZE = 15;
+
 function filterMobileAdjItems(query) {
   const dropdown = document.getElementById('mAdjDropdown');
   const list = document.getElementById('mAdjSuggestionsList');
@@ -10215,22 +10227,45 @@ function filterMobileAdjItems(query) {
   const q = (query || '').trim().toLowerCase();
   if (!q || !stockDataCache || stockDataCache.length === 0) {
     dropdown.style.display = 'none';
+    _mobileAdjAllMatched = [];
     return;
   }
 
-  const matched = stockDataCache.filter(it => {
-    const name = (it.name || '').toLowerCase();
-    const color = (it.color || '').toLowerCase();
-    return name.includes(q) || color.includes(q);
-  }).slice(0, 15);
+  const aliasInfo = typeof resolveModelAlias === 'function' ? resolveModelAlias(query) : null;
+  const targetClean = aliasInfo ? aliasInfo.targetModel.toLowerCase().replace(/[\s_\-\/]/g, '') : null;
+  const qClean = q.replace(/[\s_\-\/]/g, '');
 
-  if (matched.length === 0) {
+  _mobileAdjAllMatched = stockDataCache.filter(it => {
+    const itName = (it.name || '').toLowerCase();
+    const itColor = (it.color || '').toLowerCase();
+    const itClean = itName.replace(/[\s_\-\/]/g, '');
+
+    if (itName.includes(q) || itColor.includes(q)) return true;
+    if (qClean && itClean.includes(qClean)) return true;
+    if (targetClean && itClean === targetClean) return true;
+    return false;
+  });
+
+  if (_mobileAdjAllMatched.length === 0) {
     dropdown.style.display = 'none';
     return;
   }
 
-  list.innerHTML = matched.map((it, i) => `
-    <li onclick="selectMobileAdjItem(${i})" data-index="${i}" style="padding: 9px 12px; border-bottom: 1px solid #f1f5f9; cursor: pointer; display: flex; justify-content: space-between; align-items: center;">
+  _mobileAdjPageLimit = MOBILE_ADJ_PAGE_SIZE;
+  renderMobileAdjSuggestions();
+  dropdown.style.display = 'block';
+}
+
+function renderMobileAdjSuggestions() {
+  const list = document.getElementById('mAdjSuggestionsList');
+  if (!list) return;
+
+  const totalCount = _mobileAdjAllMatched.length;
+  const currentSlice = _mobileAdjAllMatched.slice(0, _mobileAdjPageLimit);
+  window._mobileAdjMatched = currentSlice;
+
+  let html = currentSlice.map((it, i) => `
+    <li onclick="selectMobileAdjItem(${i})" data-index="${i}" style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; cursor: pointer; display: flex; justify-content: space-between; align-items: center; -webkit-tap-highlight-color: rgba(99,102,241,0.15);">
       <div>
         <strong style="color: #1e293b; font-size: 10pt;">${escapeHtml(it.name)}</strong>
         <span style="font-size: 8.5pt; color: #64748b; margin-left: 4px;">(${escapeHtml(it.color || 'SURTIDO')})</span>
@@ -10239,8 +10274,35 @@ function filterMobileAdjItems(query) {
     </li>
   `).join('');
 
-  dropdown.style.display = 'block';
-  window._mobileAdjMatched = matched;
+  if (totalCount > _mobileAdjPageLimit) {
+    const remaining = totalCount - _mobileAdjPageLimit;
+    const nextCount = Math.min(remaining, MOBILE_ADJ_PAGE_SIZE);
+    html += `
+      <li onclick="showMoreMobileAdjItems(event)" style="padding: 12px 14px; background: linear-gradient(135deg, #f5f3ff, #ede9fe); color: #4338ca; text-align: center; font-weight: 800; font-size: 9.2pt; cursor: pointer; border-top: 1.5px solid #ddd6fe; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 -2px 6px rgba(0,0,0,0.04);">
+        <span>➕ 결과 더보기 (+${nextCount}개)</span>
+        <span style="font-size: 8pt; color: #6366f1; font-weight: 600;">(현재 ${_mobileAdjPageLimit}개 / 총 ${totalCount}개)</span>
+      </li>
+    `;
+  } else if (totalCount > MOBILE_ADJ_PAGE_SIZE) {
+    html += `
+      <li style="padding: 9px 12px; background: #f8fafc; color: #94a3b8; text-align: center; font-size: 8pt; font-weight: 600; border-top: 1px solid #e2e8f0;">
+        ✓ 전체 ${totalCount}개 품목이 모두 표시되었습니다.
+      </li>
+    `;
+  }
+
+  list.innerHTML = html;
+}
+
+function showMoreMobileAdjItems(event) {
+  if (event) {
+    event.stopPropagation();
+    event.preventDefault();
+  }
+  _mobileAdjPageLimit += MOBILE_ADJ_PAGE_SIZE;
+  renderMobileAdjSuggestions();
+  const searchInput = document.getElementById('mAdjItemSearch');
+  if (searchInput) searchInput.focus();
 }
 
 function selectMobileAdjItem(index) {
@@ -10414,6 +10476,11 @@ function submitMobileAdjItem(isContinue) {
     if (preview) preview.style.display = 'none';
 
     if (qtyInput) qtyInput.value = '';
+
+    const dropdown = document.getElementById('mAdjDropdown');
+    if (dropdown) dropdown.style.display = 'none';
+    _mobileAdjAllMatched = [];
+    _mobileAdjPageLimit = MOBILE_ADJ_PAGE_SIZE;
 
     const searchInput = document.getElementById('mAdjItemSearch');
     if (searchInput) {
