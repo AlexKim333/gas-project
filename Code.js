@@ -15,7 +15,14 @@ const SHEETS = {
   IN_LOCATIONS: '입고처목록',
   OUT_LOCATIONS: '출고처목록',
   ADMINS: '관리자명단',
-  MANUFACTURERS: '메이커'
+  MANUFACTURERS: '메이커',
+  ALIASES: '별명사전'
+};
+
+const PENDING_CONFIG = {
+  TOTAL_COLUMNS: 13,
+  HEADER_VERIFY: '검증상태',
+  HEADER_AFTER_STOCK: '처리후재고'
 };
 
 const DEFAULTS = {
@@ -166,6 +173,37 @@ function ensureSheetColumns(sheet, neededCols = 9) {
 }
 
 /**
+ * PendingSheet의 필요한 열(13열) 및 헤더(L열: 검증상태, M열: 처리후재고) 자동 확보
+ */
+function ensurePendingSheetColumns(sheet) {
+  if (!sheet) return;
+  ensureSheetColumns(sheet, PENDING_CONFIG.TOTAL_COLUMNS);
+  try {
+    const lastCol = sheet.getMaxColumns();
+    if (lastCol >= 13) {
+      const headerRange = sheet.getRange(1, 12, 1, 2);
+      const headers = headerRange.getValues()[0];
+      let needUpdate = false;
+      const newHeaders = [headers[0], headers[1]];
+      if (!headers[0]) {
+        newHeaders[0] = PENDING_CONFIG.HEADER_VERIFY;
+        needUpdate = true;
+      }
+      if (!headers[1]) {
+        newHeaders[1] = PENDING_CONFIG.HEADER_AFTER_STOCK;
+        needUpdate = true;
+      }
+      if (needUpdate) {
+        headerRange.setValues([newHeaders]);
+        headerRange.setBackground('#e2e8f0').setFontWeight('bold');
+      }
+    }
+  } catch (e) {
+    console.warn(`[PendingSheet헤더확보] 헤더 자동 생성 오류: ${e.message}`);
+  }
+}
+
+/**
  * 스프레드시트 내 모든 시트의 여유 행을 점검하고 100행 미만이면 1,000행씩 선제 확장
  */
 function ensureAllSheetsCapacity() {
@@ -232,6 +270,118 @@ function getAdminList() {
     return [];
   }
   return sheet.getRange('A2:A' + lastRow).getValues().flat().map(item => normalizeText(item)).filter(Boolean);
+}
+
+// -------------------------------------------------------------------
+// 별명(Alias) 사전 룰북 관리 및 자가학습 영구 저장소
+// -------------------------------------------------------------------
+
+/**
+ * 별명사전 시트를 가져오거나 없으면 신규 생성하고 초기 헤더 서식을 설정
+ */
+function getOrCreateAliasSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(SHEETS.ALIASES);
+  if (!sheet) {
+    sheet = ss.insertSheet(SHEETS.ALIASES);
+    sheet.getRange(1, 1, 1, 4).setValues([['별명(원문/약어)', '매핑품명', '등록일시', '등록자']]);
+    sheet.getRange('A1:D1').setBackground('#f1f5f9').setFontWeight('bold');
+    sheet.setFrozenRows(1);
+    console.log(`[별명사전] '${SHEETS.ALIASES}' 시트를 자동 생성했습니다.`);
+  }
+  return sheet;
+}
+
+/**
+ * 별명사전 시트에서 등록된 모든 별명-품명 매핑을 조회하여 클라이언트에 전달
+ * @returns {{ [cleanKey: string]: string }}
+ */
+function getAliasMap() {
+  try {
+    const sheet = getOrCreateAliasSheet();
+    const lastRow = sheet.getLastRow();
+    const map = {};
+    if (lastRow < 2) return map;
+
+    const data = sheet.getRange(2, 1, lastRow - 1, 2).getValues();
+    data.forEach(row => {
+      const alias = normalizeText(row[0]);
+      const target = normalizeText(row[1]);
+      if (alias && target) {
+        // 정규화 키 매핑 (공백, 특수문자 제거 대문자)
+        const cleanKey = alias.replace(/[\s_\-\/.,#]+/g, '').toUpperCase();
+        map[cleanKey] = target;
+        // 원문 키 대문자 보존
+        map[alias.toUpperCase()] = target;
+      }
+    });
+    return map;
+  } catch (e) {
+    console.error(`getAliasMap error: ${e.message}`);
+    return {};
+  }
+}
+
+/**
+ * 신규 별명을 '별명사전' 시트에 영구 저장 (LockService로 데이터 정합성 보장)
+ * @param {string} rawAlias OCR 원문 또는 사용자 입력 별명
+ * @param {string} targetModel 연결할 마스터 정식 품명
+ * @param {string} user 등록자 정보
+ */
+function saveProductAlias(rawAlias, targetModel, user) {
+  const alias = normalizeText(rawAlias);
+  const target = normalizeText(targetModel);
+  if (!alias || !target) {
+    return { success: false, message: '별명과 매핑 품명을 모두 입력해야 합니다.' };
+  }
+
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(20000);
+    const sheet = getOrCreateAliasSheet();
+    const lastRow = sheet.getLastRow();
+    const cleanKey = alias.replace(/[\s_\-\/.,#]+/g, '').toUpperCase();
+
+    // 기존 등록 여부 검사 (중복 방지 및 갱신)
+    if (lastRow >= 2) {
+      const existing = sheet.getRange(2, 1, lastRow - 1, 2).getValues();
+      for (let i = 0; i < existing.length; i++) {
+        const existAlias = normalizeText(existing[i][0]).replace(/[\s_\-\/.,#]+/g, '').toUpperCase();
+        if (existAlias === cleanKey) {
+          sheet.getRange(i + 2, 2).setValue(target);
+          sheet.getRange(i + 2, 3).setValue(Utilities.formatDate(new Date(), Session.getScriptTimeZone() || 'GMT', 'yyyy/MM/dd HH:mm:ss'));
+          sheet.getRange(i + 2, 4).setValue(user || '사용자수정');
+          return {
+            success: true,
+            message: `'${alias}'의 매핑 품명이 '${target}'(으)로 갱신되었습니다.`,
+            isUpdate: true,
+            cleanKey,
+            targetModel: target
+          };
+        }
+      }
+    }
+
+    // 신규 행 추가
+    const nextRow = Math.max(lastRow + 1, 2);
+    ensureSheetCapacity(sheet, nextRow);
+    const nowStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone() || 'GMT', 'yyyy/MM/dd HH:mm:ss');
+    sheet.getRange(nextRow, 1, 1, 4).setValues([[alias, target, nowStr, user || '사용자수정']]);
+    SpreadsheetApp.flush();
+
+    return {
+      success: true,
+      message: `'${alias}' ➡️ '${target}' 별명이 성공적으로 룰북에 영구 등록되었습니다!`,
+      isUpdate: false,
+      cleanKey,
+      targetModel: target
+    };
+  } catch (e) {
+    console.error(`saveProductAlias error: ${e.message}`);
+    return { success: false, message: `별명 저장 실패: ${e.message}` };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // -------------------------------------------------------------------
@@ -635,6 +785,13 @@ function processForm(tableData, mode, admin) {
       const boxQty = Math.abs(normalizeNumber(record.boxQty));
       const indQty = Math.abs(normalizeNumber(record.individualQty));
 
+      // [정합성 사전 스냅샷] 변경 직전 원본 수량 메모리 보관 (자가 복구용)
+      const snapshot = {
+        box: current.box,
+        individual: current.individual,
+        boxContent: boxContent
+      };
+
       if (boxQty > 0) {
         if (mode === 'in') {
           current.box += boxQty;
@@ -664,20 +821,42 @@ function processForm(tableData, mode, admin) {
           current.individual -= indQty;
         }
       }
+
+      // [정합성 Two-Way 불변성 자동 검증: 총 낱개 환산]
+      const reqPieces = (boxQty * boxContent) + indQty;
+      const initialPieces = (snapshot.box * boxContent) + snapshot.individual;
+      const finalPieces = (current.box * boxContent) + current.individual;
+      const actualDeltaPieces = mode === 'in' ? (finalPieces - initialPieces) : (initialPieces - finalPieces);
+
+      // 1) 총 낱개 변동량 불일치 시 즉시 스냅샷 원복 (자가 복구)
+      if (actualDeltaPieces !== reqPieces) {
+        current.box = snapshot.box;
+        current.individual = snapshot.individual;
+        throw new Error(`[정합성 오류] ${current.name}(${current.color}) 수량 불일치 감지! (요청: ${reqPieces}개, 실제변동: ${actualDeltaPieces}개) 안전하게 원상 복구되었습니다.`);
+      }
+
+      // 2) 음수 재고 감지 시 즉시 스냅샷 원복 (자가 복구)
+      if (current.box < 0 || current.individual < 0) {
+        current.box = snapshot.box;
+        current.individual = snapshot.individual;
+        throw new Error(`[정합성 오류] ${current.name}(${current.color}) 음수 재고 감지! (박스: ${current.box}, 낱개: ${current.individual}) 안전하게 원상 복구되었습니다.`);
+      }
     });
 
     // 3. 락 상태에서 고유 송장 번호 생성
     const seq = generateInvoiceNumber(typeKorean);
     const invoiceNumber = `${todayStr}-${seq}`;
 
-    // 4. PendingSheet 기록 데이터 생성
+    // 4. PendingSheet 기록 데이터 생성 (13열: 검증상태, 처리후재고 포함)
     const adminName = normalizeText(admin) || 'ADMIN';
     const pendingRows = tableData.map(record => {
       const name = normalizeText(record.itemName);
       const color = normalizeText(record.color) || DEFAULTS.COLOR;
       const boxContent = normalizeNumber(record.boxContent);
       const key = makeKey(name, color, boxContent);
-      const mfr = stockMap[key] ? stockMap[key].manufacturer : '';
+      const item = stockMap[key];
+      const mfr = item ? item.manufacturer : '';
+      const afterStockStr = item ? `${item.box}박스 ${item.individual}개` : '';
 
       return [
         invoiceNumber,
@@ -690,7 +869,9 @@ function processForm(tableData, mode, admin) {
         boxContent,
         normalizeText(record.location),
         adminName,
-        mfr
+        mfr,
+        'PASS',            // 12열 (L): 검증상태
+        afterStockStr      // 13열 (M): 처리후재고
       ];
     });
 
@@ -715,10 +896,11 @@ function processForm(tableData, mode, admin) {
       }
     }
 
-    // 6. PendingSheet 일괄 쓰기
+    // 6. PendingSheet 일괄 쓰기 (13열 동적 매핑)
+    ensurePendingSheetColumns(pendingSheet);
     const pendingLastRow = pendingSheet.getLastRow();
     ensureSheetCapacity(pendingSheet, pendingLastRow + pendingRows.length);
-    pendingSheet.getRange(pendingLastRow + 1, 1, pendingRows.length, 11).setValues(pendingRows);
+    pendingSheet.getRange(pendingLastRow + 1, 1, pendingRows.length, pendingRows[0].length).setValues(pendingRows);
     SpreadsheetApp.flush();
 
     // 7. 서브창고 입고인 경우 외부창고 재고 차감 및 주문내역 LISTO 동기화
@@ -871,7 +1053,8 @@ function searchRecords(type, invoiceNumber) {
 
   const targetInv = normalizeText(invoiceNumber);
   const targetType = normalizeText(type);
-  const data = sheet.getRange(2, 1, lastRow - 1, 11).getValues();
+  const cols = Math.max(sheet.getLastColumn(), PENDING_CONFIG.TOTAL_COLUMNS);
+  const data = sheet.getRange(2, 1, lastRow - 1, cols).getValues();
 
   const records = data.filter(row => {
     const inv = normalizeText(row[0]);
@@ -887,7 +1070,9 @@ function searchRecords(type, invoiceNumber) {
     boxContent: normalizeNumber(row[7]),
     location: normalizeText(row[8]),
     admin: normalizeText(row[9]),
-    manufacturer: normalizeText(row[10])
+    manufacturer: normalizeText(row[10]),
+    verificationStatus: normalizeText(row[11]) || 'PASS',
+    afterStock: normalizeText(row[12]) || ''
   }));
 }
 
@@ -901,6 +1086,8 @@ function updatePendingRecords(invoiceNumber, type, newRecords, admin) {
     const targetInv = normalizeText(invoiceNumber).replace(/-/g, '/');
     const targetType = normalizeText(type);
 
+    ensurePendingSheetColumns(pendingSheet);
+
     // 1. 재고 맵 로드
     ensureSheetColumns(stockSheet, 9);
     const stockLastRow = stockSheet.getLastRow();
@@ -912,14 +1099,20 @@ function updatePendingRecords(invoiceNumber, type, newRecords, admin) {
     const oldMatchedRows = [];
 
     if (pendingLastRow >= 2) {
-      const pData = pendingSheet.getRange(2, 1, pendingLastRow - 1, 11).getValues();
+      const pCols = Math.max(pendingSheet.getLastColumn(), PENDING_CONFIG.TOTAL_COLUMNS);
+      const pData = pendingSheet.getRange(2, 1, pendingLastRow - 1, pCols).getValues();
       pData.forEach(row => {
         const inv = normalizeText(row[0]).replace(/-/g, '/');
         const rType = normalizeText(row[1]);
         if (inv === targetInv && rType === targetType) {
           oldMatchedRows.push(row);
         } else {
-          keptPendingRows.push(row);
+          // 기존 행이 11열만 가졌을 경우 13열로 안전하게 패딩 맞춤
+          const paddedRow = [...row];
+          while (paddedRow.length < PENDING_CONFIG.TOTAL_COLUMNS) {
+            paddedRow.push('');
+          }
+          keptPendingRows.push(paddedRow);
         }
       });
     }
@@ -943,28 +1136,21 @@ function updatePendingRecords(invoiceNumber, type, newRecords, admin) {
           safeStock: 0,
           boxContent: boxContent,
           initialStock: 0,
-          manufacturer: normalizeText(row[10])
+          manufacturer: ''
         };
         stockMap[key] = item;
       }
 
       if (targetType === '입고') {
-        // 입고 취소 -> 재고 차감
-        item.box -= boxQty;
-        item.individual -= individualQty;
-        while (item.individual < 0 && item.box > 0) {
-          if (item.boxContent <= 0) break;
-          item.box -= 1;
-          item.individual += item.boxContent;
-        }
+        item.box = Math.max(0, item.box - boxQty);
+        item.individual = Math.max(0, item.individual - individualQty);
       } else {
-        // 출고 취소 -> 재고 복원(가산)
         item.box += boxQty;
         item.individual += individualQty;
       }
     });
 
-    // 4. 신규 레코드 반영 (수정 내역이 있을 경우)
+    // 4. 새로운 기록 반영
     const createdPendingRows = [];
     const adminName = normalizeText(admin) || 'ADMIN';
 
@@ -973,6 +1159,8 @@ function updatePendingRecords(invoiceNumber, type, newRecords, admin) {
         const name = normalizeText(record.itemName);
         const color = normalizeText(record.color) || DEFAULTS.COLOR;
         const boxContent = normalizeNumber(record.boxContent);
+        const boxQty = Math.abs(normalizeNumber(record.boxQty));
+        const individualQty = Math.abs(normalizeNumber(record.individualQty));
         const key = makeKey(name, color, boxContent);
         let item = stockMap[key];
 
@@ -993,8 +1181,12 @@ function updatePendingRecords(invoiceNumber, type, newRecords, admin) {
           stockMap[key] = item;
         }
 
-        const boxQty = Math.abs(normalizeNumber(record.boxQty));
-        const individualQty = Math.abs(normalizeNumber(record.individualQty));
+        // [정합성 사전 스냅샷]
+        const snapshot = {
+          box: item.box,
+          individual: item.individual,
+          boxContent: item.boxContent
+        };
 
         if (targetType === '입고') {
           item.box += boxQty;
@@ -1020,6 +1212,19 @@ function updatePendingRecords(invoiceNumber, type, newRecords, admin) {
           }
         }
 
+        // [정합성 Two-Way 불변성 자동 검증: 총 낱개 환산]
+        const reqPieces = (boxQty * item.boxContent) + individualQty;
+        const initPieces = (snapshot.box * item.boxContent) + snapshot.individual;
+        const finPieces = (item.box * item.boxContent) + item.individual;
+        const actualDelta = targetType === '입고' ? (finPieces - initPieces) : (initPieces - finPieces);
+
+        if (actualDelta !== reqPieces || item.box < 0 || item.individual < 0) {
+          item.box = snapshot.box;
+          item.individual = snapshot.individual;
+          throw new Error(`[정합성 오류] ${item.name}(${item.color}) 수정 처리 중 수량 불일치 감지! 안전하게 원상 복구되었습니다.`);
+        }
+
+        const afterStockStr = `${item.box}박스 ${item.individual}개`;
         createdPendingRows.push([
           invoiceNumber,
           targetType,
@@ -1031,7 +1236,9 @@ function updatePendingRecords(invoiceNumber, type, newRecords, admin) {
           boxContent,
           normalizeText(record.location),
           adminName,
-          item.manufacturer || normalizeText(record.manufacturer)
+          item.manufacturer || normalizeText(record.manufacturer),
+          'UPDATE_PASS',     // 12열 (L): 검증상태
+          afterStockStr      // 13열 (M): 처리후재고
         ]);
       });
     }
@@ -1059,14 +1266,14 @@ function updatePendingRecords(invoiceNumber, type, newRecords, admin) {
       }
     }
 
-    // B. PendingSheet 일괄 갱신 (deleteRow 루프 완전 배제)
+    // B. PendingSheet 일괄 갱신 (deleteRow 루프 완전 배제, 13열 동적 처리)
     const finalPendingRows = keptPendingRows.concat(createdPendingRows);
     if (finalPendingRows.length > 0) {
       ensureSheetCapacity(pendingSheet, 2 + finalPendingRows.length - 1);
-      pendingSheet.getRange(2, 1, finalPendingRows.length, 11).setValues(finalPendingRows);
+      pendingSheet.getRange(2, 1, finalPendingRows.length, finalPendingRows[0].length).setValues(finalPendingRows);
     }
     if (pendingLastRow - 1 > finalPendingRows.length) {
-      pendingSheet.getRange(2 + finalPendingRows.length, 1, (pendingLastRow - 1) - finalPendingRows.length, 11).clearContent();
+      pendingSheet.getRange(2 + finalPendingRows.length, 1, (pendingLastRow - 1) - finalPendingRows.length, PENDING_CONFIG.TOTAL_COLUMNS).clearContent();
     }
     SpreadsheetApp.flush();
 
@@ -2215,7 +2422,9 @@ function processQuickStockAdjustment(adjustments, admin) {
         current.individual = targetIndiv;
       }
 
-      // PendingSheet 기록: 구분 = '재고조정'
+      const afterStockStr = `${targetBox}박스 ${targetIndiv}개`;
+
+      // PendingSheet 기록: 구분 = '재고조정' (13열 지원)
       pendingRows.push([
         invoiceNumber,
         '재고조정',
@@ -2227,7 +2436,9 @@ function processQuickStockAdjustment(adjustments, admin) {
         boxContent,
         normalizeText(item.location) || '재고조정',
         adminName,
-        current.manufacturer || ''
+        current.manufacturer || '',
+        'ADJUST_PASS',       // 12열 (L): 검증상태
+        afterStockStr        // 13열 (M): 처리후재고
       ]);
 
       updatedKeys.push({
@@ -2258,11 +2469,12 @@ function processQuickStockAdjustment(adjustments, admin) {
       stockSheet.getRange(2, 1, updatedStockRows.length, 9).setValues(updatedStockRows);
     }
 
-    // 4. PendingSheet 에 '재고조정' 행 일괄 추가
+    // 4. PendingSheet 에 '재고조정' 행 일괄 추가 (13열 동적 매핑)
     if (pendingRows.length > 0) {
+      ensurePendingSheetColumns(pendingSheet);
       const pLastRow = Math.max(pendingSheet.getLastRow() + 1, 2);
       ensureSheetCapacity(pendingSheet, pLastRow + pendingRows.length - 1);
-      pendingSheet.getRange(pLastRow, 1, pendingRows.length, 11).setValues(pendingRows);
+      pendingSheet.getRange(pLastRow, 1, pendingRows.length, pendingRows[0].length).setValues(pendingRows);
     }
     SpreadsheetApp.flush();
 
@@ -2354,7 +2566,8 @@ function verifyStockIntegrity() {
   // 2. PendingSheet 전표 내역 로드 및 누적
   const pendingLastRow = pendingSheet.getLastRow();
   if (pendingLastRow >= 2) {
-    const pendingData = pendingSheet.getRange(2, 1, pendingLastRow - 1, 11).getValues();
+    const pCols = Math.max(pendingSheet.getLastColumn(), PENDING_CONFIG.TOTAL_COLUMNS);
+    const pendingData = pendingSheet.getRange(2, 1, pendingLastRow - 1, pCols).getValues();
     pendingData.forEach(row => {
       const type = normalizeText(row[1]); // '입고', '출고'
       const name = normalizeText(row[3]);
@@ -3356,7 +3569,8 @@ function analyzeWinterPeakDemandAndSafeStock() {
     const curPendingSheet = getSheet(SHEETS.PENDING);
     const curLastRow = curPendingSheet.getLastRow();
     if (curLastRow >= 2) {
-      const curData = curPendingSheet.getRange(2, 1, curLastRow - 1, 11).getValues();
+      const pCols = Math.max(curPendingSheet.getLastColumn(), 11);
+      const curData = curPendingSheet.getRange(2, 1, curLastRow - 1, pCols).getValues();
       curData.forEach(row => {
         if (normalizeText(row[1]) === '출고') {
           allOutboundRows.push({ row: row, source: '현재' });

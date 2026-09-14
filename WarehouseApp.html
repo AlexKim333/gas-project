@@ -2369,6 +2369,86 @@
       </div>
     </div>
 
+    <!-- ⚠️ 마스터 미확인 품목 3단계 판별 모달 (신상품 / 별명 / 오타) -->
+    <div id="unmatchedTriageModal" class="modal" style="display: none; width: 580px; max-width: 95vw; padding: 18px; box-shadow: 0 12px 36px rgba(0,0,0,0.3); border-radius: 12px; z-index: 10000;">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 12px;">
+        <h3 style="margin: 0; color: #1e293b; font-size: 12pt; font-weight: bold; display: flex; align-items: center; gap: 8px;">
+          <span>⚠️</span> <span>마스터 미확인 품목 자동 처리</span>
+        </h3>
+        <span id="unmatchedCountBadge" style="background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; font-size: 8.5pt; font-weight: 700; padding: 2px 8px; border-radius: 12px;">1건 발견</span>
+      </div>
+
+      <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; font-size: 8.5pt; color: #92400e; line-height: 1.45;">
+        OCR로 추출되었으나 <strong>상품 마스터에 등록되지 않은 품목</strong>입니다.<br>
+        <strong>신상품 등록</strong>, <strong>기존 상품의 별명 연결</strong>, 또는 <strong>오타 수정</strong>을 통해 장바구니에 정상 반영할 수 있습니다.
+      </div>
+
+      <!-- 미매칭 품목 카드 목록 -->
+      <div id="unmatchedItemsList" style="display: flex; flex-direction: column; gap: 10px; max-height: 360px; overflow-y: auto; padding: 2px; margin-bottom: 14px;">
+        <!-- 동적 렌더링 -->
+      </div>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #e2e8f0; padding-top: 12px;">
+        <button type="button" onclick="bypassUnmatchedTriage()" style="padding: 8px 14px; background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 8.5pt;" title="나중에 장바구니에서 직접 수정합니다">
+          ⏩ 그대로 장바구니 담기
+        </button>
+        <button type="button" onclick="confirmUnmatchedTriage()" style="padding: 8px 18px; background: #4f46e5; color: #ffffff; border: none; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 9pt; box-shadow: 0 2px 6px rgba(79, 70, 229, 0.35);">
+          ✅ 처리 완료 및 장바구니 반영
+        </button>
+      </div>
+    </div>
+
+    <!-- ✨ 신상품 빠른 마스터 등록 모달 (입출고 화면 유지 인라인 팝업) -->
+    <div id="quickProductModal" class="modal" style="display: none; width: 440px; max-width: 92vw; padding: 20px; box-shadow: 0 12px 36px rgba(0,0,0,0.35); border-radius: 12px; z-index: 10001;">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 14px;">
+        <h3 style="margin: 0; color: #1e293b; font-size: 11.5pt; font-weight: bold; display: flex; align-items: center; gap: 6px;">
+          <span>✨</span> <span>신상품 빠른 마스터 등록</span>
+        </h3>
+        <button type="button" onclick="closeQuickProductModal()" style="border: none; background: none; font-size: 16pt; cursor: pointer; color: #94a3b8; line-height: 1;">&times;</button>
+      </div>
+
+      <form id="quickProductForm" onsubmit="submitQuickProduct(event)" style="display: flex; flex-direction: column; gap: 10px;">
+        <div>
+          <label style="display: block; font-size: 8.5pt; font-weight: 700; color: #334155; margin-bottom: 3px;">품명 <span style="color:#ef4444;">*</span></label>
+          <input type="text" id="quickProdItemName" required style="width: 100%; box-sizing: border-box; padding: 7px 10px; border: 1.5px solid #cbd5e1; border-radius: 6px; font-size: 9.5pt; font-weight: 600;" placeholder="예: P-4D70">
+        </div>
+
+        <div style="display: flex; gap: 10px;">
+          <div style="flex: 1;">
+            <label style="display: block; font-size: 8.5pt; font-weight: 700; color: #334155; margin-bottom: 3px;">색상</label>
+            <input type="text" id="quickProdColor" value="SURTIDO" style="width: 100%; box-sizing: border-box; padding: 7px 10px; border: 1.5px solid #cbd5e1; border-radius: 6px; font-size: 9.5pt;">
+          </div>
+          <div style="flex: 1;">
+            <label style="display: block; font-size: 8.5pt; font-weight: 700; color: #334155; margin-bottom: 3px;">박스당수량 (PZS)</label>
+            <input type="number" id="quickProdBoxContent" min="0" value="0" style="width: 100%; box-sizing: border-box; padding: 7px 10px; border: 1.5px solid #cbd5e1; border-radius: 6px; font-size: 9.5pt;">
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 10px;">
+          <div style="flex: 1;">
+            <label style="display: block; font-size: 8.5pt; font-weight: 700; color: #334155; margin-bottom: 3px;">안전재고 (상자)</label>
+            <input type="number" id="quickProdSafeStock" min="0" value="0" style="width: 100%; box-sizing: border-box; padding: 7px 10px; border: 1.5px solid #cbd5e1; border-radius: 6px; font-size: 9.5pt;">
+          </div>
+          <div style="flex: 1;">
+            <label style="display: block; font-size: 8.5pt; font-weight: 700; color: #334155; margin-bottom: 3px;">기초재고 (상자)</label>
+            <input type="number" id="quickProdInitialStock" min="0" value="0" style="width: 100%; box-sizing: border-box; padding: 7px 10px; border: 1.5px solid #cbd5e1; border-radius: 6px; font-size: 9.5pt;">
+          </div>
+        </div>
+
+        <div>
+          <label style="display: block; font-size: 8.5pt; font-weight: 700; color: #334155; margin-bottom: 3px;">제조사</label>
+          <select id="quickProdManufacturer" style="width: 100%; box-sizing: border-box; padding: 7px 10px; border: 1.5px solid #cbd5e1; border-radius: 6px; font-size: 9.5pt;">
+            <option value="">(선택 안함)</option>
+          </select>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; border-top: 1px solid #e2e8f0; padding-top: 12px;">
+          <button type="button" onclick="closeQuickProductModal()" style="padding: 8px 14px; background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 8.5pt;">취소</button>
+          <button type="submit" id="btnSubmitQuickProd" style="padding: 8px 16px; background: #059669; color: #ffffff; border: none; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 9pt;">💾 마스터 등록 완료</button>
+        </div>
+      </form>
+    </div>
+
     <iframe id="printFrame" style="display: none;"></iframe>
   </div>
 
@@ -2391,7 +2471,7 @@ try {
 } catch (e) {}
 
 // 🏷️ 대표 상품 별명(Alias) 룰북 매핑 사전 (사장님 요청 8대 대표 모델 공식 별명)
-const PRODUCT_ALIAS_MAP = {
+let PRODUCT_ALIAS_MAP = {
   // P-4D70: LICRA LARGA, LICRA #70
   'LICRALARGA': 'P-4D70',
   'LICRALARGAS': 'P-4D70',
@@ -2574,6 +2654,74 @@ function resolveModelAlias(rawQuery) {
     }
   }
   return null;
+}
+
+/**
+ * 🔄 서버(별명사전 시트)에서 등록된 별명 룰북을 비동기 로드하여 클라이언트 사전에 병합
+ */
+function loadServerAliases() {
+  if (typeof google !== 'undefined' && google.script && google.script.run) {
+    google.script.run
+      .withSuccessHandler(serverAliasMap => {
+        if (serverAliasMap && typeof serverAliasMap === 'object') {
+          Object.assign(PRODUCT_ALIAS_MAP, serverAliasMap);
+          const count = Object.keys(serverAliasMap).length;
+          console.log(`[별명사전] 서버 룰북 ${count}건 동기화 완료`);
+        }
+      })
+      .withFailureHandler(err => {
+        console.warn(`[별명사전] 서버 룰북 동기화 지연/실패: ${err?.message || err}`);
+      })
+      .getAliasMap();
+  }
+}
+
+/**
+ * 🏷️ [자가학습 인터셉터] 수정 시 OCR 원문과 확정 품명이 다르면 룰북 영구 등록 제안
+ */
+function checkAndPromptRegisterAlias(rawAlias, targetModel) {
+  if (!rawAlias || !targetModel) return;
+  const cleanRaw = normalizeAliasCleanKey(rawAlias);
+  const cleanTarget = normalizeAliasCleanKey(targetModel);
+  if (!cleanRaw || !cleanTarget || cleanRaw === cleanTarget) return;
+
+  // 이미 해당 품목으로 등록된 별명인지 검사
+  const existing = resolveModelAlias(rawAlias);
+  if (existing && normalizeAliasCleanKey(existing.targetModel) === cleanTarget) {
+    return; // 이미 등록된 별명
+  }
+
+  setTimeout(() => {
+    const confirmRegister = confirm(
+      `🏷️ [별명 룰북 자동 학습 안내]\n\n` +
+      `• OCR 원문: "${rawAlias}"\n` +
+      `• 확정 품목: "${targetModel}"\n\n` +
+      `앞으로 "${rawAlias}"이(가) 스캔되면 자동으로 "${targetModel}"(으)로 100% 매칭되도록 룰북에 영구 등록하시겠습니까?\n\n(확인 시 다음 주문서부터는 별도 수정 없이 자동 매칭됩니다.)`
+    );
+
+    if (confirmRegister) {
+      // 1. 클라이언트 메모리에 즉시 반영
+      PRODUCT_ALIAS_MAP[cleanRaw] = targetModel;
+      PRODUCT_ALIAS_MAP[rawAlias.toUpperCase().trim()] = targetModel;
+
+      // 2. 서버 스프레드시트에 영구 저장
+      const curAdmin = (document.getElementById('admin')?.value || '작업자');
+      if (typeof google !== 'undefined' && google.script && google.script.run) {
+        google.script.run
+          .withSuccessHandler(res => {
+            if (res && res.success) {
+              showAppToast(res.message || '🏷️ 별명이 룰북에 영구 등록되었습니다!', 3000);
+            }
+          })
+          .withFailureHandler(err => {
+            console.error('별명 저장 실패:', err);
+          })
+          .saveProductAlias(rawAlias, targetModel, curAdmin);
+      } else {
+        showAppToast(`🏷️ '${rawAlias}' ➡️ '${targetModel}' 별명이 등록되었습니다.`, 3000);
+      }
+    }
+  }, 120);
 }
 
 function applyRecentAdjustments(dataList) {
@@ -3115,6 +3263,7 @@ function initPage() {
   setInterval(updateClock, 1000);
   loadAdminList();
   loadStockData();
+  loadServerAliases();
   updateOrderDraftBadge();
 }
 
@@ -3569,6 +3718,7 @@ function addRecord() {
 
   if (editingRecordIndex !== -1 && editingRecordIndex < records.length) {
     const origRec = records[editingRecordIndex];
+    const rawModelVal = origRec.rawModel;
     if (origRec.rawModel) {
       formData.rawModel = origRec.rawModel;
       formData.rawColor = origRec.rawColor || '';
@@ -3580,6 +3730,11 @@ function addRecord() {
     formData.isManualEdited = true;
     records[editingRecordIndex] = formData;
     exitEditMode();
+
+    // 🏷️ [자가학습 인터셉터] OCR 원문과 수정된 품명이 다르고 미등록 별명인 경우 룰북 영구 등록 제안
+    if (rawModelVal && typeof checkAndPromptRegisterAlias === 'function') {
+      checkAndPromptRegisterAlias(rawModelVal, formData.itemName);
+    }
   } else {
     records.push(formData);
   }
@@ -8080,114 +8235,130 @@ function onHandwrittenExtracted(data) {
     return;
   }
 
-  // 🚨 [사장님 업무 규칙] 출고 모드에서 파싱 완료 시 항상 출고처 확인/선택 게이트 모달을 디폴트로 오픈!
-  if (!hasExistingRecords && currentType === 'out') {
-    const defaultCustName = (candidateLocations[0]?.baseName || rawBranchCandidate || detectedLoc || '').trim();
-    pendingMultiLocState = {
-      records: newRecords,
-      detectedAdmin: detectedAdmin,
-      usageMetadata: data.usageMetadata,
-      usedModel: data.usedModel,
-      customerName: defaultCustName,
-      detectedLoc: detectedLoc || (candidateLocations[0]?.fullLoc || ''),
-      mode: (candidateLocations.length > 0) ? 'candidates' : 'manual'
-    };
+  const proceedWithFinalRecords = (recordsToProceed) => {
+    // 🚨 [사장님 업무 규칙] 출고 모드에서 파싱 완료 시 항상 출고처 확인/선택 게이트 모달을 디폴트로 오픈!
+    if (!hasExistingRecords && currentType === 'out') {
+      const defaultCustName = (candidateLocations[0]?.baseName || rawBranchCandidate || detectedLoc || '').trim();
+      pendingMultiLocState = {
+        records: recordsToProceed,
+        detectedAdmin: detectedAdmin,
+        usageMetadata: data.usageMetadata,
+        usedModel: data.usedModel,
+        customerName: defaultCustName,
+        detectedLoc: detectedLoc || (candidateLocations[0]?.fullLoc || ''),
+        mode: (candidateLocations.length > 0) ? 'candidates' : 'manual'
+      };
 
-    if (candidateLocations.length > 0) {
-      openMultiLocationSelectModal(candidateLocations, defaultCustName, 'candidates');
-    } else {
-      openMultiLocationSelectModal([], defaultCustName, 'manual');
-    }
-    return;
-  }
-
-  // 🚨 [사장님 업무 규칙] 기존 장바구니 품목과의 1줄 통합 (Cross-Page 누적 합산)
-  let mergedIntoExistingCount = 0;
-  if (hasExistingRecords) {
-    newRecords.forEach(newRec => {
-      const matchKey = `${newRec.itemName.replace(/[\s_\-]/g, '').toUpperCase()}__${newRec.color.replace(/[\s_\-]/g, '').toUpperCase()}`;
-      const existingRec = records.find(r => 
-        `${r.itemName.replace(/[\s_\-]/g, '').toUpperCase()}__${(r.color || 'SURTIDO').replace(/[\s_\-]/g, '').toUpperCase()}` === matchKey
-      );
-
-      if (existingRec) {
-        if (currentType === 'out') {
-          existingRec.boxQty = - (Math.abs(existingRec.boxQty || 0) + Math.abs(newRec.boxQty || 0));
-          existingRec.individualQty = - (Math.abs(existingRec.individualQty || 0) + Math.abs(newRec.individualQty || 0));
-        } else {
-          existingRec.boxQty = (existingRec.boxQty || 0) + (newRec.boxQty || 0);
-          existingRec.individualQty = (existingRec.individualQty || 0) + (newRec.individualQty || 0);
-        }
-        if (!existingRec.boxContent && newRec.boxContent) {
-          existingRec.boxContent = newRec.boxContent;
-        }
-        if (newRec.matchRate !== undefined) {
-          existingRec.matchRate = Math.min(existingRec.matchRate || 100, newRec.matchRate);
-        }
-        if (newRec.rawModel && !existingRec.rawModel?.includes(newRec.rawModel)) {
-          existingRec.rawModel = [existingRec.rawModel, newRec.rawModel].filter(Boolean).join(', ');
-        }
-        mergedIntoExistingCount++;
+      if (candidateLocations.length > 0) {
+        openMultiLocationSelectModal(candidateLocations, defaultCustName, 'candidates');
       } else {
-        records.push(newRec);
+        openMultiLocationSelectModal([], defaultCustName, 'manual');
       }
-    });
-  } else {
-    records.push(...newRecords);
-  }
-
-  saveTableData();
-  updateTable();
-  updateTotals();
-  
-  let msg = `🎉 손글씨 주문서 1줄 통합 인식 성공!\n\n총 ${data.results.length}개 원본 행이 ${newRecords.length}개 대표 품목으로 통합되어 장바구니에 적재되었습니다.`;
-  if (mergedIntoExistingCount > 0) {
-    msg += `\n(기존 장바구니에 있던 ${mergedIntoExistingCount}개 동일 품목 라인에 자동 합산되었습니다.)`;
-  }
-  if (!hasExistingRecords) {
-    if (detectedLoc) {
-      msg += `\n출고처: [${detectedLoc}] 자동 선택됨`;
-    } else if (rawBranchCandidate) {
-      msg += `\n⚠️ 주문서 지점명 [${rawBranchCandidate}]이(가) 출고처 목록에 없어 미지정되었습니다. 상단 [출고처]에서 선택해 주세요.`;
+      return;
     }
-    if (detectedAdmin) msg += `\n요청자(관리자): [${detectedAdmin}] 자동 선택됨`;
-  } else {
-    msg += `\n(기존 [${currentLocValue}] 주문서에 이어서 누적 추가됨)`;
-  }
 
-  // ⚡ [핵심] 토큰 소비량을 상단에 먼저 배치 (브라우저 alert 창 높이 제한으로 인한 잘림 원천 방지)
-  if (data.usageMetadata) {
-    const meta = data.usageMetadata;
-    const totalTokens = (meta.totalTokenCount || 0).toLocaleString();
-    const promptTokens = (meta.promptTokenCount || 0).toLocaleString();
-    const outputTokens = (meta.candidatesTokenCount || 0).toLocaleString();
-    const thoughtTokens = meta.thoughtsTokenCount ? meta.thoughtsTokenCount.toLocaleString() : null;
-    const modelName = data.usedModel || 'gemini-3.7-flash';
-    let detail = `입력: ${promptTokens} / 출력: ${outputTokens}`;
-    if (thoughtTokens) {
-      detail += ` / 추론: ${thoughtTokens}`;
+    // 🚨 [사장님 업무 규칙] 기존 장바구니 품목과의 1줄 통합 (Cross-Page 누적 합산)
+    let mergedIntoExistingCount = 0;
+    if (hasExistingRecords) {
+      recordsToProceed.forEach(newRec => {
+        const matchKey = `${newRec.itemName.replace(/[\s_\-]/g, '').toUpperCase()}__${newRec.color.replace(/[\s_\-]/g, '').toUpperCase()}`;
+        const existingRec = records.find(r => 
+          `${r.itemName.replace(/[\s_\-]/g, '').toUpperCase()}__${(r.color || 'SURTIDO').replace(/[\s_\-]/g, '').toUpperCase()}` === matchKey
+        );
+
+        if (existingRec) {
+          if (currentType === 'out') {
+            existingRec.boxQty = - (Math.abs(existingRec.boxQty || 0) + Math.abs(newRec.boxQty || 0));
+            existingRec.individualQty = - (Math.abs(existingRec.individualQty || 0) + Math.abs(newRec.individualQty || 0));
+          } else {
+            existingRec.boxQty = (existingRec.boxQty || 0) + (newRec.boxQty || 0);
+            existingRec.individualQty = (existingRec.individualQty || 0) + (newRec.individualQty || 0);
+          }
+          if (!existingRec.boxContent && newRec.boxContent) {
+            existingRec.boxContent = newRec.boxContent;
+          }
+          if (newRec.matchRate !== undefined) {
+            existingRec.matchRate = Math.min(existingRec.matchRate || 100, newRec.matchRate);
+          }
+          if (newRec.rawModel && !existingRec.rawModel?.includes(newRec.rawModel)) {
+            existingRec.rawModel = [existingRec.rawModel, newRec.rawModel].filter(Boolean).join(', ');
+          }
+          mergedIntoExistingCount++;
+        } else {
+          records.push(newRec);
+        }
+      });
+    } else {
+      records.push(...recordsToProceed);
     }
-    msg += `\n\n⚡ [AI 소비 토큰]: 총 ${totalTokens} 토큰\n(${detail} · ${modelName})`;
-    updateAiTokenPill(data.usageMetadata, data.usedModel);
+
+    saveTableData();
+    updateTable();
+    updateTotals();
+    
+    let msg = `🎉 손글씨 주문서 1줄 통합 인식 성공!\n\n총 ${data.results.length}개 원본 행이 ${recordsToProceed.length}개 대표 품목으로 통합되어 장바구니에 적재되었습니다.`;
+    if (mergedIntoExistingCount > 0) {
+      msg += `\n(기존 장바구니에 있던 ${mergedIntoExistingCount}개 동일 품목 라인에 자동 합산되었습니다.)`;
+    }
+    if (!hasExistingRecords) {
+      if (detectedLoc) {
+        msg += `\n출고처: [${detectedLoc}] 자동 선택됨`;
+      } else if (rawBranchCandidate) {
+        msg += `\n⚠️ 주문서 지점명 [${rawBranchCandidate}]이(가) 출고처 목록에 없어 미지정되었습니다. 상단 [출고처]에서 선택해 주세요.`;
+      }
+      if (detectedAdmin) msg += `\n요청자(관리자): [${detectedAdmin}] 자동 선택됨`;
+    } else {
+      msg += `\n(기존 [${currentLocValue}] 주문서에 이어서 누적 추가됨)`;
+    }
+
+    // ⚡ [핵심] 토큰 소비량을 상단에 먼저 배치 (브라우저 alert 창 높이 제한으로 인한 잘림 원천 방지)
+    if (data.usageMetadata) {
+      const meta = data.usageMetadata;
+      const totalTokens = (meta.totalTokenCount || 0).toLocaleString();
+      const promptTokens = (meta.promptTokenCount || 0).toLocaleString();
+      const outputTokens = (meta.candidatesTokenCount || 0).toLocaleString();
+      const thoughtTokens = meta.thoughtsTokenCount ? meta.thoughtsTokenCount.toLocaleString() : null;
+      const modelName = data.usedModel || 'gemini-3.7-flash';
+      let detail = `입력: ${promptTokens} / 출력: ${outputTokens}`;
+      if (thoughtTokens) {
+        detail += ` / 추론: ${thoughtTokens}`;
+      }
+      msg += `\n\n⚡ [AI 소비 토큰]: 총 ${totalTokens} 토큰\n(${detail} · ${modelName})`;
+      updateAiTokenPill(data.usageMetadata, data.usedModel);
+    }
+
+    const maxDisplay = 10;
+    const displayRecs = recordsToProceed.slice(0, maxDisplay);
+    msg += '\n\n📋 [1줄 통합 적재 내역' + (recordsToProceed.length > maxDisplay ? ` (상위 ${maxDisplay}개 / 총 ${recordsToProceed.length}개)` : '') + ']:\n' + displayRecs.map((rec, i) => {
+      let qtyDesc = '';
+      const b = Math.abs(rec.boxQty);
+      const ind = Math.abs(rec.individualQty);
+      if (b > 0 && ind > 0) qtyDesc = `${b}상자 + ${ind}개`;
+      else if (b > 0) qtyDesc = `${b}상자`;
+      else qtyDesc = `${ind}개 (PZS)`;
+      return ` ${i + 1}. ${rec.itemName} | 컬러: ${rec.color} | ${qtyDesc} (규격: ${rec.boxContent}개/박스)`;
+    }).join('\n');
+
+    if (recordsToProceed.length > maxDisplay) {
+      msg += `\n ... 외 ${recordsToProceed.length - maxDisplay}개 품목 (장바구니 테이블에서 확인 가능)`;
+    }
+
+    alert(msg);
+  };
+
+  // 🔍 [사전 차단 게이트] 마스터 미확인 품목 판별 (일치율 60% 미만이거나 마스터에 없는 품목)
+  const unmatchedIndices = [];
+  newRecords.forEach((r, idx) => {
+    if (!isItemInMasterCatalog(r.itemName) || (r.matchRate !== undefined && r.matchRate < 60)) {
+      unmatchedIndices.push(idx);
+    }
+  });
+
+  if (unmatchedIndices.length > 0) {
+    openUnmatchedTriageModal(newRecords, unmatchedIndices, proceedWithFinalRecords);
+  } else {
+    proceedWithFinalRecords(newRecords);
   }
-
-  const maxDisplay = 10;
-  const displayRecs = newRecords.slice(0, maxDisplay);
-  msg += '\n\n📋 [1줄 통합 적재 내역' + (newRecords.length > maxDisplay ? ` (상위 ${maxDisplay}개 / 총 ${newRecords.length}개)` : '') + ']:\n' + displayRecs.map((rec, i) => {
-    let qtyDesc = '';
-    const b = Math.abs(rec.boxQty);
-    const ind = Math.abs(rec.individualQty);
-    if (b > 0 && ind > 0) qtyDesc = `${b}상자 + ${ind}개`;
-    else if (b > 0) qtyDesc = `${b}상자`;
-    else qtyDesc = `${ind}개 (PZS)`;
-    return ` ${i + 1}. ${rec.itemName} | 컬러: ${rec.color} | ${qtyDesc} (규격: ${rec.boxContent}개/박스)`;
-  }).join('\n');
-
-  if (newRecords.length > maxDisplay) {
-    msg += `\n ... 외 ${newRecords.length - maxDisplay}개 품목 (장바구니 테이블에서 확인 가능)`;
-  }
-
-  alert(msg);
 }
 
 // 전역 클립보드 붙여넣기(Ctrl+V) 이벤트 리스너 (이미지 감지)
@@ -8205,6 +8376,427 @@ window.addEventListener('paste', function(e) {
     }
   }
 });
+
+// -------------------------------------------------------------------
+// ⚠️ 마스터 미확인 품목 판별 및 자동화 처리 게이트웨이 (Pre-Cart Gate)
+// 1) 🏷️ 별명 룰북 연결  2) ✨ 신상품 인라인 마스터 등록  3) ✏️ 오타 재수정
+// -------------------------------------------------------------------
+
+let pendingTriageState = null;
+let quickProdTargetItemIndex = null;
+
+/**
+ * 특정 품명이 마스터 카탈로그(stockDataCache)에 존재하는지 검사
+ */
+function isItemInMasterCatalog(itemName) {
+  if (!stockDataCache || stockDataCache.length === 0) return true; // 캐시 부재 시 통과
+  const cleanTarget = normalizeAliasCleanKey(itemName);
+  return stockDataCache.some(s => normalizeAliasCleanKey(s.name) === cleanTarget);
+}
+
+/**
+ * 미매칭 품목 판별 모달 열기
+ */
+function openUnmatchedTriageModal(allRecords, unmatchedIndices, continuationCallback) {
+  pendingTriageState = {
+    allRecords: allRecords,
+    unmatchedIndices: unmatchedIndices,
+    continuationCallback: continuationCallback,
+    resolvedMap: new Map() // idx -> { status, label, resolvedName }
+  };
+
+  const modal = document.getElementById('unmatchedTriageModal');
+  const badge = document.getElementById('unmatchedCountBadge');
+  if (badge) {
+    badge.textContent = `${unmatchedIndices.length}건 미확인`;
+  }
+  if (modal) {
+    modal.style.display = 'block';
+  }
+
+  renderUnmatchedTriageCards();
+}
+
+/**
+ * 미매칭 품목 카드 목록 렌더링
+ */
+function renderUnmatchedTriageCards() {
+  const container = document.getElementById('unmatchedItemsList');
+  if (!container || !pendingTriageState) return;
+
+  const { allRecords, unmatchedIndices, resolvedMap } = pendingTriageState;
+  let html = '';
+
+  unmatchedIndices.forEach((recordIdx, order) => {
+    const rec = allRecords[recordIdx];
+    const isResolved = resolvedMap.has(recordIdx);
+    const resolvedInfo = resolvedMap.get(recordIdx);
+    const rawDisplay = rec.rawModel || rec.itemName;
+    const colorDisplay = rec.color || 'SURTIDO';
+    const qtyDisplay = `${rec.boxQty ? Math.abs(rec.boxQty) + '상자 ' : ''}${rec.individualQty ? Math.abs(rec.individualQty) + '개' : ''}`.trim() || '1상자';
+
+    html += `
+      <div id="triageCard_${recordIdx}" style="border: 1.5px solid ${isResolved ? '#10b981' : '#f59e0b'}; background: ${isResolved ? '#f0fdf4' : '#fff'}; border-radius: 8px; padding: 12px; transition: all 0.2s;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+          <div>
+            <span style="font-size: 8pt; font-weight: 700; color: #64748b; background: #f1f5f9; padding: 2px 6px; border-radius: 4px; margin-right: 6px;">#${order + 1}</span>
+            <span style="font-size: 10.5pt; font-weight: 800; color: #0f172a;">📷 OCR 추출: <strong>${escapeHtml(rawDisplay)}</strong></span>
+            <span style="font-size: 8.5pt; color: #475569; margin-left: 6px;">(색상: ${escapeHtml(colorDisplay)}, 수량: ${escapeHtml(qtyDisplay)})</span>
+          </div>
+          <div>
+            ${isResolved 
+              ? `<span style="font-size: 8pt; font-weight: 700; color: #059669; background: #d1fae5; border: 1px solid #a7f3d0; padding: 3px 8px; border-radius: 6px;">✅ ${escapeHtml(resolvedInfo.label || '확인 완료')}</span>` 
+              : `<span style="font-size: 8pt; font-weight: 700; color: #b45309; background: #fef3c7; border: 1px solid #fde68a; padding: 3px 8px; border-radius: 6px;">⚠️ 마스터 미확인</span>`}
+          </div>
+        </div>
+
+        ${isResolved ? `
+          <div style="font-size: 8.5pt; color: #065f46; font-weight: 600; padding: 6px 10px; background: #ecfdf5; border-radius: 6px; display: flex; justify-content: space-between; align-items: center;">
+            <span>➡️ 장바구니 반영 품목: <strong>${escapeHtml(rec.itemName)}</strong> (${escapeHtml(rec.color)})</span>
+            <button type="button" onclick="cancelTriageResolution(${recordIdx})" style="background: none; border: none; color: #94a3b8; font-size: 8pt; text-decoration: underline; cursor: pointer;">다시 설정</button>
+          </div>
+        ` : `
+          <!-- 3단계 액션 버튼 바 -->
+          <div id="triageActions_${recordIdx}" style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px;">
+            <button type="button" onclick="toggleTriageAliasInput(${recordIdx})" style="flex: 1; padding: 6px 10px; background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; border-radius: 6px; font-weight: 700; font-size: 8.2pt; cursor: pointer;">
+              🏷️ 기존상품 별명 연결
+            </button>
+            <button type="button" onclick="openQuickProductModal(${recordIdx}, '${escapeHtml(rawDisplay)}', '${escapeHtml(colorDisplay)}', ${rec.boxContent || 0})" style="flex: 1; padding: 6px 10px; background: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; border-radius: 6px; font-weight: 700; font-size: 8.2pt; cursor: pointer;">
+              ✨ 신상품 마스터 등록
+            </button>
+            <button type="button" onclick="toggleTriageTypoInput(${recordIdx})" style="flex: 1; padding: 6px 10px; background: #f8fafc; color: #475569; border: 1px solid #cbd5e1; border-radius: 6px; font-weight: 700; font-size: 8.2pt; cursor: pointer;">
+              ✏️ 오타 직접 수정
+            </button>
+          </div>
+
+          <!-- 별명 연결 인라인 검색 폼 -->
+          <div id="triageAliasBox_${recordIdx}" style="display: none; margin-top: 8px; padding: 8px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px;">
+            <div style="font-size: 8pt; font-weight: 700; color: #1e293b; margin-bottom: 4px;">🔍 연결할 기존 마스터 정식 품명을 검색하세요:</div>
+            <div style="display: flex; gap: 6px;">
+              <input type="text" id="triageAliasInput_${recordIdx}" placeholder="품명 검색 (예: P-4D70)" oninput="filterTriageAliasSuggestions(${recordIdx}, this.value)" style="flex: 1; padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 5px; font-size: 8.8pt;">
+              <button type="button" onclick="toggleTriageAliasInput(${recordIdx})" style="padding: 6px 10px; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 5px; font-size: 8pt;">취소</button>
+            </div>
+            <div id="triageAliasDropdown_${recordIdx}" style="display: none; max-height: 120px; overflow-y: auto; margin-top: 4px; border: 1px solid #cbd5e1; border-radius: 5px; background: #fff;"></div>
+          </div>
+
+          <!-- 오타 수정 인라인 폼 -->
+          <div id="triageTypoBox_${recordIdx}" style="display: none; margin-top: 8px; padding: 8px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px;">
+            <div style="font-size: 8pt; font-weight: 700; color: #1e293b; margin-bottom: 4px;">✏️ 올바른 모델명을 입력하고 [재매칭]을 누르세요:</div>
+            <div style="display: flex; gap: 6px;">
+              <input type="text" id="triageTypoInput_${recordIdx}" value="${escapeHtml(rawDisplay)}" style="flex: 1; padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 5px; font-size: 8.8pt;">
+              <button type="button" onclick="submitTriageTypoFix(${recordIdx})" style="padding: 6px 12px; background: #3b82f6; color: #fff; border: none; border-radius: 5px; font-weight: 700; font-size: 8.2pt; cursor: pointer;">재매칭</button>
+              <button type="button" onclick="toggleTriageTypoInput(${recordIdx})" style="padding: 6px 10px; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 5px; font-size: 8pt;">취소</button>
+            </div>
+          </div>
+        `}
+      </div>
+    `;
+  });
+
+  container.innerHTML = html;
+}
+
+function toggleTriageAliasInput(idx) {
+  const box = document.getElementById(`triageAliasBox_${idx}`);
+  const typoBox = document.getElementById(`triageTypoBox_${idx}`);
+  if (typoBox) typoBox.style.display = 'none';
+  if (box) {
+    box.style.display = box.style.display === 'none' ? 'block' : 'none';
+    if (box.style.display === 'block') {
+      const input = document.getElementById(`triageAliasInput_${idx}`);
+      if (input) {
+        input.focus();
+        filterTriageAliasSuggestions(idx, input.value);
+      }
+    }
+  }
+}
+
+function filterTriageAliasSuggestions(idx, query) {
+  const dd = document.getElementById(`triageAliasDropdown_${idx}`);
+  if (!dd) return;
+  const q = (query || '').trim().toLowerCase();
+  const qClean = q.replace(/[\s_\-\/.,#]+/g, '');
+
+  const uniqueNames = Array.from(new Set((stockDataCache || []).map(s => s.name).filter(Boolean)));
+  const matches = uniqueNames.filter(name => {
+    if (!q) return true;
+    const cleanN = name.toLowerCase().replace(/[\s_\-\/.,#]+/g, '');
+    return cleanN.includes(qClean) || name.toLowerCase().includes(q);
+  }).slice(0, 15);
+
+  if (matches.length === 0) {
+    dd.innerHTML = '<div style="padding: 6px 8px; font-size: 8pt; color: #94a3b8;">일치하는 마스터 품목이 없습니다.</div>';
+    dd.style.display = 'block';
+    return;
+  }
+
+  let html = '';
+  matches.forEach(name => {
+    html += `
+      <div onclick="applyTriageAliasSelect(${idx}, '${escapeHtml(name)}')" 
+           style="padding: 6px 8px; font-size: 8.5pt; color: #1e293b; cursor: pointer; border-bottom: 1px solid #f1f5f9;"
+           onmouseover="this.style.background='#eff6ff'" onmouseout="this.style.background='#fff'">
+        <strong>${escapeHtml(name)}</strong>
+      </div>
+    `;
+  });
+  dd.innerHTML = html;
+  dd.style.display = 'block';
+}
+
+function applyTriageAliasSelect(idx, targetModel) {
+  if (!pendingTriageState) return;
+  const rec = pendingTriageState.allRecords[idx];
+  const raw = rec.rawModel || rec.itemName;
+
+  // 1. 레코드 갱신
+  rec.itemName = targetModel;
+  rec.matchRate = 100;
+  rec.isAlias = true;
+  rec.aliasName = raw;
+
+  // 마스터에서 boxContent 보정
+  const matchedMaster = (stockDataCache || []).find(s => s.name === targetModel);
+  if (matchedMaster && matchedMaster.boxContent) {
+    rec.boxContent = matchedMaster.boxContent;
+  }
+
+  // 2. 클라이언트 룰북 반영
+  const cleanRaw = normalizeAliasCleanKey(raw);
+  PRODUCT_ALIAS_MAP[cleanRaw] = targetModel;
+  PRODUCT_ALIAS_MAP[raw.toUpperCase().trim()] = targetModel;
+
+  // 3. 서버 스프레드시트에 영구 저장
+  const curAdmin = (document.getElementById('admin')?.value || '작업자');
+  if (typeof google !== 'undefined' && google.script && google.script.run) {
+    google.script.run
+      .withSuccessHandler(res => {
+        if (res && res.success) {
+          console.log(`[별명사전] 영구 저장 완료: ${raw} ➡️ ${targetModel}`);
+        }
+      })
+      .saveProductAlias(raw, targetModel, curAdmin);
+  }
+
+  pendingTriageState.resolvedMap.set(idx, { label: `별명 매핑: ${targetModel}`, resolvedName: targetModel });
+  showAppToast(`🏷️ '${raw}' ➡️ '${targetModel}' 별명이 룰북에 영구 등록되었습니다!`, 2500);
+  renderUnmatchedTriageCards();
+}
+
+function toggleTriageTypoInput(idx) {
+  const box = document.getElementById(`triageTypoBox_${idx}`);
+  const aliasBox = document.getElementById(`triageAliasBox_${idx}`);
+  if (aliasBox) aliasBox.style.display = 'none';
+  if (box) {
+    box.style.display = box.style.display === 'none' ? 'block' : 'none';
+    if (box.style.display === 'block') {
+      const input = document.getElementById(`triageTypoInput_${idx}`);
+      if (input) {
+        input.focus();
+        input.select();
+      }
+    }
+  }
+}
+
+function submitTriageTypoFix(idx) {
+  if (!pendingTriageState) return;
+  const input = document.getElementById(`triageTypoInput_${idx}`);
+  const fixedText = (input?.value || '').trim();
+  if (!fixedText) {
+    alert('수정할 모델명을 입력하세요.');
+    return;
+  }
+
+  const rec = pendingTriageState.allRecords[idx];
+  rec.rawModel = fixedText;
+
+  // 마스터 재매칭 시도
+  const match = findBestCatalogMatch(fixedText, stockDataCache, 0.55);
+  if (match) {
+    rec.itemName = match.item.name;
+    rec.color = match.item.color || rec.color;
+    rec.boxContent = match.item.boxContent || rec.boxContent;
+    rec.matchRate = Math.round((match.score || 1.0) * 100);
+    pendingTriageState.resolvedMap.set(idx, { label: `오타 수정 매칭: ${match.item.name}`, resolvedName: match.item.name });
+    showAppToast(`✅ '${match.item.name}'(으)로 자동 재매칭되었습니다!`, 2500);
+  } else {
+    rec.itemName = fixedText;
+    rec.matchRate = 85;
+    pendingTriageState.resolvedMap.set(idx, { label: `오타 수정 적용: ${fixedText}`, resolvedName: fixedText });
+    showAppToast(`✏️ '${fixedText}'(으)로 수정 적용되었습니다.`, 2500);
+  }
+
+  renderUnmatchedTriageCards();
+}
+
+function cancelTriageResolution(idx) {
+  if (!pendingTriageState) return;
+  pendingTriageState.resolvedMap.delete(idx);
+  renderUnmatchedTriageCards();
+}
+
+/**
+ * 미매칭 판별 완료 후 장바구니 반영
+ */
+function confirmUnmatchedTriage() {
+  if (!pendingTriageState) return;
+  const modal = document.getElementById('unmatchedTriageModal');
+  if (modal) modal.style.display = 'none';
+
+  const callback = pendingTriageState.continuationCallback;
+  const finalRecords = pendingTriageState.allRecords;
+  pendingTriageState = null;
+
+  if (typeof callback === 'function') {
+    callback(finalRecords);
+  }
+}
+
+/**
+ * 미매칭 판별 건너뛰고 그대로 장바구니 반영
+ */
+function bypassUnmatchedTriage() {
+  if (!pendingTriageState) return;
+  const modal = document.getElementById('unmatchedTriageModal');
+  if (modal) modal.style.display = 'none';
+
+  const callback = pendingTriageState.continuationCallback;
+  const finalRecords = pendingTriageState.allRecords;
+  pendingTriageState = null;
+
+  if (typeof callback === 'function') {
+    callback(finalRecords);
+  }
+}
+
+// -------------------------------------------------------------------
+// ✨ 신상품 빠른 마스터 등록 모달 (Quick Product Registration)
+// -------------------------------------------------------------------
+
+function openQuickProductModal(itemIndex, defaultName, defaultColor, defaultBoxContent) {
+  quickProdTargetItemIndex = itemIndex;
+  const modal = document.getElementById('quickProductModal');
+  if (!modal) return;
+
+  const nameInput = document.getElementById('quickProdItemName');
+  const colorInput = document.getElementById('quickProdColor');
+  const boxContentInput = document.getElementById('quickProdBoxContent');
+  const safeStockInput = document.getElementById('quickProdSafeStock');
+  const initialStockInput = document.getElementById('quickProdInitialStock');
+  const mfgSelect = document.getElementById('quickProdManufacturer');
+
+  if (nameInput) nameInput.value = defaultName || '';
+  if (colorInput) colorInput.value = defaultColor || 'SURTIDO';
+  if (boxContentInput) boxContentInput.value = defaultBoxContent || 0;
+  if (safeStockInput) safeStockInput.value = 0;
+  if (initialStockInput) initialStockInput.value = 0;
+
+  // 제조사 셀렉트 옵션 복제
+  if (mfgSelect) {
+    const existingMfg = document.getElementById('manufacturer');
+    if (existingMfg && existingMfg.options.length > 1) {
+      mfgSelect.innerHTML = existingMfg.innerHTML;
+    }
+  }
+
+  modal.style.display = 'block';
+  if (nameInput) {
+    nameInput.focus();
+    nameInput.select();
+  }
+}
+
+function closeQuickProductModal() {
+  const modal = document.getElementById('quickProductModal');
+  if (modal) modal.style.display = 'none';
+  quickProdTargetItemIndex = null;
+}
+
+function submitQuickProduct(e) {
+  if (e) e.preventDefault();
+  const name = (document.getElementById('quickProdItemName')?.value || '').trim();
+  const color = (document.getElementById('quickProdColor')?.value || 'SURTIDO').trim();
+  const boxContent = parseInt(document.getElementById('quickProdBoxContent')?.value, 10) || 0;
+  const safeStock = parseInt(document.getElementById('quickProdSafeStock')?.value, 10) || 0;
+  const initialStock = parseInt(document.getElementById('quickProdInitialStock')?.value, 10) || 0;
+  const manufacturer = (document.getElementById('quickProdManufacturer')?.value || '').trim();
+
+  if (!name) {
+    alert('품명을 입력해주세요.');
+    return;
+  }
+
+  const payload = {
+    itemName: name,
+    color: color,
+    boxContent: boxContent,
+    safeStock: safeStock,
+    initialStock: initialStock,
+    manufacturer: manufacturer
+  };
+
+  const submitBtn = document.getElementById('btnSubmitQuickProd');
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.textContent = '⏳ 등록 중...';
+  }
+
+  const onSuccess = (res) => {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = '💾 마스터 등록 완료';
+    }
+    closeQuickProductModal();
+
+    // stockDataCache에 즉시 추가하여 메모리 동기화
+    stockDataCache.push({
+      name: name,
+      color: color,
+      boxContent: boxContent,
+      safeStock: safeStock,
+      initialStock: initialStock,
+      stockBox: initialStock,
+      stockIndividual: 0,
+      manufacturer: manufacturer
+    });
+
+    // 미매칭 항목이 등록된 품목이면 즉시 매칭 완료 처리
+    if (quickProdTargetItemIndex !== null && pendingTriageState) {
+      const rec = pendingTriageState.allRecords[quickProdTargetItemIndex];
+      rec.itemName = name;
+      rec.color = color;
+      rec.boxContent = boxContent;
+      rec.matchRate = 100;
+      pendingTriageState.resolvedMap.set(quickProdTargetItemIndex, {
+        label: `신상품 등록: ${name}`,
+        resolvedName: name
+      });
+      renderUnmatchedTriageCards();
+    }
+
+    showAppToast(`✨ 신상품 '${name}'(이)가 마스터에 성공적으로 등록되었습니다!`, 3000);
+  };
+
+  const onFailure = (err) => {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = '💾 마스터 등록 완료';
+    }
+    alert('상품 등록 실패: ' + (err?.message || err));
+  };
+
+  if (typeof google !== 'undefined' && google.script && google.script.run) {
+    google.script.run
+      .withSuccessHandler(onSuccess)
+      .withFailureHandler(onFailure)
+      .registerProduct([payload]);
+  } else {
+    // 로컬/테스트 폴백
+    onSuccess([{ success: true, record: payload }]);
+  }
+}
 
 // -------------------------------------------------------------------
 // 📝 외부창고 주문서 작성 목록 관리 (Order Draft)
@@ -8994,6 +9586,7 @@ function setupHotkeyShortcuts() {
       closeStockAuditModal();
       closeStockNormalizeModal();
       closeWinterSafeStockModal();
+      closeQuickProductModal();
     }
     // Ctrl + Enter : 그리드 모달이 열려 있을 때 일괄 담기 실행
     else if (e.ctrlKey && e.key === 'Enter') {
