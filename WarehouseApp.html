@@ -1694,6 +1694,7 @@
         <button onclick="setPage('입고입력')" class="active">📥 입고입력</button>
         <button onclick="setPage('출고입력')">📤 출고입력</button>
         <button onclick="setPage('상품등록')">🏷️ 상품등록</button>
+        <button onclick="setPage('재고조정')">📋 재고조정</button>
         <button type="button" onclick="openSubWarehouseMatrixModal()" id="btnNavOrderDraft" title="외부창고 8대 재고 매트릭스 & 주문서 작성">
           <span>📝 주문서작성</span>
           <span id="orderDraftBadge" class="nav-badge" style="display: none;">0</span>
@@ -1742,6 +1743,7 @@
           <div class="table-top-bar">
             <div class="action-buttons">
               <button type="button" class="action-btn btn-ocr" id="btnOcrUpload" onclick="triggerHandwrittenImageUpload()" title="손글씨 주문서/송장 사진 촬영 또는 붙여넣기 (Ctrl+V)">📷 주문서</button>
+              <button type="button" class="action-btn btn-mobile-adj" id="btnOpenMobileAdj" onclick="openMobileStockAdjModal()" title="현장 이동 실사 전용 모바일 간편입력 모달 열기" style="display: none; background: #6366f1; color: #ffffff; font-weight: bold; border: 1px solid #4f46e5;">📱 모바일전용</button>
               <input type="file" id="orderCameraInput" accept="image/*" capture="environment" style="display:none;" onchange="handleImageFileSelect(event)">
               <input type="file" id="orderGalleryInput" accept="image/*" style="display:none;" onchange="handleImageFileSelect(event)">
               <input type="file" id="orderImageFileInput" accept="image/*" style="display:none;" onchange="handleImageFileSelect(event)">
@@ -2114,6 +2116,108 @@
       <div style="display: flex; justify-content: flex-end; gap: 8px;">
         <button type="button" onclick="closeQuickStockModal()" style="padding: 6px 13px; background: #e2e8f0; color: #475569; border: none; border-radius: 5px; font-weight: 600; cursor: pointer; font-size: 8.8pt;">취소</button>
         <button type="button" id="btnSubmitQuickAdj" onclick="submitQuickStockAdjustment()" style="padding: 6px 16px; background: #2563eb; color: #ffffff; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 8.8pt;">💾 재고조정 실행</button>
+      </div>
+    </div>
+
+    <!-- 📱 현장 이동 실사 전용 모바일 간편입력 모달 -->
+    <div id="mobileStockAdjModal" class="modal" style="display: none; width: 94vw; max-width: 480px; max-height: 90vh; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 14px 16px; box-shadow: 0 20px 50px rgba(0,0,0,0.4); flex-direction: column; z-index: 1060; border-radius: 12px; background: #ffffff; box-sizing: border-box; overflow-y: auto;">
+      <!-- 헤더 -->
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px solid #e0e7ff; padding-bottom: 8px; margin-bottom: 10px;">
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span style="font-size: 14pt;">📱</span>
+          <h3 style="margin: 0; color: #4338ca; font-size: 12pt; font-weight: 800;">현장 간편 재고조사</h3>
+        </div>
+        <button type="button" onclick="closeMobileStockAdjModal()" style="background: none; border: none; font-size: 16pt; color: #64748b; cursor: pointer; padding: 0 4px; line-height: 1;">✕</button>
+      </div>
+
+      <!-- 품목 검색 & 스캔 -->
+      <div style="margin-bottom: 10px;">
+        <label style="display: block; font-size: 8.5pt; font-weight: 700; color: #334155; margin-bottom: 3px;">품명 검색 또는 스캔:</label>
+        <div style="display: flex; gap: 6px;">
+          <div style="position: relative; flex: 1;">
+            <input type="text" id="mAdjItemSearch" placeholder="품명 검색 (예: CECI)" autocomplete="off" oninput="filterMobileAdjItems(this.value)" style="width: 100%; box-sizing: border-box; padding: 8px 10px; font-size: 10.5pt; font-weight: 700; border: 2px solid #818cf8; border-radius: 6px;">
+            <div id="mAdjDropdown" class="dropdown-container" style="display: none; position: absolute; top: 100%; left: 0; width: 100%; z-index: 1100; max-height: 180px; overflow-y: auto; background: white; border: 1.5px solid #818cf8; border-radius: 6px; box-shadow: 0 6px 16px rgba(0,0,0,0.15);">
+              <ul id="mAdjSuggestionsList" style="list-style: none; margin: 0; padding: 0;"></ul>
+            </div>
+          </div>
+          <button type="button" onclick="triggerHandwrittenImageUpload()" title="카메라 촬영 또는 사진 첨부" style="padding: 0 12px; background: #6366f1; color: white; border: none; border-radius: 6px; font-size: 12pt; cursor: pointer; display: flex; align-items: center; justify-content: center;">📷</button>
+        </div>
+      </div>
+
+      <!-- 품목 카드 및 스마트 힌트 (선택된 품목) -->
+      <div id="mAdjSelectedCard" style="display: none; margin-bottom: 10px; padding: 10px 12px; background: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 8px;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+          <div>
+            <div id="mAdjCardTitle" style="font-weight: 800; font-size: 11pt; color: #1e293b;">-</div>
+            <div id="mAdjCardSpec" style="font-size: 8.5pt; color: #64748b; margin-top: 2px;">SURTIDO (박스당 0개)</div>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-size: 7.5pt; color: #64748b; font-weight: 600;">현재 전산재고</div>
+            <div id="mAdjCardCurrentStock" style="font-weight: 800; font-size: 11.5pt; color: #0f766e;">0상자 (0개)</div>
+          </div>
+        </div>
+
+        <!-- 💡 스마트 힌트 뱃지 (제안 4번: 중복 실사 감지 및 모드 추천) -->
+        <div id="mAdjSmartHintBadge" style="margin-top: 6px; padding: 5px 8px; border-radius: 4px; font-size: 8pt; font-weight: 700; display: none;"></div>
+      </div>
+
+      <!-- 조정 방식 선택 큼직한 터치 토글 (치환 vs 추가) -->
+      <div style="margin-bottom: 10px;">
+        <label style="display: block; font-size: 8.5pt; font-weight: 700; color: #334155; margin-bottom: 4px;">재고조정유형:</label>
+        <div style="display: flex; gap: 8px;">
+          <button type="button" id="btnMAdjModeReplace" onclick="setMobileAdjMode('replace')" style="flex: 1; padding: 9px 4px; border: 2px solid #3b82f6; background: #eff6ff; color: #1d4ed8; font-weight: 800; font-size: 9.5pt; border-radius: 8px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px; transition: all 0.15s ease;">
+            <span style="font-size: 12pt;">🔄</span>
+            <span>치환 (= 덮어쓰기)</span>
+            <span style="font-size: 7pt; opacity: 0.8; font-weight: normal;">실재고 확정</span>
+          </button>
+          <button type="button" id="btnMAdjModeIncrement" onclick="setMobileAdjMode('increment')" style="flex: 1; padding: 9px 4px; border: 2px solid #cbd5e1; background: #ffffff; color: #475569; font-weight: 800; font-size: 9.5pt; border-radius: 8px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px; transition: all 0.15s ease;">
+            <span style="font-size: 12pt;">➕</span>
+            <span>추가 (+ 누적더하기)</span>
+            <span style="font-size: 7pt; opacity: 0.8; font-weight: normal;">기존재고에 합산</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 수량 입력 & 퀵 증감 버튼 -->
+      <div style="margin-bottom: 10px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+          <label style="font-size: 8.5pt; font-weight: 700; color: #334155;">실사 수량 입력:</label>
+          <div style="display: flex; gap: 8px; font-size: 8pt; font-weight: 700;">
+            <label style="cursor: pointer;"><input type="radio" name="mAdjUnit" value="box" checked onchange="updateMobileAdjUnit()"> 상자</label>
+            <label style="cursor: pointer;"><input type="radio" name="mAdjUnit" value="individual" onchange="updateMobileAdjUnit()"> 낱개</label>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 6px; align-items: center;">
+          <input type="number" id="mAdjQtyInput" min="0" placeholder="수량 입력" oninput="updateMobileAdjLivePreview()" style="flex: 1; padding: 8px 10px; font-size: 14pt; font-weight: 800; text-align: right; border: 2px solid #cbd5e1; border-radius: 6px;">
+          <div style="display: flex; gap: 4px;">
+            <button type="button" onclick="stepMobileAdjQty(1)" style="padding: 7px 10px; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px; font-weight: bold; cursor: pointer;">+1</button>
+            <button type="button" onclick="stepMobileAdjQty(5)" style="padding: 7px 10px; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px; font-weight: bold; cursor: pointer;">+5</button>
+            <button type="button" onclick="stepMobileAdjQty(10)" style="padding: 7px 10px; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px; font-weight: bold; cursor: pointer;">+10</button>
+          </div>
+        </div>
+
+        <!-- 💡 실시간 계산 결과 미리보기 (제안 3번) -->
+        <div id="mAdjLivePreviewBox" style="display: none; margin-top: 6px; padding: 7px 10px; border-radius: 6px; font-size: 9pt; font-weight: 700;">
+        </div>
+      </div>
+
+      <!-- 💾 원터치 저장 & 다음 품목 연속 입력 버튼 (제안 2번: Continuous Loop) -->
+      <div style="margin-bottom: 12px;">
+        <button type="button" id="btnMAdjSaveAndNext" onclick="submitMobileAdjItem(true)" style="width: 100%; padding: 12px 14px; background: linear-gradient(135deg, #2563eb, #1d4ed8); color: white; border: none; border-radius: 8px; font-size: 11pt; font-weight: 800; cursor: pointer; box-shadow: 0 4px 12px rgba(37,99,235,0.3); display: flex; align-items: center; justify-content: center; gap: 6px;">
+          <span>💾 저장 후 다음 품목 ➔</span>
+        </button>
+      </div>
+
+      <!-- 이번 세션 실사 목록 (미니 리스트) -->
+      <div style="border-top: 1.5px solid #f1f5f9; padding-top: 8px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <span style="font-size: 8.5pt; font-weight: 700; color: #475569;">📋 이번 실사 목록 (<span id="mAdjSessionCount">0</span>건)</span>
+          <button type="button" onclick="submitFormFromMobileModal()" style="padding: 4px 10px; background: #16a34a; color: white; border: none; border-radius: 5px; font-size: 8pt; font-weight: 800; cursor: pointer;">🚀 서버 최종 제출</button>
+        </div>
+        <div id="mAdjSessionList" style="max-height: 120px; overflow-y: auto; font-size: 8pt; border: 1px solid #e2e8f0; border-radius: 6px; padding: 4px;">
+          <div style="color: #94a3b8; text-align: center; padding: 12px 0;">아직 입력된 실사 내역이 없습니다.</div>
+        </div>
       </div>
     </div>
 
@@ -2903,6 +3007,49 @@ const typeConfig = {
       <div class="input-row"><label for="initialStock">기초재고:</label><input type="number" id="initialStock" name="initialStock" tabindex="5"></div>
       <div class="input-row"><label for="manufacturer">제조사:</label><select id="manufacturer" name="manufacturer" tabindex="6"><option value="">선택</option></select></div>
     `
+  },
+  'adj': {
+    title: '재고조사', bannerColor: '#ede9fe', processFunction: 'processStockAdjustmentForm',
+    locationsFunction: 'getInitialAdjInvoiceNumber', invoiceFunction: 'getInitialAdjInvoiceNumber',
+    locationLabel: '재고조정유형:', qtyLabel: '실사수량:', invoiceLabel: '조사전표번호:',
+    totalBoxesLabel: '상자: ', totalIndividualsLabel: '낱개: ',
+    tableHeaders: ['품명', '컬러', '실사상자', '실사낱개', '조정유형', '박스당수량', '일치율'],
+    confirmTitle: '재고조사 내역 확인',
+    pendingStorageKey: 'pendingAdjRecordsList',
+    sessionStorageKey: 'pendingAdjRecords',
+    metadataStorageKey: 'pendingAdjMetadata',
+    inputs: `
+      <div class="input-row" style="align-items: center; margin-bottom: 6px; padding: 6px 8px; background: #f5f3ff; border: 1.5px solid #ddd6fe; border-radius: 6px;">
+        <label style="font-weight: 700; color: #4338ca; min-width: 90px; margin-bottom: 0;">재고조정유형:</label>
+        <div class="adj-mode-options" style="display: flex; gap: 14px; align-items: center;">
+          <label style="display: inline-flex; align-items: center; gap: 4px; cursor: pointer; font-weight: 700; color: #1e1b4b; font-size: 9pt;">
+            <input type="radio" name="adjType" value="replace" checked onchange="onAdjTypeRadioChanged(this.value)"> 🔄 치환
+          </label>
+          <label style="display: inline-flex; align-items: center; gap: 4px; cursor: pointer; font-weight: 700; color: #047857; font-size: 9pt;">
+            <input type="radio" name="adjType" value="increment" onchange="onAdjTypeRadioChanged(this.value)"> ➕ 추가
+          </label>
+        </div>
+      </div>
+      <div class="unit-options">
+        <label><input type="radio" name="unitType" value="box" checked onchange="updateUnitType()"> 상자</label>
+        <label><input type="radio" name="unitType" value="individual" onchange="updateUnitType()"> 낱개</label>
+      </div>
+      <div id="editModeNotice" style="display: none; margin-bottom: 8px; padding: 7px 10px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-weight: 700; color: #1d4ed8; font-size: 8.5pt;">✏️ 레코드 수정 모드 (<span id="editRowNumber">#1행</span>)</span>
+          <button type="button" onclick="cancelEditRecord()" style="background: none; border: none; color: #64748b; font-size: 8.5pt; cursor: pointer; font-weight: 700; padding: 0 4px;" title="수정 취소">✕ 취소</button>
+        </div>
+        <div id="editOcrOriginalContainer" style="font-size: 8pt; color: #334155; margin-top: 4px; line-height: 1.4; word-break: break-all;">
+          📷 OCR 원문: <strong id="editRawModelText" style="color: #1e293b; background: #dbeafe; padding: 1px 4px; border-radius: 3px;">-</strong>
+        </div>
+      </div>
+      <div class="input-row"><label for="itemName">품명:</label><input type="text" id="itemName" name="itemName" autocomplete="off" oninput="filterItems(this.value)" onchange="autoFillColor(); checkItemAuditHint(this.value);" tabindex="2"><div id="customDropdown" class="dropdown-container" style="display: none;"><ul id="itemSuggestionsList"></ul></div></div>
+      <div id="itemAuditHintBox" style="display: none; margin-bottom: 6px; padding: 4px 8px; border-radius: 5px; font-size: 8pt; font-weight: 600;"></div>
+      <div class="input-row"><label for="color">색상:</label><input type="text" id="color" name="color" value="SURTIDO" tabindex="3"></div>
+      <div class="input-row"><label id="qtyLabel">실사수량:</label><input type="text" id="qty" name="qty" tabindex="4" placeholder="수량 (예: 1 또는 10P)" oninput="handleQtyInput(this); updateLiveAdjPreview();"></div>
+      <div id="liveAdjPreviewBox" style="display: none; margin-bottom: 6px; padding: 5px 8px; border-radius: 5px; font-size: 8.2pt; font-weight: 700;"></div>
+      <div class="input-row"><label for="boxContent">박스당수량:</label><input type="number" id="boxContent" name="boxContent" tabindex="5"></div>
+    `
   }
 };
 
@@ -3100,7 +3247,7 @@ function restoreMetadata() {
 
 function setPage(page, initialData = null) {
   if (typeof exitEditMode === 'function') exitEditMode();
-  currentType = page === '입고입력' ? 'in' : page === '출고입력' ? 'out' : 'product';
+  currentType = page === '입고입력' ? 'in' : page === '출고입력' ? 'out' : (page === '재고조정' || page === '재고조사') ? 'adj' : 'product';
   const config = typeConfig[currentType];
   if (!config) {
     alert(`오류: 페이지 유형 '${page}'를 설정할 수 없습니다.`);
@@ -3135,6 +3282,17 @@ function setPage(page, initialData = null) {
     if (locTabLabel) {
       locTabLabel.textContent = currentType === 'in' ? '입고처' : '출고처';
     }
+    const tabBtnLocation = document.getElementById('tabBtn_location');
+    if (tabBtnLocation) {
+      tabBtnLocation.style.display = (currentType === 'adj' || currentType === 'product') ? 'none' : '';
+      if (currentType === 'adj') {
+        switchHotkeyTab('bestseller');
+      }
+    }
+    const cartLocPill = document.getElementById('cartLocationPill');
+    const cartLocDiv = document.getElementById('cartLocationDivider');
+    if (cartLocPill) cartLocPill.style.display = (currentType === 'adj' || currentType === 'product') ? 'none' : 'inline-flex';
+    if (cartLocDiv) cartLocDiv.style.display = (currentType === 'adj' || currentType === 'product') ? 'none' : 'inline';
 
     const btnOcr = document.getElementById('btnOcrUpload');
     if (btnOcr) {
@@ -3142,6 +3300,11 @@ function setPage(page, initialData = null) {
         btnOcr.textContent = '📄 송장스캔 (Ctrl+V)';
         btnOcr.title = '서브창고 화물운송장(Carta de Porte) 송장 사진 붙여넣기(Ctrl+V) 또는 파일 선택 -> 발주분과 실물 대조(델타 반영)';
         btnOcr.style.background = '#0f766e';
+        btnOcr.style.color = '#ffffff';
+      } else if (currentType === 'adj') {
+        btnOcr.textContent = '📋 실사표스캔 (Ctrl+V)';
+        btnOcr.title = '재고조사표(Inventario) 사진 붙여넣기(Ctrl+V) 또는 파일 선택 -> 테이블에 실사 수량 자동 적재';
+        btnOcr.style.background = '#6366f1';
         btnOcr.style.color = '#ffffff';
       } else {
         btnOcr.textContent = '📷 주문서';
@@ -3151,8 +3314,15 @@ function setPage(page, initialData = null) {
       }
     }
 
-    document.querySelectorAll('.menu button').forEach(btn => btn.classList.remove('active'));
-    const activeButton = document.querySelector(`.menu button[onclick="setPage('${page}')"]`);
+    const btnMobileAdj = document.getElementById('btnOpenMobileAdj');
+    if (btnMobileAdj) {
+      btnMobileAdj.style.display = (currentType === 'adj') ? 'inline-flex' : 'none';
+    }
+
+    let activeButton = document.querySelector(`.menu button[onclick="setPage('${page}')"]`);
+    if (!activeButton && (page === '재고조정' || page === '재고조사')) {
+      activeButton = document.querySelector('.menu button[onclick*="재고조정"]') || document.querySelector('.menu button[onclick*="재고조사"]');
+    }
     if (activeButton) activeButton.classList.add('active');
 
     // locationCache 초기화
@@ -3178,6 +3348,8 @@ function setPage(page, initialData = null) {
       if (confirmHeader) {
         if (currentType === 'product') {
           confirmHeader.innerHTML = `<tr>${config.tableHeaders.map(h => `<th>${h}</th>`).join('')}</tr>`;
+        } else if (currentType === 'adj') {
+          confirmHeader.innerHTML = `<tr><th>품명</th><th>컬러</th><th>실사상자</th><th>실사낱개</th><th>조정유형</th><th>박스당수량</th><th>일치율</th></tr>`;
         } else {
           const qtyLabelText = currentType === 'in' ? '입고' : '출고';
           const locLabelText = currentType === 'in' ? '입고처' : '출고처';
@@ -3185,7 +3357,9 @@ function setPage(page, initialData = null) {
         }
       }
       if (currentType !== 'product') {
-        loadDropdowns();
+        if (currentType !== 'adj') {
+          loadDropdowns();
+        }
         getInitialInvoice();
       }
       if (currentType === 'product') {
@@ -3649,8 +3823,8 @@ function addRecord() {
   const colorInput = document.getElementById('color');
   const boxContentInput = document.getElementById('boxContent');
   const locationSelect = document.getElementById('location');
-  if (!unitTypeRadio || !qtyInput || !itemNameInput || !colorInput || !boxContentInput || !locationSelect) {
-    alert('입출고 폼의 일부 요소를 찾을 수 없습니다.');
+  if (!unitTypeRadio || !qtyInput || !itemNameInput || !colorInput || !boxContentInput) {
+    alert('입력 폼의 일부 요소를 찾을 수 없습니다.');
     return;
   }
   const rawQtyStr = (qtyInput.value || '').trim();
@@ -3666,10 +3840,27 @@ function addRecord() {
   const itemName = itemNameInput.value.trim();
   const color = colorInput.value;
   const boxContent = parseInt(boxContentInput.value) || 0;
-  const location = locationSelect.value;
-  if (!itemName || !location || (!qty && unitType === 'box') || (!qty && unitType === 'individual')) {
-    alert('필수 항목(품명, 입출고처, 수량)을 입력하세요.');
-    return;
+
+  let location = '';
+  let adjType = 'replace';
+  if (currentType === 'adj') {
+    const adjRadio = document.querySelector('input[name="adjType"]:checked');
+    adjType = adjRadio ? adjRadio.value : 'replace';
+    location = (adjType === 'increment' ? '재고추가' : '재고치환');
+    if (!itemName || (!qty && unitType === 'box') || (!qty && unitType === 'individual')) {
+      alert('필수 항목(품명, 실사수량)을 입력하세요.');
+      return;
+    }
+  } else {
+    if (!locationSelect) {
+      alert('입출고처 선택 요소를 찾을 수 없습니다.');
+      return;
+    }
+    location = locationSelect.value;
+    if (!itemName || !location || (!qty && unitType === 'box') || (!qty && unitType === 'individual')) {
+      alert('필수 항목(품명, 입출고처, 수량)을 입력하세요.');
+      return;
+    }
   }
 
   const stockInfo = checkItemAndStock(itemName, color, boxContent, qty, unitType);
@@ -3701,13 +3892,18 @@ function addRecord() {
   const formData = {
     itemName,
     color,
-    boxQty: unitType === 'box' ? (currentType === 'in' ? qty : -qty) : 0,
-    individualQty: unitType === 'individual' ? (currentType === 'in' ? qty : -qty) : 0,
+    boxQty: unitType === 'box' ? (currentType === 'out' ? -qty : qty) : 0,
+    individualQty: unitType === 'individual' ? (currentType === 'out' ? -qty : qty) : 0,
     boxContent,
     location,
     unitType,
-    matchRate: 100
+    matchRate: 100,
+    adjType: currentType === 'adj' ? adjType : undefined
   };
+
+  if (currentType === 'adj' && typeof recordStockAuditHistory === 'function') {
+    recordStockAuditHistory(itemName, color, formData.boxQty, formData.individualQty, adjType);
+  }
 
   if (currentType === 'out' && unitType === 'individual') {
     const proceed = confirm('낱개출고입니다. 진행할까요?');
@@ -3919,6 +4115,64 @@ function updateTable() {
           <td>${rec.safeStock}</td>
           <td>${rec.initialStock}</td>
           <td>${escapeHtml(rec.manufacturer || '')}</td>
+        </tr>
+      `;
+    } else if (currentType === 'adj') {
+      let curBox = 0;
+      let curIndiv = 0;
+      let stockDisplay = '';
+
+      if (stockExactMap) {
+        const recCleanName = (rec.itemName || '').replace(/[\s_\-]/g, '').toLowerCase();
+        const recCleanColor = (rec.color || 'SURTIDO').trim().toLowerCase();
+        const sInfo = stockExactMap.get(recCleanName + '__' + recCleanColor)
+                   || stockSurtidoMap.get(recCleanName)
+                   || stockNameMap.get(recCleanName)
+                   || null;
+        curBox = sInfo ? (sInfo.stockBox || 0) : 0;
+        curIndiv = sInfo ? (sInfo.stockIndividual || 0) : 0;
+        stockDisplay = `<span class="no-print stock-avail-tag" style="background: #f1f5f9; color: #475569; border-color: #cbd5e1;">현재(${curBox}+${curIndiv})</span>`;
+      }
+
+      const isRepl = (rec.adjType !== 'increment');
+      const bQty = Math.abs(rec.boxQty || 0);
+      const iQty = Math.abs(rec.individualQty || 0);
+      const expectedBox = isRepl ? bQty : (curBox + bQty);
+      const diffBox = isRepl ? (bQty - curBox) : bQty;
+      const diffBoxStr = diffBox >= 0 ? `+${diffBox}` : `${diffBox}`;
+      const diffColor = diffBox < 0 ? '#dc2626' : (diffBox > 0 ? '#16a34a' : '#64748b');
+
+      const adjBadgeHtml = isRepl
+        ? `<button type="button" class="no-print" onclick="toggleRecordAdjType(${idx})" style="background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; border-radius:4px; font-size:7.5pt; font-weight:700; padding:1px 6px; cursor:pointer;" title="클릭하여 [추가] 모드로 전환">🔄 치환</button>`
+        : `<button type="button" class="no-print" onclick="toggleRecordAdjType(${idx})" style="background:#ecfdf5; color:#047857; border:1px solid #a7f3d0; border-radius:4px; font-size:7.5pt; font-weight:700; padding:1px 6px; cursor:pointer;" title="클릭하여 [치환] 모드로 전환">➕ 추가</button>`;
+
+      const previewTag = `
+        <div style="font-size:7.2pt; color:#64748b; margin-top:2px;">
+          ➔ 예상: <strong style="color: #1e293b;">${expectedBox}상자</strong> <span style="color:${diffColor}; font-weight:700;">(${diffBoxStr})</span>
+        </div>
+      `;
+
+      const rate = (rec.matchRate !== undefined && rec.matchRate !== null) ? rec.matchRate : 100;
+      const finalRowStyle = isEditingThisRow ? 'background-color: #eff6ff;' : '';
+
+      html += `
+        <tr class="${editingClass}" style="${finalRowStyle}" ondblclick="enterEditMode(${idx})" title="더블클릭하여 품목 수정">
+          <td><input type="checkbox" class="rowCheckbox" data-index="${idx}" ${isEditingThisRow ? 'checked' : ''}></td>
+          <td>
+            <span style="font-weight: 600;">${escapeHtml(rec.itemName)}</span>
+            ${stockDisplay}
+            ${previewTag}
+          </td>
+          <td>${escapeHtml(rec.color)}</td>
+          <td contenteditable="true" class="editable" onblur="updateRecord(${idx}, 'boxQty', this.textContent)">${rec.boxQty}</td>
+          <td contenteditable="true" class="editable" onblur="updateRecord(${idx}, 'individualQty', this.textContent)">${rec.individualQty}</td>
+          <td style="text-align: center;">${adjBadgeHtml}</td>
+          <td contenteditable="true" class="editable" onblur="updateRecord(${idx}, 'boxContent', this.textContent)">${rec.boxContent}</td>
+          <td style="text-align: center; vertical-align: middle;">
+            <span style="font-weight: 700; font-size: 7.5pt; padding: 2px 5px; border-radius: 9999px; display: inline-flex; align-items: center; justify-content: center; background: #dcfce7; color: #15803d; border: 1px solid #86efac;">
+              ${rate}%
+            </span>
+          </td>
         </tr>
       `;
     } else {
@@ -4174,26 +4428,45 @@ function showConfirmModal() {
   if (!tbody || !confirmModalDiv) return;
   let html = '';
   records.forEach(rec => {
-    html += currentType === 'product' ? `
-      <tr>
-        <td>${escapeHtml(rec.itemName)}</td>
-        <td>${escapeHtml(rec.color)}</td>
-        <td>${rec.boxContent}</td>
-        <td>${rec.safeStock}</td>
-        <td>${rec.initialStock}</td>
-        <td>${escapeHtml(rec.manufacturer || '')}</td>
-      </tr>
-    ` : `
-      <tr>
-        <td>${escapeHtml(rec.itemName)}</td>
-        <td>${escapeHtml(rec.color)}</td>
-        <td>${currentType === 'in' ? rec.boxQty : Math.abs(rec.boxQty)}</td>
-        <td>${currentType === 'in' ? rec.individualQty : Math.abs(rec.individualQty)}</td>
-        <td>${rec.boxContent}</td>
-        <td>${escapeHtml(rec.location)}</td>
-        <td style="text-align: center; font-weight: 700; color: ${(rec.matchRate || 100) >= 80 ? '#15803d' : '#b45309'};">${rec.matchRate !== undefined ? rec.matchRate + '%' : '100%'}</td>
-      </tr>
-    `;
+    if (currentType === 'product') {
+      html += `
+        <tr>
+          <td>${escapeHtml(rec.itemName)}</td>
+          <td>${escapeHtml(rec.color)}</td>
+          <td>${rec.boxContent}</td>
+          <td>${rec.safeStock}</td>
+          <td>${rec.initialStock}</td>
+          <td>${escapeHtml(rec.manufacturer || '')}</td>
+        </tr>
+      `;
+    } else if (currentType === 'adj') {
+      const typeBadge = rec.adjType === 'increment' 
+        ? '<span style="color:#047857; font-weight:700;">➕ 재고추가</span>' 
+        : '<span style="color:#1d4ed8; font-weight:700;">🔄 재고치환</span>';
+      html += `
+        <tr>
+          <td>${escapeHtml(rec.itemName)}</td>
+          <td>${escapeHtml(rec.color)}</td>
+          <td style="font-weight:bold;">${rec.boxQty}상자</td>
+          <td>${rec.individualQty}개</td>
+          <td style="text-align:center;">${typeBadge}</td>
+          <td>${rec.boxContent}</td>
+          <td style="text-align: center; font-weight: 700; color: ${(rec.matchRate || 100) >= 80 ? '#15803d' : '#b45309'};">${rec.matchRate !== undefined ? rec.matchRate + '%' : '100%'}</td>
+        </tr>
+      `;
+    } else {
+      html += `
+        <tr>
+          <td>${escapeHtml(rec.itemName)}</td>
+          <td>${escapeHtml(rec.color)}</td>
+          <td>${currentType === 'in' ? rec.boxQty : Math.abs(rec.boxQty)}</td>
+          <td>${currentType === 'in' ? rec.individualQty : Math.abs(rec.individualQty)}</td>
+          <td>${rec.boxContent}</td>
+          <td>${escapeHtml(rec.location)}</td>
+          <td style="text-align: center; font-weight: 700; color: ${(rec.matchRate || 100) >= 80 ? '#15803d' : '#b45309'};">${rec.matchRate !== undefined ? rec.matchRate + '%' : '100%'}</td>
+        </tr>
+      `;
+    }
   });
   tbody.innerHTML = html;
   confirmModalDiv.style.display = 'block';
@@ -4240,6 +4513,24 @@ function confirmSubmit() {
         if (confirmModalDiv) confirmModalDiv.style.display = 'none';
         if (adminSelect) adminSelect.value = 'ADMIN';
         showAppToast('🔄 최신 상품 및 재고를 시트에서 동기화 중입니다...', 2500);
+        loadStockData(true);
+      } else if (type === 'adj') {
+        const count = result.adjustedCount || recordsToPrint.length;
+        const invNum = result.invoiceNumber || result;
+        alert(`✅ [재고조사 처리 완료]\n총 ${count}개 품목의 재고(치환/추가)가 구글 시트에 즉시 반영되었습니다.\n(조사전표번호: ${invNum})`);
+        records = [];
+        updateTable();
+        toggleScroll();
+        currentInvoiceNumber = invNum;
+        const invoiceSpan = document.getElementById('invoiceNumber');
+        if (invoiceSpan) invoiceSpan.textContent = invNum;
+        updateTotals();
+        const storageKey = typeConfig[type] ? typeConfig[type].sessionStorageKey : null;
+        if (storageKey) localStorage.removeItem(storageKey);
+        clearForm();
+        const confirmModalDiv = document.getElementById('confirmModal');
+        if (confirmModalDiv) confirmModalDiv.style.display = 'none';
+        showAppToast('🔄 최신 재고를 시트에서 동기화 중입니다...', 2500);
         loadStockData(true);
       } else {
         alert('입출고가 성공적으로 처리되었습니다.');
@@ -7163,6 +7454,7 @@ function processHandwrittenImageFile(fileOrBlob) {
   const myRun = ++ocrRunToken;
   const targetType = currentType; // 비동기 대기 중 탭 전환 방어용 캡처
   const isInbound = targetType === 'in';
+  const isAdj = targetType === 'adj';
 
   showOcrLoadingModal(true, null, '⚡ 와츠앱급 1600px 초압축 진행 중...');
 
@@ -7171,19 +7463,20 @@ function processHandwrittenImageFile(fileOrBlob) {
 
     showOcrLoadingModal(true, base64Data, `📷 압축 완료: ${compressLog}`);
 
-    // 입고=서브창고 화물운송장(Carta de Porte), 출고=고객 손글씨 주문서
-    callServer(isInbound ? 'analyzeCartaDePorte' : 'analyzeHandwrittenOrder', [base64Data], {
+    // 입고/재고조사=서브창고 송장 및 재고조사표, 출고=고객 손글씨 주문서
+    callServer((isInbound || isAdj) ? 'analyzeCartaDePorte' : 'analyzeHandwrittenOrder', [base64Data], {
       key: 'ocr',
       timeout: 180000,
       onSuccess: res => {
         if (currentType !== targetType) {
-          const what = isInbound ? '송장 분석' : '손글씨 주문서 분석';
-          const where = isInbound ? '입고' : '출고';
+          const what = isAdj ? '재고조사표 분석' : (isInbound ? '송장 분석' : '손글씨 주문서 분석');
+          const where = isAdj ? '재고조사' : (isInbound ? '입고' : '출고');
           alert(`⚠️ ${what}이 완료되었으나 현재 작업 탭이 변경되어(${currentType}) 데이터가 반영되지 않았습니다. ${where} 탭에서 다시 시도해 주세요.`);
           showOcrLoadingModal(false);
           return;
         }
-        if (isInbound) onCartaDePorteExtracted(res);
+        if (isAdj) onStockAuditSheetExtracted(res);
+        else if (isInbound) onCartaDePorteExtracted(res);
         else onHandwrittenExtracted(res);
       },
       onError: onHandwrittenError,
@@ -7233,6 +7526,56 @@ function onCartaDePorteExtracted(res) {
     // 📥 직접 적재 모드: 보류를 안 불러왔더라도 송장 품목들을 바로 테이블에 적재
     loadCartaDePorteDirectly(res);
   }
+}
+
+/**
+ * 📋 재고조사표(Inventario) 파싱 결과 수신 및 실사 테이블 자동 적재
+ */
+function onStockAuditSheetExtracted(res) {
+  showOcrLoadingModal(false);
+  if (!res || !res.items || res.items.length === 0) {
+    alert('⚠️ 재고조사표에서 품목 데이터를 읽지 못했습니다.\n선명한 이미지를 다시 시도해 주세요.');
+    return;
+  }
+
+  if (res.usageMetadata) {
+    updateAiTokenPill(res.usageMetadata, res.usedModel);
+  }
+
+  const adjRadio = document.querySelector('input[name="adjType"]:checked');
+  const currentAdjType = adjRadio ? adjRadio.value : 'replace';
+  const invoiceItems = res.items || [];
+  let addedCount = 0;
+
+  invoiceItems.forEach(inv => {
+    const matchMaster = findBestCatalogMatch(inv.modelo, stockDataCache, 0.6);
+    const itemName = matchMaster ? matchMaster.item.name : inv.modelo;
+    const boxContent = matchMaster ? matchMaster.item.boxContent : 0;
+    const color = inv.color || (matchMaster ? matchMaster.item.color : 'SURTIDO');
+    const matchScore = matchMaster ? Math.round((matchMaster.score || 0.9) * 100) : 70;
+
+    records.push({
+      itemName: itemName,
+      color: color,
+      boxQty: inv.boxes || 0,
+      individualQty: inv.piezas || 0,
+      boxContent: boxContent,
+      location: (currentAdjType === 'increment' ? '재고추가' : '재고치환'),
+      adjType: currentAdjType,
+      unitType: (inv.boxes > 0 ? 'box' : 'individual'),
+      matchRate: matchScore,
+      rawModel: inv.modelo || '',
+      rawColor: inv.color || ''
+    });
+    addedCount++;
+  });
+
+  saveTableData();
+  updateTable();
+  updateTotals();
+
+  const modeLabel = currentAdjType === 'increment' ? '➕ 재고추가' : '🔄 재고치환';
+  alert(`📋 [재고조사표 스캔 완료]\n총 ${addedCount}개 품목이 실사 테이블에 자동 적재되었습니다.\n(현재 선택된 모드: ${modeLabel})\n\n테이블의 수량 및 유형을 눈으로 확인하신 후 [🚀 제출] 버튼을 눌러주세요.`);
 }
 
 /**
@@ -9587,6 +9930,7 @@ function setupHotkeyShortcuts() {
       closeStockNormalizeModal();
       closeWinterSafeStockModal();
       closeQuickProductModal();
+      closeMobileStockAdjModal();
     }
     // Ctrl + Enter : 그리드 모달이 열려 있을 때 일괄 담기 실행
     else if (e.ctrlKey && e.key === 'Enter') {
@@ -9597,6 +9941,506 @@ function setupHotkeyShortcuts() {
       }
     }
   });
+}
+
+// -------------------------------------------------------------------
+// 📋 재고조사 (실사 이력 / 스마트 힌트 / 실시간 계산 / 모바일 전용 모달)
+// -------------------------------------------------------------------
+
+let currentMobileAdjItem = null;
+let currentMobileAdjMode = 'replace'; // 'replace' or 'increment'
+
+function recordStockAuditHistory(itemName, color, box, indiv, adjType) {
+  try {
+    const raw = localStorage.getItem('recent_stock_audits') || '{}';
+    const audits = JSON.parse(raw);
+    const cleanName = (itemName || '').replace(/[\s_\-]/g, '').toLowerCase();
+    const cleanColor = (color || 'SURTIDO').trim().toLowerCase();
+    const key = `${cleanName}__${cleanColor}`;
+    audits[key] = {
+      itemName: itemName,
+      color: color || 'SURTIDO',
+      box: Math.abs(box || 0),
+      indiv: Math.abs(indiv || 0),
+      adjType: adjType,
+      timestamp: Date.now()
+    };
+    localStorage.setItem('recent_stock_audits', JSON.stringify(audits));
+  } catch (e) {}
+}
+
+function getItemAuditHint(itemName, color) {
+  try {
+    const raw = localStorage.getItem('recent_stock_audits');
+    if (!raw) return null;
+    const audits = JSON.parse(raw);
+    const cleanName = (itemName || '').replace(/[\s_\-]/g, '').toLowerCase();
+    const cleanColor = (color || 'SURTIDO').trim().toLowerCase();
+    const key = `${cleanName}__${cleanColor}`;
+    const entry = audits[key];
+    if (!entry) return null;
+
+    const auditDate = new Date(entry.timestamp);
+    const today = new Date();
+    const isToday = (auditDate.getFullYear() === today.getFullYear() &&
+                     auditDate.getMonth() === today.getMonth() &&
+                     auditDate.getDate() === today.getDate());
+
+    const hours = String(auditDate.getHours()).padStart(2, '0');
+    const mins = String(auditDate.getMinutes()).padStart(2, '0');
+    const timeStr = `${hours}:${mins}`;
+    const typeStr = entry.adjType === 'increment' ? '추가' : '치환';
+
+    return {
+      isToday: isToday,
+      timeStr: timeStr,
+      dateStr: `${auditDate.getMonth() + 1}/${auditDate.getDate()}`,
+      box: entry.box,
+      indiv: entry.indiv,
+      typeStr: typeStr,
+      adjType: entry.adjType
+    };
+  } catch (e) {
+    return null;
+  }
+}
+
+function checkItemAuditHint(itemName) {
+  if (currentType !== 'adj') return;
+  const hintBox = document.getElementById('itemAuditHintBox');
+  if (!hintBox) return;
+
+  const colorInput = document.getElementById('color');
+  const color = colorInput ? colorInput.value : 'SURTIDO';
+  const hint = getItemAuditHint(itemName, color);
+
+  if (!hint) {
+    hintBox.style.display = 'none';
+    return;
+  }
+
+  hintBox.style.display = 'block';
+  if (hint.isToday) {
+    hintBox.style.background = '#fef3c7';
+    hintBox.style.border = '1px solid #fde68a';
+    hintBox.style.color = '#92400e';
+    hintBox.innerHTML = `⚠️ 오늘 ${hint.timeStr}에 ${hint.box}상자 실사됨 (${hint.typeStr}) ➔ <strong>[추가]</strong> 모드 추천!`;
+
+    // 💡 제안 4번: 자동으로 추가 모드로 추천 전환
+    const incRadio = document.querySelector('input[name="adjType"][value="increment"]');
+    if (incRadio) {
+      incRadio.checked = true;
+      updateLiveAdjPreview();
+    }
+  } else {
+    hintBox.style.background = '#f1f5f9';
+    hintBox.style.border = '1px solid #cbd5e1';
+    hintBox.style.color = '#475569';
+    hintBox.innerHTML = `ℹ️ 최근 실사: ${hint.dateStr} (${hint.box}상자 ${hint.typeStr}) ➔ <strong>[치환]</strong> 모드 추천`;
+  }
+}
+
+function onAdjTypeRadioChanged(val) {
+  updateLiveAdjPreview();
+}
+
+function updateLiveAdjPreview() {
+  const previewBox = document.getElementById('liveAdjPreviewBox');
+  if (!previewBox) return;
+  if (currentType !== 'adj') {
+    previewBox.style.display = 'none';
+    return;
+  }
+
+  const nameInput = document.getElementById('itemName');
+  const qtyInput = document.getElementById('qty');
+  const colorInput = document.getElementById('color');
+  const itemName = (nameInput ? nameInput.value : '').trim();
+  const rawQty = (qtyInput ? qtyInput.value : '').trim();
+
+  if (!itemName || !rawQty) {
+    previewBox.style.display = 'none';
+    return;
+  }
+
+  const isP = /[pP]$/i.test(rawQty) || /pz$/i.test(rawQty);
+  const qty = parseInt(rawQty.replace(/[^\d]/g, ''), 10) || 0;
+  const adjRadio = document.querySelector('input[name="adjType"]:checked');
+  const adjType = adjRadio ? adjRadio.value : 'replace';
+
+  const cleanName = itemName.replace(/[\s_\-]/g, '').toLowerCase();
+  const cleanColor = (colorInput ? colorInput.value : 'SURTIDO').trim().toLowerCase();
+  let sInfo = null;
+  if (stockDataCache) {
+    sInfo = stockDataCache.find(it => {
+      const itName = (it.name || '').replace(/[\s_\-]/g, '').toLowerCase();
+      const itColor = (it.color || 'SURTIDO').trim().toLowerCase();
+      return itName === cleanName && itColor === cleanColor;
+    }) || stockDataCache.find(it => (it.name || '').replace(/[\s_\-]/g, '').toLowerCase() === cleanName);
+  }
+
+  const curBox = sInfo ? (sInfo.stockBox || 0) : 0;
+  const curIndiv = sInfo ? (sInfo.stockIndividual || 0) : 0;
+
+  previewBox.style.display = 'block';
+  if (adjType === 'replace') {
+    const diff = qty - curBox;
+    const diffStr = diff >= 0 ? `+${diff}` : `${diff}`;
+    const diffColor = diff < 0 ? '#dc2626' : (diff > 0 ? '#16a34a' : '#475569');
+    previewBox.style.background = '#eff6ff';
+    previewBox.style.border = '1px solid #bfdbfe';
+    previewBox.style.color = '#1e40af';
+    previewBox.innerHTML = `🔄 [치환 미리보기] 현재 ${curBox}상자 ➔ 실사 확정: <strong style="font-size: 9.5pt;">${qty}상자</strong> (<span style="color: ${diffColor};">${diffStr}상자 오차</span>)`;
+  } else {
+    const finalBox = curBox + qty;
+    previewBox.style.background = '#ecfdf5';
+    previewBox.style.border = '1px solid #a7f3d0';
+    previewBox.style.color = '#065f46';
+    previewBox.innerHTML = `➕ [추가 미리보기] 기존 ${curBox}상자 + 추가 ${qty}상자 ➔ 최종: <strong style="font-size: 9.5pt;">${finalBox}상자</strong>`;
+  }
+}
+
+function toggleRecordAdjType(idx) {
+  if (idx < 0 || idx >= records.length) return;
+  const current = records[idx].adjType || 'replace';
+  const newType = current === 'increment' ? 'replace' : 'increment';
+  records[idx].adjType = newType;
+  records[idx].location = (newType === 'increment' ? '재고추가' : '재고치환');
+  saveTableData();
+  updateTable();
+  updateTotals();
+}
+
+// -------------------------------------------------------------------
+// 📱 모바일 전용 간편입력 모달 로직
+// -------------------------------------------------------------------
+
+function openMobileStockAdjModal() {
+  const modal = document.getElementById('mobileStockAdjModal');
+  const overlay = document.getElementById('modalOverlay');
+  if (modal) modal.style.display = 'flex';
+  if (overlay) overlay.style.display = 'block';
+
+  currentMobileAdjItem = null;
+  currentMobileAdjMode = 'replace';
+  setMobileAdjMode('replace');
+
+  const card = document.getElementById('mAdjSelectedCard');
+  if (card) card.style.display = 'none';
+
+  const preview = document.getElementById('mAdjLivePreviewBox');
+  if (preview) preview.style.display = 'none';
+
+  const searchInput = document.getElementById('mAdjItemSearch');
+  if (searchInput) {
+    searchInput.value = '';
+    setTimeout(() => { searchInput.focus(); }, 120);
+  }
+
+  const qtyInput = document.getElementById('mAdjQtyInput');
+  if (qtyInput) qtyInput.value = '';
+
+  renderMobileAdjSessionList();
+}
+
+function closeMobileStockAdjModal() {
+  const modal = document.getElementById('mobileStockAdjModal');
+  const overlay = document.getElementById('modalOverlay');
+  if (modal) modal.style.display = 'none';
+  if (overlay) overlay.style.display = 'none';
+}
+
+function setMobileAdjMode(mode) {
+  currentMobileAdjMode = mode;
+  const btnRep = document.getElementById('btnMAdjModeReplace');
+  const btnInc = document.getElementById('btnMAdjModeIncrement');
+  if (btnRep && btnInc) {
+    if (mode === 'replace') {
+      btnRep.style.background = '#eff6ff';
+      btnRep.style.borderColor = '#3b82f6';
+      btnRep.style.color = '#1d4ed8';
+      btnInc.style.background = '#ffffff';
+      btnInc.style.borderColor = '#cbd5e1';
+      btnInc.style.color = '#475569';
+    } else {
+      btnInc.style.background = '#ecfdf5';
+      btnInc.style.borderColor = '#10b981';
+      btnInc.style.color = '#047857';
+      btnRep.style.background = '#ffffff';
+      btnRep.style.borderColor = '#cbd5e1';
+      btnRep.style.color = '#475569';
+    }
+  }
+  updateMobileAdjLivePreview();
+}
+
+function filterMobileAdjItems(query) {
+  const dropdown = document.getElementById('mAdjDropdown');
+  const list = document.getElementById('mAdjSuggestionsList');
+  if (!dropdown || !list) return;
+
+  const q = (query || '').trim().toLowerCase();
+  if (!q || !stockDataCache || stockDataCache.length === 0) {
+    dropdown.style.display = 'none';
+    return;
+  }
+
+  const matched = stockDataCache.filter(it => {
+    const name = (it.name || '').toLowerCase();
+    const color = (it.color || '').toLowerCase();
+    return name.includes(q) || color.includes(q);
+  }).slice(0, 15);
+
+  if (matched.length === 0) {
+    dropdown.style.display = 'none';
+    return;
+  }
+
+  list.innerHTML = matched.map((it, i) => `
+    <li onclick="selectMobileAdjItem(${i})" data-index="${i}" style="padding: 9px 12px; border-bottom: 1px solid #f1f5f9; cursor: pointer; display: flex; justify-content: space-between; align-items: center;">
+      <div>
+        <strong style="color: #1e293b; font-size: 10pt;">${escapeHtml(it.name)}</strong>
+        <span style="font-size: 8.5pt; color: #64748b; margin-left: 4px;">(${escapeHtml(it.color || 'SURTIDO')})</span>
+      </div>
+      <span style="font-size: 8.5pt; font-weight: 700; color: #0d9488;">${it.stockBox}상자</span>
+    </li>
+  `).join('');
+
+  dropdown.style.display = 'block';
+  window._mobileAdjMatched = matched;
+}
+
+function selectMobileAdjItem(index) {
+  const matched = window._mobileAdjMatched;
+  if (!matched || !matched[index]) return;
+  const item = matched[index];
+  currentMobileAdjItem = item;
+
+  const searchInput = document.getElementById('mAdjItemSearch');
+  if (searchInput) searchInput.value = `${item.name} (${item.color || 'SURTIDO'})`;
+
+  const dropdown = document.getElementById('mAdjDropdown');
+  if (dropdown) dropdown.style.display = 'none';
+
+  // 카드 출력
+  const card = document.getElementById('mAdjSelectedCard');
+  const cardTitle = document.getElementById('mAdjCardTitle');
+  const cardSpec = document.getElementById('mAdjCardSpec');
+  const cardStock = document.getElementById('mAdjCardCurrentStock');
+  const hintBadge = document.getElementById('mAdjSmartHintBadge');
+
+  if (card) card.style.display = 'block';
+  if (cardTitle) cardTitle.textContent = item.name;
+  if (cardSpec) cardSpec.textContent = `${item.color || 'SURTIDO'} (박스당 ${item.boxContent || 0}개) | 제조사: ${item.manufacturer || '-'}`;
+  if (cardStock) cardStock.textContent = `${item.stockBox || 0}상자 (${item.stockIndividual || 0}개)`;
+
+  // 💡 스마트 힌트 (제안 4번)
+  const hint = getItemAuditHint(item.name, item.color);
+  if (hint && hintBadge) {
+    hintBadge.style.display = 'block';
+    if (hint.isToday) {
+      hintBadge.style.background = '#fef3c7';
+      hintBadge.style.border = '1px solid #fde68a';
+      hintBadge.style.color = '#92400e';
+      hintBadge.innerHTML = `⚠️ 오늘 ${hint.timeStr}에 ${hint.box}상자 실사됨 (${hint.typeStr}) ➔ [추가] 모드 추천`;
+      setMobileAdjMode('increment');
+    } else {
+      hintBadge.style.background = '#f1f5f9';
+      hintBadge.style.border = '1px solid #cbd5e1';
+      hintBadge.style.color = '#475569';
+      hintBadge.innerHTML = `ℹ️ 최근 실사: ${hint.dateStr} (${hint.box}상자 ${hint.typeStr}) ➔ [치환] 모드 추천`;
+      setMobileAdjMode('replace');
+    }
+  } else if (hintBadge) {
+    hintBadge.style.display = 'block';
+    hintBadge.style.background = '#f8fafc';
+    hintBadge.style.border = '1px solid #e2e8f0';
+    hintBadge.style.color = '#64748b';
+    hintBadge.innerHTML = `✨ 이번 재고조사 첫 실사 ➔ [치환] 모드 추천`;
+    setMobileAdjMode('replace');
+  }
+
+  const qtyInput = document.getElementById('mAdjQtyInput');
+  if (qtyInput) {
+    qtyInput.value = '';
+    setTimeout(() => { qtyInput.focus(); }, 80);
+  }
+
+  updateMobileAdjLivePreview();
+}
+
+function updateMobileAdjUnit() {
+  updateMobileAdjLivePreview();
+}
+
+function stepMobileAdjQty(step) {
+  const qtyInput = document.getElementById('mAdjQtyInput');
+  if (!qtyInput) return;
+  const curVal = parseInt(qtyInput.value, 10) || 0;
+  qtyInput.value = Math.max(0, curVal + step);
+  updateMobileAdjLivePreview();
+}
+
+function updateMobileAdjLivePreview() {
+  const preview = document.getElementById('mAdjLivePreviewBox');
+  if (!preview) return;
+
+  if (!currentMobileAdjItem) {
+    preview.style.display = 'none';
+    return;
+  }
+
+  const qtyInput = document.getElementById('mAdjQtyInput');
+  const qty = parseInt(qtyInput ? qtyInput.value : 0, 10) || 0;
+  const unitRadio = document.querySelector('input[name="mAdjUnit"]:checked');
+  const unit = unitRadio ? unitRadio.value : 'box';
+
+  const curBox = currentMobileAdjItem.stockBox || 0;
+  const curIndiv = currentMobileAdjItem.stockIndividual || 0;
+
+  preview.style.display = 'block';
+  if (currentMobileAdjMode === 'replace') {
+    const diff = qty - (unit === 'box' ? curBox : curIndiv);
+    const diffStr = diff >= 0 ? `+${diff}` : `${diff}`;
+    const diffColor = diff < 0 ? '#dc2626' : (diff > 0 ? '#16a34a' : '#475569');
+    preview.style.background = '#eff6ff';
+    preview.style.border = '1.5px solid #bfdbfe';
+    preview.style.color = '#1e40af';
+    preview.innerHTML = `🔄 [치환 확정] 현재 ${curBox}상자 ➔ 실사: <span style="font-size:11pt; font-weight:800;">${qty}${unit === 'box' ? '상자' : '개'}</span> (<strong style="color:${diffColor};">${diffStr} 변동</strong>)`;
+  } else {
+    const finalVal = (unit === 'box' ? curBox : curIndiv) + qty;
+    preview.style.background = '#ecfdf5';
+    preview.style.border = '1.5px solid #a7f3d0';
+    preview.style.color = '#065f46';
+    preview.innerHTML = `➕ [추가 합산] 기존 ${curBox}상자 + 추가 ${qty}${unit === 'box' ? '상자' : '개'} ➔ 최종: <span style="font-size:11pt; font-weight:800;">${finalVal}${unit === 'box' ? '상자' : '개'}</span>`;
+  }
+}
+
+// 💡 제안 2번: 원터치 저장 & 다음 품목 연속 입력 루프 (Continuous Loop)
+function submitMobileAdjItem(isContinue) {
+  if (!currentMobileAdjItem) {
+    alert('실사할 품목을 먼저 검색하여 선택해주세요.');
+    const searchInput = document.getElementById('mAdjItemSearch');
+    if (searchInput) searchInput.focus();
+    return;
+  }
+
+  const qtyInput = document.getElementById('mAdjQtyInput');
+  const qty = parseInt(qtyInput ? qtyInput.value : 0, 10);
+  if (isNaN(qty) || qty < 0) {
+    alert('실사 수량을 올바르게 입력해주세요.');
+    if (qtyInput) qtyInput.focus();
+    return;
+  }
+
+  const unitRadio = document.querySelector('input[name="mAdjUnit"]:checked');
+  const unit = unitRadio ? unitRadio.value : 'box';
+
+  const newRec = {
+    itemName: currentMobileAdjItem.name,
+    color: currentMobileAdjItem.color || 'SURTIDO',
+    boxQty: unit === 'box' ? qty : 0,
+    individualQty: unit === 'individual' ? qty : 0,
+    boxContent: currentMobileAdjItem.boxContent || 0,
+    location: currentMobileAdjMode === 'increment' ? '재고추가' : '재고치환',
+    adjType: currentMobileAdjMode,
+    unitType: unit,
+    matchRate: 100
+  };
+
+  // 1. 메인 records 배열에 추가
+  records.push(newRec);
+
+  // 2. 실사 이력 로컬 저장
+  recordStockAuditHistory(newRec.itemName, newRec.color, newRec.boxQty, newRec.individualQty, newRec.adjType);
+
+  // 3. 진동 피드백 (모바일 지원 시)
+  if (navigator.vibrate) {
+    try { navigator.vibrate(50); } catch(e) {}
+  }
+
+  // 4. 화면 토스트 알림
+  const modeName = currentMobileAdjMode === 'increment' ? '➕추가' : '🔄치환';
+  showAppToast(`✅ [${modeName}] ${newRec.itemName} (${newRec.boxQty}상자 ${newRec.individualQty}개) 기록 완료`, 1800);
+
+  // 5. 메인 테이블 동기화
+  saveTableData();
+  updateTable();
+  updateTotals();
+
+  // 6. 모바일 미니 목록 갱신
+  renderMobileAdjSessionList();
+
+  if (isContinue) {
+    // 💡 다음 품목 자동 포커스 루프
+    currentMobileAdjItem = null;
+    const card = document.getElementById('mAdjSelectedCard');
+    if (card) card.style.display = 'none';
+
+    const preview = document.getElementById('mAdjLivePreviewBox');
+    if (preview) preview.style.display = 'none';
+
+    if (qtyInput) qtyInput.value = '';
+
+    const searchInput = document.getElementById('mAdjItemSearch');
+    if (searchInput) {
+      searchInput.value = '';
+      searchInput.focus();
+    }
+  }
+}
+
+function renderMobileAdjSessionList() {
+  const countSpan = document.getElementById('mAdjSessionCount');
+  const container = document.getElementById('mAdjSessionList');
+  if (!container) return;
+
+  if (!records || records.length === 0) {
+    if (countSpan) countSpan.textContent = '0';
+    container.innerHTML = `<div style="color: #94a3b8; text-align: center; padding: 12px 0;">아직 입력된 실사 내역이 없습니다.</div>`;
+    return;
+  }
+
+  if (countSpan) countSpan.textContent = String(records.length);
+
+  let html = '';
+  for (let i = records.length - 1; i >= 0; i--) {
+    const r = records[i];
+    const isInc = r.adjType === 'increment';
+    const tag = isInc ? '<span style="color:#047857; font-weight:700;">➕추가</span>' : '<span style="color:#1d4ed8; font-weight:700;">🔄치환</span>';
+    html += `
+      <div style="padding: 5px 8px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <strong style="color: #1e293b;">${escapeHtml(r.itemName)}</strong>
+          <span style="color: #64748b; font-size: 7.5pt;">(${escapeHtml(r.color)})</span>
+          <span style="margin-left: 4px; font-size: 7.5pt;">${tag}</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span style="font-weight: 800; color: #0f766e;">${r.boxQty}상자</span>
+          <button type="button" onclick="deleteMobileSessionItem(${i})" style="background:none; border:none; color:#ef4444; font-weight:bold; cursor:pointer; font-size:9pt; padding:0 2px;">✕</button>
+        </div>
+      </div>
+    `;
+  }
+  container.innerHTML = html;
+}
+
+function deleteMobileSessionItem(index) {
+  if (index < 0 || index >= records.length) return;
+  records.splice(index, 1);
+  saveTableData();
+  updateTable();
+  updateTotals();
+  renderMobileAdjSessionList();
+}
+
+function submitFormFromMobileModal() {
+  if (!records || records.length === 0) {
+    alert('제출할 실사 데이터가 없습니다.');
+    return;
+  }
+  closeMobileStockAdjModal();
+  submitForm();
 }
 
 function bootstrapApp() {

@@ -608,10 +608,16 @@ function generateInvoiceNumber(type) {
   const data = sheet.getRange(2, 1, lastRow - 1, 2).getValues();
   let maxSeq = 0;
 
+  const isAdjType = (type === '재고조사' || type === '재고치환' || type === '재고추가' || type === '재고조정');
+
   for (let i = 0; i < data.length; i++) {
     const inv = String(data[i][0] || '');
     const rowType = String(data[i][1] || '');
-    if (rowType === type && inv.includes('-')) {
+    const isMatch = isAdjType
+      ? (rowType === '재고조사' || rowType === '재고치환' || rowType === '재고추가' || rowType === '재고조정')
+      : (rowType === type);
+
+    if (isMatch && inv.includes('-')) {
       const parts = inv.split('-');
       const invDate = parts[0].replace(/-/g, '/');
       const invSeq = parseInt(parts[1], 10);
@@ -629,6 +635,10 @@ function getInitialInvoiceNumber() {
 
 function getInitialOutInvoiceNumber() {
   return generateInvoiceNumber('출고');
+}
+
+function getInitialAdjInvoiceNumber() {
+  return generateInvoiceNumber('재고조사');
 }
 
 function getMaxSequentialNumber(date, type) {
@@ -2508,6 +2518,176 @@ function processQuickStockAdjustment(adjustments, admin) {
 }
 
 // -------------------------------------------------------------------
+// 📋 재고조사 일괄 처리 (재고치환 / 재고추가 전표 발행 및 원장 반영)
+// -------------------------------------------------------------------
+
+function processStockAdjustmentForm(tableData, admin) {
+  if (!tableData || tableData.length === 0) {
+    throw new Error('처리할 재고조사 데이터가 없습니다.');
+  }
+
+  const lock = LockService.getScriptLock();
+  let cacheWarmed = false;
+  try {
+    lock.waitLock(25000); // 25초 락
+
+    const stockSheet = getSheet(SHEETS.STOCK);
+    const pendingSheet = getSheet(SHEETS.PENDING);
+    const todayStr = formatDate(new Date());
+    const adminName = normalizeText(admin) || 'ADMIN';
+
+    // 1. 재고 데이터 맵 로드
+    ensureSheetColumns(stockSheet, 9);
+    const stockLastRow = stockSheet.getLastRow();
+    const stockMap = buildStockMap(stockSheet, stockLastRow).map;
+
+    // 2. 송장/전표 번호 생성
+    const seq = generateInvoiceNumber('재고조사');
+    const invoiceNumber = `${todayStr}-${seq}`;
+    const pendingRows = [];
+    const updatedKeys = [];
+
+    tableData.forEach(record => {
+      const name = normalizeText(record.itemName);
+      const color = normalizeText(record.color) || DEFAULTS.COLOR;
+      const boxContent = normalizeNumber(record.boxContent);
+      const key = makeKey(name, color, boxContent);
+
+      let current = stockMap[key];
+      if (!current) {
+        current = {
+          name: name,
+          color: color,
+          box: 0,
+          individual: 0,
+          safeStock: normalizeNumber(record.safeStock),
+          boxContent: boxContent,
+          initialStock: 0,
+          manufacturer: normalizeText(record.manufacturer),
+          isDelta: /^(.*?\d+)[A-Za-z]$/i.test(name) || /^([A-Za-z\s_-]+)\d+$/i.test(name)
+        };
+        stockMap[key] = current;
+      }
+
+      const prevBox = normalizeNumber(current.box);
+      const prevIndiv = normalizeNumber(current.individual);
+      const inputBox = normalizeNumber(record.boxQty);
+      const inputIndiv = normalizeNumber(record.individualQty);
+      const adjType = record.adjType === 'increment' ? 'increment' : 'replace';
+      const typeKorean = adjType === 'increment' ? '재고추가' : '재고치환';
+
+      let afterBox = prevBox;
+      let afterIndiv = prevIndiv;
+      let deltaDesc = '';
+
+      if (adjType === 'replace') {
+        // [재고치환] 입력값으로 최종 실재고 덮어쓰기
+        afterBox = inputBox;
+        afterIndiv = inputIndiv;
+        const diffBox = afterBox - prevBox;
+        const diffIndiv = afterIndiv - prevIndiv;
+        const diffBoxStr = diffBox >= 0 ? `+${diffBox}` : `${diffBox}`;
+        const diffIndivStr = diffIndiv >= 0 ? `+${diffIndiv}` : `${diffIndiv}`;
+        deltaDesc = `[치환] ${prevBox}상자 ➔ ${afterBox}상자 (변동: ${diffBoxStr}상자, ${diffIndivStr}개)`;
+      } else {
+        // [재고추가] 기존 재고에 입력값 누적 합산
+        afterBox = prevBox + inputBox;
+        afterIndiv = prevIndiv + inputIndiv;
+        deltaDesc = `[추가] 기존 ${prevBox}상자 + 추가 ${inputBox}상자 ➔ 최종 ${afterBox}상자`;
+      }
+
+      current.box = afterBox;
+      current.individual = afterIndiv;
+
+      const afterStockStr = `${afterBox}박스 ${afterIndiv}개`;
+
+      // PendingSheet 기록 (13열)
+      pendingRows.push([
+        invoiceNumber,
+        typeKorean,
+        new Date(),
+        name,
+        color,
+        inputBox,
+        inputIndiv,
+        boxContent,
+        deltaDesc,
+        adminName,
+        current.manufacturer || '',
+        'ADJUST_PASS',
+        afterStockStr
+      ]);
+
+      updatedKeys.push({
+        key: key,
+        name: name,
+        color: color,
+        box: afterBox,
+        individual: afterIndiv,
+        boxContent: boxContent,
+        adjType: adjType,
+        prevBox: prevBox,
+        prevIndiv: prevIndiv
+      });
+    });
+
+    // 3. 재고시트 일괄 갱신
+    const updatedStockRows = Object.values(stockMap).map(v => [
+      v.name,
+      v.color,
+      v.box,
+      v.individual,
+      v.safeStock,
+      v.boxContent,
+      v.initialStock,
+      v.manufacturer,
+      v.isDelta ? 'Y' : ''
+    ]);
+
+    if (updatedStockRows.length > 0) {
+      ensureSheetCapacity(stockSheet, 2 + updatedStockRows.length - 1);
+      stockSheet.getRange(2, 1, updatedStockRows.length, 9).setValues(updatedStockRows);
+    }
+
+    // 4. PendingSheet 에 '재고치환'/'재고추가' 행 일괄 추가
+    if (pendingRows.length > 0) {
+      ensurePendingSheetColumns(pendingSheet);
+      const pLastRow = Math.max(pendingSheet.getLastRow() + 1, 2);
+      ensureSheetCapacity(pendingSheet, pLastRow + pendingRows.length - 1);
+      pendingSheet.getRange(pLastRow, 1, pendingRows.length, pendingRows[0].length).setValues(pendingRows);
+    }
+    SpreadsheetApp.flush();
+
+    try {
+      cacheWarmed = warmStockCacheFromMap(stockMap);
+    } catch (cErr) {}
+
+    return {
+      success: true,
+      invoiceNumber: invoiceNumber,
+      adjustedCount: pendingRows.length,
+      updatedItems: updatedKeys
+    };
+  } catch (e) {
+    console.error(`processStockAdjustmentForm error: ${e.message}`);
+    throw e;
+  } finally {
+    try {
+      if (!cacheWarmed) {
+        invalidateStockCache();
+      }
+    } catch (finErr) {
+      console.warn(`[Cache] 캐시 무효화 실패: ${finErr.message}`);
+    }
+    try {
+      lock.releaseLock();
+    } catch (lErr) {
+      console.warn(`[Lock] 락 해제 경고: ${lErr.message}`);
+    }
+  }
+}
+
+// -------------------------------------------------------------------
 // 재고 정합성 자동 검사기 (전표 장부 vs 원장 현재고 전수 대사)
 // -------------------------------------------------------------------
 
@@ -2598,7 +2778,7 @@ function verifyStockIntegrity() {
       const item = stockMap[key];
       const indivDelta = (boxQty * (boxContent || item.boxContent || 1)) + indivQty;
 
-      if (type === '입고') {
+      if (type === '입고' || type === '재고추가') {
         item.calculatedTotalIndiv += indivDelta;
         item.inBoxTotal += boxQty;
         item.inIndivTotal += indivQty;
@@ -2606,6 +2786,8 @@ function verifyStockIntegrity() {
         item.calculatedTotalIndiv -= indivDelta;
         item.outBoxTotal += boxQty;
         item.outIndivTotal += indivQty;
+      } else if (type === '재고치환' || type === '재고조정') {
+        item.calculatedTotalIndiv = indivDelta;
       }
     });
   }
