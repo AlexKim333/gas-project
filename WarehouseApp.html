@@ -10231,19 +10231,20 @@ function filterMobileAdjItems(query) {
     return;
   }
 
-  const aliasInfo = typeof resolveModelAlias === 'function' ? resolveModelAlias(query) : null;
-  const targetClean = aliasInfo ? aliasInfo.targetModel.toLowerCase().replace(/[\s_\-\/]/g, '') : null;
-  const qClean = q.replace(/[\s_\-\/]/g, '');
-
+  // 🎯 순수 입력어 포함 조건 (Exact Substring Match)
+  // 사용자가 입력한 검색어(예: '-160')를 하이픈 제거 없이 그대로 포함한 품목만 정확히 매칭
   _mobileAdjAllMatched = stockDataCache.filter(it => {
     const itName = (it.name || '').toLowerCase();
     const itColor = (it.color || '').toLowerCase();
-    const itClean = itName.replace(/[\s_\-\/]/g, '');
-
-    if (itName.includes(q) || itColor.includes(q)) return true;
-    if (qClean && itClean.includes(qClean)) return true;
-    if (targetClean && itClean === targetClean) return true;
-    return false;
+    return itName.includes(q) || itColor.includes(q);
+  }).sort((a, b) => {
+    const aName = (a.name || '').toLowerCase();
+    const bName = (b.name || '').toLowerCase();
+    const aInName = aName.includes(q);
+    const bInName = bName.includes(q);
+    if (aInName && !bInName) return -1;
+    if (!aInName && bInName) return 1;
+    return aName.localeCompare(bName);
   });
 
   if (_mobileAdjAllMatched.length === 0) {
