@@ -2131,6 +2131,37 @@
       <span>현장 실사 모달</span>
     </button>
 
+    <!-- 🚨 중복 실사 감지 팝업 모달 (리스트 볼 필요 없이 자동 롤백 안내) -->
+    <div id="mAdjDuplicatePromptModal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(15, 23, 42, 0.7); z-index: 1070; justify-content: center; align-items: center; padding: 16px; box-sizing: border-box; backdrop-filter: blur(2px);">
+      <div style="background: #ffffff; border-radius: 16px; width: 100%; max-width: 340px; padding: 22px 18px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.35); border: 2.5px solid #f59e0b; text-align: center; box-sizing: border-box;">
+        <div style="font-size: 26pt; margin-bottom: 6px; line-height: 1;">💡</div>
+        <h4 style="margin: 0 0 6px 0; font-size: 12pt; font-weight: 900; color: #1e293b;">이미 실사 목록에 있는 물품입니다!</h4>
+        <div style="margin: 0 0 12px 0;">
+          <strong id="mAdjDupItemName" style="color: #1e1b4b; font-size: 11pt;">품목명</strong>
+          <span id="mAdjDupItemColor" style="color: #64748b; font-size: 9pt; margin-left: 4px;">(SURTIDO)</span>
+        </div>
+        <div style="background: #fef3c7; border: 1.5px solid #fde68a; border-radius: 10px; padding: 10px 12px; margin-bottom: 14px;">
+          <div style="font-size: 8pt; color: #92400e; font-weight: 700;">기존에 입력하신 실사량</div>
+          <div style="font-size: 18pt; font-weight: 900; color: #b45309; margin-top: 2px;">
+            <span id="mAdjDupItemQty">10</span><span id="mAdjDupItemUnit" style="font-size: 11pt; font-weight: 800; margin-left: 2px;">상자</span>
+          </div>
+        </div>
+        <p style="margin: 0 0 16px 0; font-size: 9pt; color: #334155; font-weight: 700; line-height: 1.45;">
+          기존 입력 항목에 새로 발견한 수량을<br/><strong style="color: #059669; font-size: 10pt;">➕ 추가 합산(롤백)</strong>하시겠습니까?
+        </p>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <button type="button" id="btnMAdjDupConfirmYes" onclick="confirmMobileDuplicateRollback()" 
+            style="width: 100%; height: 48px; background: linear-gradient(135deg, #059669, #047857); color: white; border: none; border-radius: 8px; font-size: 11pt; font-weight: 800; cursor: pointer; box-shadow: 0 4px 12px rgba(5,150,105,0.35); display: flex; align-items: center; justify-content: center; gap: 6px;">
+            <span>➕ 예 (기존 수량에 합산 롤백)</span>
+          </button>
+          <button type="button" onclick="closeMobileDuplicatePromptModal()" 
+            style="width: 100%; height: 40px; background: #f8fafc; color: #64748b; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 9.5pt; font-weight: 700; cursor: pointer;">
+            ✕ 아니오 (새 항목으로 별도 입력)
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- 📱 현장 이동 실사 전용 모바일 간편입력 모달 -->
     <div id="mobileStockAdjModal" class="modal" style="display: none; width: 94vw; max-width: 480px; max-height: 90vh; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 14px 16px; box-shadow: 0 20px 50px rgba(0,0,0,0.4); flex-direction: column; z-index: 1060; border-radius: 12px; background: #ffffff; box-sizing: border-box; overflow-y: auto;">
       <!-- 헤더 -->
@@ -2147,7 +2178,7 @@
         <label style="display: block; font-size: 8.5pt; font-weight: 700; color: #334155; margin-bottom: 3px;">품명 검색 또는 스캔:</label>
         <div style="display: flex; gap: 6px;">
           <div style="position: relative; flex: 1;">
-            <input type="text" id="mAdjItemSearch" placeholder="품명 검색 (예: CECI)" autocomplete="off" oninput="filterMobileAdjItems(this.value)" style="width: 100%; box-sizing: border-box; padding: 8px 10px; font-size: 10.5pt; font-weight: 700; border: 2px solid #818cf8; border-radius: 6px;">
+            <input type="text" id="mAdjItemSearch" placeholder="품명 검색 (예: CECI)" autocomplete="off" oninput="filterMobileAdjItems(this.value)" onkeydown="if(event.key === 'Enter'){ handleMobileAdjSearchEnter(); }" style="width: 100%; box-sizing: border-box; padding: 8px 10px; font-size: 10.5pt; font-weight: 700; border: 2px solid #818cf8; border-radius: 6px;">
             <div id="mAdjDropdown" class="dropdown-container" style="display: none; position: absolute; top: 100%; left: 0; width: 100%; z-index: 1100; max-height: 270px; overflow-y: auto; background: white; border: 1.5px solid #818cf8; border-radius: 6px; box-shadow: 0 6px 16px rgba(0,0,0,0.15);">
               <ul id="mAdjSuggestionsList" style="list-style: none; margin: 0; padding: 0;"></ul>
             </div>
@@ -3679,6 +3710,29 @@ function selectItem(name, color, boxContent) {
   boxContentInput.value = boxContent || '';
   dropdownVisible = false;
   hideCustomDropdown();
+
+  // 💡 PC 재고조정 모드에서도 임시 목록에 이미 등록된 품목이면 자동 롤백 확인!
+  if (currentType === 'adj' && Array.isArray(records)) {
+    const cleanName = (name || '').trim().toLowerCase();
+    const cleanColor = (color || 'SURTIDO').trim().toLowerCase();
+    const existingIndex = records.findIndex(r => {
+      const rName = (r.itemName || '').trim().toLowerCase();
+      const rColor = (r.color || 'SURTIDO').trim().toLowerCase();
+      return rName === cleanName && rColor === cleanColor;
+    });
+
+    if (existingIndex >= 0) {
+      const existRec = records[existingIndex];
+      const existQty = (existRec.unitType === 'individual' ? existRec.individualQty : existRec.boxQty) || 0;
+      const existUnit = existRec.unitType === 'individual' ? '개' : '상자';
+      setTimeout(() => {
+        if (confirm(`💡 이미 임시 실사 목록에 등록된 품목입니다!\n\n품목: ${name} (${color || 'SURTIDO'})\n기존 입력: ${existQty}${existUnit}\n\n기존 행(#${existingIndex + 1}번)을 불러와서 수정/합산(롤백)하시겠습니까?`)) {
+          enterEditMode(existingIndex);
+          showAppToast(`🔄 [#${existingIndex + 1}번] 기존 ${existQty}${existUnit} 항목이 수정 폼으로 롤백되었습니다.`, 2000);
+        }
+      }, 100);
+    }
+  }
 }
 
 function autoFillColor() {
@@ -10245,6 +10299,7 @@ function closeMobileStockAdjModal() {
   if (modal) modal.style.display = 'none';
   if (overlay) overlay.style.display = 'none';
   if (dropdown) dropdown.style.display = 'none';
+  if (typeof closeMobileDuplicatePromptModal === 'function') closeMobileDuplicatePromptModal();
   _mobileAdjAllMatched = [];
   editingMobileRecordIndex = -1;
   editingMobileOriginalQty = 0;
@@ -10368,6 +10423,46 @@ function showMoreMobileAdjItems(event) {
   if (searchInput) searchInput.focus();
 }
 
+let pendingMobileDuplicateIndex = -1;
+
+function showMobileDuplicatePromptModal(index, item, existQty, existUnit) {
+  pendingMobileDuplicateIndex = index;
+  const modal = document.getElementById('mAdjDuplicatePromptModal');
+  const nameEl = document.getElementById('mAdjDupItemName');
+  const colorEl = document.getElementById('mAdjDupItemColor');
+  const qtyEl = document.getElementById('mAdjDupItemQty');
+  const unitEl = document.getElementById('mAdjDupItemUnit');
+
+  if (nameEl) nameEl.textContent = item.name;
+  if (colorEl) colorEl.textContent = `(${item.color || 'SURTIDO'})`;
+  if (qtyEl) qtyEl.textContent = String(existQty);
+  if (unitEl) unitEl.textContent = existUnit;
+
+  if (modal) modal.style.display = 'flex';
+}
+
+function closeMobileDuplicatePromptModal() {
+  const modal = document.getElementById('mAdjDuplicatePromptModal');
+  if (modal) modal.style.display = 'none';
+  pendingMobileDuplicateIndex = -1;
+}
+
+function confirmMobileDuplicateRollback() {
+  const idx = pendingMobileDuplicateIndex;
+  closeMobileDuplicatePromptModal();
+  if (idx >= 0 && idx < records.length) {
+    editMobileSessionItem(idx);
+    showAppToast(`🔄 [#${idx + 1}번] 기존 ${records[idx].boxQty || records[idx].individualQty || 0}상자에 추가 합산 모드로 전환되었습니다.`, 2000);
+  }
+}
+
+function handleMobileAdjSearchEnter() {
+  const matched = window._mobileAdjMatched;
+  if (matched && matched.length > 0) {
+    selectMobileAdjItem(0);
+  }
+}
+
 function selectMobileAdjItem(index) {
   const matched = window._mobileAdjMatched;
   if (!matched || !matched[index]) return;
@@ -10401,25 +10496,33 @@ function selectMobileAdjItem(index) {
     return rName === itName && rColor === itColor;
   });
 
-  if (existingSessionIndex >= 0 && hintBadge) {
+  if (existingSessionIndex >= 0) {
     const existRec = records[existingSessionIndex];
     const existQty = (existRec.unitType === 'individual' ? existRec.individualQty : existRec.boxQty) || 0;
     const existUnit = existRec.unitType === 'individual' ? '개' : '상자';
-    hintBadge.style.display = 'block';
-    hintBadge.style.background = '#fef3c7';
-    hintBadge.style.border = '1.5px solid #f59e0b';
-    hintBadge.style.color = '#92400e';
-    hintBadge.innerHTML = `
-      <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
-        <div>
-          <strong style="font-size: 8.5pt;">⚠️ 이번 실사 목록에 이미 ${existQty}${existUnit} 입력됨!</strong><br/>
-          <span style="font-size: 7.5pt; color: #b45309;">다른 구석에서 추가 발견하셨나요?</span>
+
+    // 1. 카드 뱃지에도 명확히 표기
+    if (hintBadge) {
+      hintBadge.style.display = 'block';
+      hintBadge.style.background = '#fef3c7';
+      hintBadge.style.border = '1.5px solid #f59e0b';
+      hintBadge.style.color = '#92400e';
+      hintBadge.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+          <div>
+            <strong style="font-size: 8.5pt;">⚠️ 이번 실사 목록에 이미 ${existQty}${existUnit} 입력됨!</strong><br/>
+            <span style="font-size: 7.5pt; color: #b45309;">다른 구석에서 추가 발견하셨나요?</span>
+          </div>
+          <button type="button" onclick="editMobileSessionItem(${existingSessionIndex})" style="background: #059669; color: white; border: none; padding: 5px 9px; border-radius: 6px; font-size: 8.5pt; font-weight: 800; cursor: pointer; white-space: nowrap; box-shadow: 0 2px 4px rgba(5,150,105,0.3);">
+            ➕ 바로 합산하기
+          </button>
         </div>
-        <button type="button" onclick="editMobileSessionItem(${existingSessionIndex})" style="background: #059669; color: white; border: none; padding: 5px 9px; border-radius: 6px; font-size: 8.5pt; font-weight: 800; cursor: pointer; white-space: nowrap; box-shadow: 0 2px 4px rgba(5,150,105,0.3);">
-          ➕ 바로 합산하기
-        </button>
-      </div>
-    `;
+      `;
+    }
+
+    // 2. 🚀 [대표님 요청 핵심] 리스트 볼 필요 없이 즉시 확인 팝업 모달 띄우기!
+    showMobileDuplicatePromptModal(existingSessionIndex, item, existQty, existUnit);
+    return;
   } else {
     // 💡 스마트 힌트 (제안 4번)
     const hint = getItemAuditHint(item.name, item.color);
