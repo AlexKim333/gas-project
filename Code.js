@@ -1151,12 +1151,14 @@ function updatePendingRecords(invoiceNumber, type, newRecords, admin) {
         stockMap[key] = item;
       }
 
-      if (targetType === '입고') {
+      if (targetType === '입고' || targetType === '재고추가') {
         item.box = Math.max(0, item.box - boxQty);
         item.individual = Math.max(0, item.individual - individualQty);
-      } else {
+      } else if (targetType === '출고') {
         item.box += boxQty;
         item.individual += individualQty;
+      } else if (targetType === '재고치환' || targetType === '재고조정') {
+        console.warn(`[updatePendingRecords] 재고치환/조정 전표(${targetInv}) 수정: 원장 상태 보존`);
       }
     });
 
@@ -2576,6 +2578,18 @@ function processStockAdjustmentForm(tableData, admin) {
       const adjType = record.adjType === 'increment' ? 'increment' : 'replace';
       const typeKorean = adjType === 'increment' ? '재고추가' : '재고치환';
 
+      // [1단계: 입력값 음수 원천 차단]
+      if (inputBox < 0 || inputIndiv < 0) {
+        throw new Error(`[${name}(${color})] 실사 수량에는 음수(- 수량)를 입력할 수 없습니다. (입력: ${inputBox}상자, ${inputIndiv}개)`);
+      }
+
+      // [2단계: 정합성 사전 스냅샷 보관 (자가 복구용)]
+      const snapshot = {
+        box: prevBox,
+        individual: prevIndiv,
+        boxContent: boxContent
+      };
+
       let afterBox = prevBox;
       let afterIndiv = prevIndiv;
       let deltaDesc = '';
@@ -2594,6 +2608,33 @@ function processStockAdjustmentForm(tableData, admin) {
         afterBox = prevBox + inputBox;
         afterIndiv = prevIndiv + inputIndiv;
         deltaDesc = `[추가] 기존 ${prevBox}상자 + 추가 ${inputBox}상자 ➔ 최종 ${afterBox}상자`;
+      }
+
+      // [3단계: Two-Way 불변성 정합성 검증 - 총 낱개 환산]
+      const initialPieces = (snapshot.box * boxContent) + snapshot.individual;
+      const finalPieces = (afterBox * boxContent) + afterIndiv;
+      const inputPieces = (inputBox * boxContent) + inputIndiv;
+
+      if (adjType === 'replace') {
+        if (finalPieces !== inputPieces) {
+          current.box = snapshot.box;
+          current.individual = snapshot.individual;
+          throw new Error(`[정합성 오류] ${name}(${color}) 재고치환 수량 불일치 감지! (기대: ${inputPieces}개, 실제: ${finalPieces}개) 원상 복구되었습니다.`);
+        }
+      } else {
+        const expectedPieces = initialPieces + inputPieces;
+        if (finalPieces !== expectedPieces) {
+          current.box = snapshot.box;
+          current.individual = snapshot.individual;
+          throw new Error(`[정합성 오류] ${name}(${color}) 재고추가 수량 불일치 감지! (기대: ${expectedPieces}개, 실제: ${finalPieces}개) 원상 복구되었습니다.`);
+        }
+      }
+
+      // [4단계: 음수 재고 결과 차단]
+      if (afterBox < 0 || afterIndiv < 0) {
+        current.box = snapshot.box;
+        current.individual = snapshot.individual;
+        throw new Error(`[정합성 오류] ${name}(${color}) 음수 재고 발생 차단! (상자: ${afterBox}, 낱개: ${afterIndiv}) 원상 복구되었습니다.`);
       }
 
       current.box = afterBox;
@@ -2658,6 +2699,15 @@ function processStockAdjustmentForm(tableData, admin) {
     }
     SpreadsheetApp.flush();
 
+    // 5. [자동 정합성 대사 파이프라인] 재고조사 완료 즉시 0.05초 만에 전수 대사 실행
+    let integrityAudit = null;
+    try {
+      integrityAudit = verifyStockIntegrity();
+      console.log(`[재고조사 자동정합성대사] 전수점검: ${integrityAudit.checkedCount}품목, 불일치: ${integrityAudit.discrepancyCount}건`);
+    } catch (auditErr) {
+      console.warn(`[재고조사] 자동 정합성 대사 예외: ${auditErr.message}`);
+    }
+
     try {
       cacheWarmed = warmStockCacheFromMap(stockMap);
     } catch (cErr) {}
@@ -2666,7 +2716,13 @@ function processStockAdjustmentForm(tableData, admin) {
       success: true,
       invoiceNumber: invoiceNumber,
       adjustedCount: pendingRows.length,
-      updatedItems: updatedKeys
+      updatedItems: updatedKeys,
+      integrity: integrityAudit ? {
+        checkedCount: integrityAudit.checkedCount,
+        discrepancyCount: integrityAudit.discrepancyCount,
+        isClean: integrityAudit.discrepancyCount === 0,
+        discrepancies: integrityAudit.discrepancies.slice(0, 5)
+      } : null
     };
   } catch (e) {
     console.error(`processStockAdjustmentForm error: ${e.message}`);

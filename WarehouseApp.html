@@ -4646,7 +4646,15 @@ function confirmSubmit() {
       } else if (type === 'adj') {
         const count = result.adjustedCount || recordsToPrint.length;
         const invNum = result.invoiceNumber || result;
-        alert(`✅ [재고조사 처리 완료]\n총 ${count}개 품목의 재고(치환/추가)가 구글 시트에 즉시 반영되었습니다.\n(조사전표번호: ${invNum})`);
+        let integrityMsg = '';
+        if (result && result.integrity) {
+          if (result.integrity.isClean) {
+            integrityMsg = `\n\n🛡️ [데이터 정합성 자동검증 통과]\n전수 ${result.integrity.checkedCount}개 품목 장부 대사 결과 오차 0건 (100% 무결성 일치)!`;
+          } else {
+            integrityMsg = `\n\n⚠️ [데이터 정합성 주의]\n${result.integrity.discrepancyCount}건의 오차가 감지되었습니다. [재고정합성검사] 메뉴를 확인해 주세요.`;
+          }
+        }
+        alert(`✅ [재고조사 처리 완료]\n총 ${count}개 품목의 재고(치환/추가)가 구글 시트에 즉시 반영되었습니다.\n(조사전표번호: ${invNum})${integrityMsg}`);
         records = [];
         updateTable();
         toggleScroll();
