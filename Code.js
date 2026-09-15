@@ -931,8 +931,30 @@ function processForm(tableData, mode, admin) {
       console.warn(`[Cache] processForm 캐시 갱신 경고: ${cErr.message}`);
     }
 
+    const updatedItems = tableData.map(record => {
+      const name = normalizeText(record.itemName);
+      const color = normalizeText(record.color) || DEFAULTS.COLOR;
+      const boxContent = normalizeNumber(record.boxContent);
+      const key = makeKey(name, color, boxContent);
+      const item = stockMap[key];
+      return item ? {
+        name: item.name,
+        color: item.color,
+        stockBox: item.box,
+        stockIndividual: item.individual,
+        boxContent: item.boxContent,
+        safeStock: item.safeStock,
+        key: key
+      } : null;
+    }).filter(Boolean);
+
     console.log(`processForm 완료: ${invoiceNumber} (${typeKorean} ${pendingRows.length}건)`);
-    return seq;
+    return {
+      success: true,
+      seq: seq,
+      invoiceNumber: invoiceNumber,
+      updatedItems: updatedItems
+    };
   } catch (e) {
     console.error(`processForm error: ${e.message}`);
     throw e;
