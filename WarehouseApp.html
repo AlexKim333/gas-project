@@ -2162,8 +2162,8 @@
       </div>
     </div>
 
-    <!-- 📱 현장 이동 실사 전용 모바일 간편입력 모달 (상단 고정형: 크기 변경 시 아래로만 확장) -->
-    <div id="mobileStockAdjModal" class="modal" style="display: none; width: 94vw; max-width: 480px; max-height: calc(100vh - 32px); top: 16px; left: 50%; transform: translateX(-50%); padding: 14px 16px; box-shadow: 0 20px 50px rgba(0,0,0,0.4); flex-direction: column; z-index: 1060; border-radius: 12px; background: #ffffff; box-sizing: border-box; overflow-y: auto;">
+    <!-- 📱 현장 이동 실사 전용 모바일 간편입력 모달 (최상단 밀착 고정형: 화면 맨 위 4px에서 팝업 & 아래로만 확장) -->
+    <div id="mobileStockAdjModal" class="modal" style="display: none; width: 95vw; max-width: 490px; max-height: calc(100vh - 12px) !important; top: 4px !important; left: 50% !important; transform: translateX(-50%) !important; margin: 0 !important; margin-top: 0 !important; padding: 12px 14px; box-shadow: 0 16px 40px rgba(0,0,0,0.35); flex-direction: column; z-index: 1060; border-radius: 12px; background: #ffffff; box-sizing: border-box; overflow-y: auto;">
       <!-- 헤더 -->
       <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px solid #e0e7ff; padding-bottom: 8px; margin-bottom: 10px;">
         <div style="display: flex; align-items: center; gap: 6px;">
@@ -10255,7 +10255,14 @@ function toggleRecordAdjType(idx) {
 function openMobileStockAdjModal() {
   const modal = document.getElementById('mobileStockAdjModal');
   const overlay = document.getElementById('modalOverlay');
-  if (modal) modal.style.display = 'flex';
+  if (modal) {
+    modal.style.setProperty('top', '4px', 'important');
+    modal.style.setProperty('left', '50%', 'important');
+    modal.style.setProperty('transform', 'translateX(-50%)', 'important');
+    modal.style.setProperty('margin-top', '0px', 'important');
+    modal.style.display = 'flex';
+    modal.scrollTop = 0;
+  }
   if (overlay) overlay.style.display = 'block';
 
   currentMobileAdjItem = null;
