@@ -7493,7 +7493,7 @@ function openImageCropModal(fileOrBlob) {
             cropperInstance = new Cropper(cropImg, {
               viewMode: 1,
               dragMode: 'move',
-              autoCropArea: 0.88, // 영수증 88% 영역을 초기 선택격자로 지정
+              autoCropArea: 1.0, // 🌟 복사한 이미지 100% 전체 영역과 선택격자 1:1 완벽 밀착
               responsive: true,
               restore: false,
               guides: true, // 3x3 선택격자선 표시
@@ -7507,7 +7507,19 @@ function openImageCropModal(fileOrBlob) {
               minContainerWidth: 200,
               minContainerHeight: 200,
               ready: function() {
-                console.log('[✂️ Cropper 초기화 완료] 영수증 선택격자 준비됨');
+                // 🌟 이미지 로드 완료 즉시 캔버스 크기(100%)와 1:1로 선택상자 크기 일치
+                try {
+                  const canvasData = cropperInstance.getCanvasData();
+                  cropperInstance.setCropBoxData({
+                    left: canvasData.left,
+                    top: canvasData.top,
+                    width: canvasData.width,
+                    height: canvasData.height
+                  });
+                } catch (e) {
+                  console.warn('setCropBoxData error:', e);
+                }
+                console.log('[✂️ Cropper 초기화 완료] 이미지 100% 크기와 선택상자 일치');
               }
             });
           } else {
@@ -7552,12 +7564,33 @@ function closeImageCropModal() {
 function rotateCropImage(deg) {
   if (cropperInstance) {
     cropperInstance.rotate(deg || 90);
+    setTimeout(() => {
+      try {
+        const canvasData = cropperInstance.getCanvasData();
+        cropperInstance.setCropBoxData({
+          left: canvasData.left,
+          top: canvasData.top,
+          width: canvasData.width,
+          height: canvasData.height
+        });
+      } catch (e) {}
+    }, 60);
   }
 }
 
 function resetCropArea() {
   if (cropperInstance) {
-    cropperInstance.reset();
+    try {
+      const canvasData = cropperInstance.getCanvasData();
+      cropperInstance.setCropBoxData({
+        left: canvasData.left,
+        top: canvasData.top,
+        width: canvasData.width,
+        height: canvasData.height
+      });
+    } catch (e) {
+      cropperInstance.reset();
+    }
   }
 }
 
