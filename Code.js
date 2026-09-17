@@ -38,7 +38,13 @@ const sheetCache = {};
 
 function getSheet(name) {
   if (!sheetCache[name]) {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let ss = null;
+    try {
+      ss = SpreadsheetApp.getActiveSpreadsheet();
+    } catch (e) {}
+    if (!ss) {
+      ss = SpreadsheetApp.openById('1CplNv7B6cx_tfoa-o1yo4xTPlyd7b7MEUBvCUxlIlOM');
+    }
     const sheet = ss.getSheetByName(name);
     if (!sheet) {
       const sheets = ss.getSheets();
@@ -3685,6 +3691,11 @@ function doGet(e) {
       return ContentService.createTextOutput(JSON.stringify(result))
         .setMimeType(ContentService.MimeType.JSON);
     }
+    if (action === 'getSubWarehouseStockMatrix') {
+      const result = getSubWarehouseStockMatrix(true);
+      return ContentService.createTextOutput(JSON.stringify(result))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
 
     if (action === 'analyzeWinterSafeStock') {
       const result = analyzeWinterPeakDemandAndSafeStock();
@@ -4194,3 +4205,9 @@ function promptApplyWinterSafeStock() {
     }
   }
 }
+
+function exportSubWarehouseJson() {
+  const result = getSubWarehouseStockMatrix(true);
+  return JSON.stringify(result);
+}
+
