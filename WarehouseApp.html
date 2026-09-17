@@ -5703,6 +5703,25 @@ function printWorkOrder() {
     return sum + (b * bc) + ind;
   }, 0);
 
+  // 1. 빠른 재고 조회를 위한 인덱스 Map 준비 (updateTable과 100% 동일 정밀 매칭)
+  let stockExactMap = null;
+  let stockSurtidoMap = null;
+  let stockNameMap = null;
+  if (stockDataCache && stockDataCache.length > 0) {
+    stockExactMap = new Map();
+    stockSurtidoMap = new Map();
+    stockNameMap = new Map();
+    for (let i = 0; i < stockDataCache.length; i++) {
+      const s = stockDataCache[i];
+      const sCleanName = (s.name || '').replace(/[\s_\-]/g, '').toLowerCase();
+      const sCleanColor = (s.color || 'SURTIDO').trim().toLowerCase();
+      const exactKey = sCleanName + '__' + sCleanColor;
+      if (!stockExactMap.has(exactKey)) stockExactMap.set(exactKey, s);
+      if (sCleanColor === 'surtido' && !stockSurtidoMap.has(sCleanName)) stockSurtidoMap.set(sCleanName, s);
+      if (!stockNameMap.has(sCleanName)) stockNameMap.set(sCleanName, s);
+    }
+  }
+
   let tableRows = '';
   records.forEach((rec, idx) => {
     const b = Math.abs(rec.boxQty || 0);
@@ -5714,10 +5733,27 @@ function printWorkOrder() {
     let indStr = ind > 0 ? `<strong>${ind}</strong>` : '-';
     let bcStr = bc > 0 ? `${bc}` : '-';
 
+    // 📦 [현장 작업자 필수 정보] 현재 전산 실재고(상자+낱개) 정확히 연동
+    let curBox = 0;
+    let curIndiv = 0;
+    if (stockExactMap) {
+      const recCleanName = (rec.itemName || '').replace(/[\s_\-]/g, '').toLowerCase();
+      const recCleanColor = (rec.color || 'SURTIDO').trim().toLowerCase();
+      const sInfo = stockExactMap.get(recCleanName + '__' + recCleanColor)
+                 || stockSurtidoMap.get(recCleanName)
+                 || stockNameMap.get(recCleanName)
+                 || null;
+      curBox = sInfo ? (sInfo.stockBox || 0) : 0;
+      curIndiv = sInfo ? (sInfo.stockIndividual || 0) : 0;
+    }
+
+    const stockColor = (curBox <= 0 && curIndiv <= 0) ? '#dc2626' : '#0284c7';
+    const stockTag = `<span style="font-weight: 700; color: ${stockColor}; font-size: 8.5pt; margin-left: 5px;">(${curBox}+${curIndiv})</span>`;
+
     tableRows += `
       <tr>
         <td style="text-align: center; font-weight: bold; width: 35px;">${idx + 1}</td>
-        <td style="text-align: left; font-weight: bold; padding-left: 8px;">${escapeHtml(rec.itemName)}</td>
+        <td style="text-align: left; font-weight: bold; padding-left: 8px;">${escapeHtml(rec.itemName)} ${stockTag}</td>
         <td style="text-align: center;">${escapeHtml(rec.color || 'SURTIDO')}</td>
         <td style="text-align: center; color: #1e40af;">${bStr}</td>
         <td style="text-align: center; color: #b45309;">${indStr}</td>
